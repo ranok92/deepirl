@@ -59,6 +59,7 @@ def takeExpertInfo(trajectories):
     env = BE.createBoard(display=True)
     actionList = [(0,-1),(1,0),(0,1),(-1,0)]
     mainStateInfo = []
+
     for i in range(trajectories):
 
         state = env.reset()
@@ -71,6 +72,7 @@ def takeExpertInfo(trajectories):
 
             action = env.take_action_from_userKeyboard()
             action = actionList[action]
+
             next_state , reward , done , _ = env.step(action)
             next_state = env.get_state_BallEnv()
             trajInfo.append(next_state)
@@ -78,8 +80,9 @@ def takeExpertInfo(trajectories):
 
         mainStateInfo.append(trajInfo)
 
-
-    np.save('expertstateinfolong_300.npy', mainStateInfo)
+    #need to divide the visitation frequency by the number of trajectories
+    #used to get the visitation frequency
+    np.save('expertstateinfolong_50.npy', mainStateInfo)
     return mainStateInfo
 
 
@@ -115,18 +118,31 @@ def getStateVisitationFrequencyExpert(demofile,stateDict):
 
     info = np.load(demofile)
     total_trajs = len(info)
+    maxlen = -1
+    avglen = 0
+    #find the max length of the given trajectories
+    for traj in info:
+        avglen+= len(traj)
+        if maxlen < len(traj):
+            maxlen = len(traj)
+    print 'Averge length of trajectories :', float(avglen)/total_trajs
+    #stateVisitationDict : a dictionary where keys are numpy arrays describing the states convereted to strings
+    #and corresponding to each of the key is a numpy array of size = max length of the expert trajectories
+    #storing the number of times that state is visited for that particular time
     stateVisitationDict = OrderedDict()
 
     for key in stateDict.keys():
+        #initialize a numpy array of size (maxlen,) corresponding to each of the states
         stateVisitationDict[key] = 0
     #stateDict = OrderedDict()
     for trajinfo in info:
-        for i in range(len(trajinfo)):
+
+        for i in range(len(trajinfo)): #iterating through a single trajectory ,  i is basically the time
             temp = np.array2string(trajinfo[i])
 
             #storing the freq of the state
             if temp not in stateVisitationDict.keys():
-
+                #initialize a numpy array of size (maxlen,) corresponding to each of the states
                 stateVisitationDict[temp] = 0
             #storing which string represents which state
             if temp not in stateDict.keys():
@@ -135,7 +151,7 @@ def getStateVisitationFrequencyExpert(demofile,stateDict):
             stateVisitationDict[temp]+=1
 
     print 'state dict : ',stateDict.keys()
-
+    print 'the state visitationdict :',stateVisitationDict
     print 'done'
     #state dict : a dictionary where key is a string and corresponding value is a numpy array
     #stateVisitationDict : a dictionary where key is a string and corresponding value is a int denoting the frequency
@@ -145,6 +161,8 @@ def getStateVisitationFrequencyExpert(demofile,stateDict):
     #array denotes which state
 
     #we can use the fact that the order of keys entered will be same for both the dictionaries
+
+
     counter = 0
     freqarray = np.zeros([len(stateDict.keys()),1])
     stateLookup = OrderedDict()
@@ -201,15 +219,19 @@ def calculate_gradients(optimizer ,stateRewards , freq_diff):
 
 
 #takes in the parameters of
-def deepMaxEntIRL(costNNparams , policyNNparams , iterations):
+def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,samplingIterations ,acGameplayiteraions):
 
     #initialize both the networks
-    filename = 'expertstateinfo.npy'
+    #filename = 'expertstateinfo.npy'
 
+    #stateDict : a dictionary where key = str(numpy state array) , value : integer index
+    #lookuptable : a dictionary where key : str(numpy array) , value : numpy array
     stateDict,lookputable = getstateDict('no obstacle')
     stateTensor = getStateTensor(lookputable)
-    expertFreq  = getStateVisitationFrequencyExpert(filename,stateDict) #add filename for expert demonstration
-    gamePlayIterations = 100
+
+
+    #expertFreq  = getStateVisitationFrequencyExpert(filename,stateDict) #add filename for expert demonstration
+    gamePlayIterations = acGameplayiteraions
     #policyNetwork = Policy(policyNNparams)
     costNetwork = CostNetwork(costNNparams)
     optimizer = optim.Adam(costNetwork.parameters() , lr = 0.002)
@@ -228,11 +250,15 @@ def deepMaxEntIRL(costNNparams , policyNNparams , iterations):
 
         rlAC = ActorCritic(costNetwork = costNetwork, noofPlays= gamePlayIterations , policy_nn_params = policyNNparams)
         optimalPolicy = rlAC.actorCriticMain()
-        stateFreq = rlAC.compute_state_visitation_freq_sampling(stateDict , 10 )
+
+        expertFreq = rlAC.compute_state_visitation_freq_Expert(stateDict, expertDemofile)
+        stateFreq = rlAC.compute_state_visitation_freq_sampling(stateDict , samplingIterations)
 
 
         print 'expert freq :',expertFreq
+        print np.sum(expertFreq)
         print 'policy freq :',stateFreq
+        print np.sum(stateFreq)
         #get the difference in frequency
         freq_diff = expertFreq - stateFreq
         freq_diff = torch.from_numpy(freq_diff).to(device)
@@ -250,18 +276,22 @@ def deepMaxEntIRL(costNNparams , policyNNparams , iterations):
 
 if __name__=='__main__':
 
-    info = takeExpertInfo(300)
+    #info = takeExpertInfo(50)
 
     stateDict,_ = getstateDict('no obstacle')
-    frqarray = getStateVisitationFrequencyExpert('expertstateinfo.npy',stateDict)
-    print frqarray
+    #frqarray = getStateVisitationFrequencyExpert('expertstateinfolong_50.npy',stateDict)
+
+    demofile = 'expertstateinfolong_50.npy'
     print stateDict
     #p = compute_state_visitation_freq_sampling(stateDict, 10, policy)
     nn_params ={'input': 29 , 'hidden': [3,3] , 'output':1}
     costNNparams = nn_params
     policyNNparams = nn_params
-    iterations = 3
-    deepMaxEntIRL(costNNparams , policyNNparams , iterations)
+    iterations_irl = 300 #number of times the algorithm will go back and forth
+    #between RL and IRL
+    samplingIter = 1000 #no of samples to be played inorder to get the agent state frequency
+    gameplayIter = 1000 #no of iterations in the Actor Critic method to be played
+    deepMaxEntIRL(demofile, costNNparams , policyNNparams , iterations_irl , samplingIter , gameplayIter)
     '''
     costNNparams = {}
     policyNNparams = {}

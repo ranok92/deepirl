@@ -193,7 +193,66 @@ class ActorCritic:
 
         return ref_state
 
-    def compute_state_visitation_freq_sampling(self,stateDict, no_of_trajs = 10):
+
+    def compute_state_visitation_freq_Expert(self, stateDict , trajectoryFile):
+
+        N_STATES = len(stateDict.keys())
+
+        #trajectoryFile was created using a list of lists
+        info = np.load(trajectoryFile)
+        #info is an array of size (no_of_samples_taken,)
+        #for each pos of info, i.e. info[0] is a list of length : number of timesteps in that trajectory
+        #for each timestep there is an array that stores the state information.
+        #i.e. info[i][j] is an array describing the state information
+        #print info
+        no_of_samples = len(info)
+        mu = np.zeros([no_of_samples, N_STATES])
+        reward_array = np.zeros(no_of_samples)
+        avglen = np.zeros(no_of_samples)
+        #loop through each of the trajectories
+        for i in range(no_of_samples):
+            trajReward = 0
+            for t in range(len(info[i])):
+                state = info[i][t]
+                stateIndex = stateDict[np.array2string(state)]
+                mu[i][stateIndex]+=1
+                if t!=0:
+
+                    state_tensor = self.toTensor(state)
+                    reward = self.costNet(state_tensor)
+                    #print 'reward :', reward.size()
+                    trajReward+=reward.item()
+
+            reward_array[i] = np.exp(trajReward)
+            avglen[i] = t
+
+
+        #print 'The reward array :',reward_array
+        #print 'sum of reward_array :', np.sum(reward_array)
+        #normalize the rewards array
+        reward_array = np.divide(reward_array, np.sum(reward_array))
+        print 'Avg length of the trajectories expert:', np.dot(avglen,reward_array)
+        #print 'The normalized reward array :', reward_array
+
+        #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
+        #print 'state visitation freq :', mu
+
+        for i in range(no_of_samples):
+
+            mu[i,:] = mu[i,:]*reward_array[i]
+
+        #print 'state visitation freq array after norm ', mu
+        p =  np.sum(mu,axis=0)
+
+        return np.expand_dims(p,axis=1)
+
+
+
+
+    #calculates the state visitation frequency of an agent
+    #stateDict : a dictionary where key = str(numpy state array) , value : integer index
+    #lookuptable : a dictionary where key : str(numpy array) , value : numpy array
+    def compute_state_visitation_freq_sampling(self,stateDict, no_of_trajs):
 
 
         N_STATES = len(stateDict.keys())
@@ -208,42 +267,83 @@ class ActorCritic:
         multiply the prob with the state visitation for each of the trajectory
         update Z (the normalizing factor)
         '''
-        T = 500
+        T = 400
         # mu[s, t] is the prob of visiting state s at time t
-        mu = np.zeros([N_STATES, T])
+        mu = np.zeros([no_of_samples, N_STATES])
 
         # get the start states
+        avglen = np.zeros(no_of_samples)
+        reward_array = np.zeros(no_of_samples)
+
         for i in range(no_of_samples):
 
             state = self.env.reset() #reset returns the original state info , but here we need the local 29 x 1 vector
             state = self.env.get_state_BallEnv(window_size=5)
 
             stateIndex = stateDict[np.array2string(state)]
-            mu[stateIndex][0]+=1
+            mu[i][stateIndex]+=1
             done = False
+            traj_reward = 0
+            #running for a single trajectory
             for t in range(1,T):
 
-                    state = self.toTensor(state)
-                    action = self.select_action(state,self.policy)
-                    action = self.agent_action_to_WorldActionSimplified(action)
-                    next_state ,reward , done, _ = self.env.step(action)
+                state = self.toTensor(state)
+                action = self.select_action(state,self.policy)
+                action = self.agent_action_to_WorldActionSimplified(action)
+                next_state ,reward , done, _ = self.env.step(action)
+                #******IMP**** state returned from env.step() is different from the state representation being used for the
+                #networks
+                next_state = self.env.get_state_BallEnv(window_size=5)
+                next_state_Index = stateDict[np.array2string(next_state)]
+                #print 'type of next state', next_state.dtype
 
-                    if done:
-                        break
-                    next_state = self.env.get_state_BallEnv(window_size=5)
-                    next_state_Index = stateDict[np.array2string(next_state)]
-                    mu[next_state_Index][t]+=1
-                    state = next_state
+                next_state_tensor = self.toTensor(next_state)
+                reward = self.costNet(next_state_tensor)
+                traj_reward+=reward.item() #keep adding the rewards obtained in each state
 
 
+                mu[i][next_state_Index]+=1
+                state = next_state
+
+                if done:
+                    break
+
+            reward_array[i] = np.exp(traj_reward) #the literature suggests exp(-C(traj)) where C(traj) is the cost of the trajectory
+                                                     #as because we are dealing with rewards, so I removed the negative sign
+            avglen[i] = t
+
+
+        print 'The reward array :',reward_array
+
+        #normalize the rewards array
+        reward_array = np.divide(reward_array, sum(reward_array))
+        print 'Avg length of the trajectories :', np.dot(avglen,reward_array)
+        print 'The normalized reward array :', reward_array
+
+        #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
+        print 'state visitation freq :', mu
+
+        for i in range(no_of_samples):
+
+            mu[i,:] = mu[i,:]*reward_array[i]
+
+        print 'state visitation freq array after norm ', mu
+        p =  np.sum(mu,axis=0)
+
+        return np.expand_dims(p,axis=1)
+        '''
+        print 'Avg length for agent sampling :', avglen/no_of_samples
+        print 'State visitation freq :',mu[:,0],'Sum :',sum(mu[:,0])
         for t in range(1,T):
 
             mu[:,t] = np.divide(mu[:,t],no_of_samples)
 
         p = np.sum(mu,1)
-        p = np.divide(p,no_of_samples)
+        #p = np.divide(p,no_of_samples)
         p = np.expand_dims(p,axis=1)
         return p
+        '''
+
 
     def finish_episode(self):
 
@@ -305,8 +405,7 @@ class ActorCritic:
         #fig = plt.figure(1)
         #lossFig = plt.figure(2)
         plt.clf()
-        print self.eps
-        for i_episode in range(10):
+        for i_episode in range(self.no_of_plays):
             running_reward = self.eps
             state = self.env.reset()
             #env.render()
@@ -350,7 +449,7 @@ class ActorCritic:
                                 self.env.render()
                         self.policy.rewards.append(reward)
                         if done:
-                            print done
+                            #print done
                             break
                         running_reward += reward
                     else:
@@ -393,8 +492,8 @@ class ActorCritic:
 
 if __name__=='__main__':
 
-    cNN  = {'input':29 , 'hidden': [512] , 'output':1}
-    pNN = {'input':29 , 'hidden': [512] , 'output':9}
+    cNN  = {'input':29 , 'hidden': [512 , 128] , 'output':1}
+    pNN = {'input':29 , 'hidden': [512 , 128] , 'output':9}
     costNetwork = CostNetwork(cNN)
     rlAC = ActorCritic(costNetwork=costNetwork , policy_nn_params= pNN ,  noofPlays = 100, Gamma = .9 , Eps = .00001 , storeModels = False , loginterval = 10 , plotinterval = 2)
     p = rlAC.actorCriticMain()
