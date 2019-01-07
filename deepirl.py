@@ -25,6 +25,9 @@ from networks import CostNetwork
 from networks import Policy
 
 
+import os
+import datetime
+
 #GLOBAL PARAMETERS
 
 NN_PARAMS = {'input': 100,
@@ -215,11 +218,20 @@ def calculate_gradients(optimizer ,stateRewards , freq_diff):
 #that has been provided to the method
 #Used policy gradient method (actorCritic)
 #implementation taken from the file ****ballgameActorCritic.py
+def dictToFilename(dict):
 
+    filestr = ''
+
+    for key in dict.keys():
+
+        filestr+=str(dict[key])
+        filestr+='_'
+
+    return filestr
 
 
 #takes in the parameters of
-def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,samplingIterations ,acGameplayiteraions):
+def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,samplingIterations ,acGameplayiteraions,storeInfo = False):
 
     #initialize both the networks
     #filename = 'expertstateinfo.npy'
@@ -240,6 +252,27 @@ def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,sam
 
     #env = BE.createBoard(display =True , static_obstacle_radius= 10 , static_obstacles= 10)
 
+
+    #if storeInfo is true create stuff to store intermediate results
+
+    if storeInfo:
+        curDay = str(datetime.datetime.now().date())
+        curtime = str(datetime.datetime.now().time())
+
+        basePath = 'saved-models-irl/'
+        subPathPolicy = curDay+'/'+curtime+'/'+'PolicyNetwork/'
+        subPathCost = curDay+'/'+curtime+'/'+'CostNetwork/'
+        curDirPolicy = basePath + subPathPolicy
+        curDirCost = basePath + subPathCost
+        fileNamePolicy = 'ActorCritic_'+dictToFilename(policyNNparams)
+
+        fileNameCost = 'ActorCritic_'+dictToFilename(costNNparams)
+        if not os.path.exists(curDirPolicy):
+            os.makedirs(curDirPolicy)
+        if not os.path.exists(curDirCost):
+            os.makedirs(curDirCost)
+
+
     #the main IRL loop
     for i in range(iterations):
 
@@ -247,8 +280,8 @@ def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,sam
         #start with a cost function
 
         #optimize policy for the provided cost function
-
-        rlAC = ActorCritic(costNetwork = costNetwork, noofPlays= gamePlayIterations , policy_nn_params = policyNNparams)
+        fileNamePolicyFull = curDirPolicy+fileNamePolicy+'iteration_'+str(i)+'.h5'
+        rlAC = ActorCritic(costNetwork = costNetwork, noofPlays= gamePlayIterations , policy_nn_params = policyNNparams, storeModels=storeInfo, fileName = fileNamePolicy, basePath = basePath+curDay+'/'+curtime+'/' , iteration = i)
         optimalPolicy = rlAC.actorCriticMain()
 
         expertFreq = rlAC.compute_state_visitation_freq_Expert(stateDict, expertDemofile)
@@ -273,6 +306,12 @@ def deepMaxEntIRL(expertDemofile,costNNparams , policyNNparams , iterations ,sam
 
         optimizer.step()
 
+        if storeInfo:
+
+            torch.save(costNetwork.state_dict(),curDirCost+fileNameCost+'iteration_'+str(i)+'.h5')
+            torch.save(optimalPolicy.state_dict(),fileNamePolicyFull)
+
+
 
 if __name__=='__main__':
 
@@ -287,11 +326,11 @@ if __name__=='__main__':
     nn_params ={'input': 29 , 'hidden': [3,3] , 'output':1}
     costNNparams = nn_params
     policyNNparams = nn_params
-    iterations_irl = 300 #number of times the algorithm will go back and forth
+    iterations_irl = 30 #number of times the algorithm will go back and forth
     #between RL and IRL
-    samplingIter = 1000 #no of samples to be played inorder to get the agent state frequency
-    gameplayIter = 1000 #no of iterations in the Actor Critic method to be played
-    deepMaxEntIRL(demofile, costNNparams , policyNNparams , iterations_irl , samplingIter , gameplayIter)
+    samplingIter = 10 #no of samples to be played inorder to get the agent state frequency
+    gameplayIter = 10 #no of iterations in the Actor Critic method to be played
+    deepMaxEntIRL(demofile, costNNparams , policyNNparams , iterations_irl , samplingIter , gameplayIter ,storeInfo=True)
     '''
     costNNparams = {}
     policyNNparams = {}

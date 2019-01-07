@@ -51,10 +51,10 @@ class HistoryBuffer():
 class ActorCritic:
 
 
-    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} , Gamma = .9 , Eps = .00001 , storeModels = False , loginterval = 10 , plotinterval = 2):
+    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} , Gamma = .9 , Eps = .00001 , storeModels = True , fileName = None, basePath = None ,loginterval = 9 , iteration = None, plotinterval = 2):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+        self.irlIter = iteration
         self.policy = Policy(policy_nn_params).to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=1e-2)
         self.gamma = Gamma
@@ -71,6 +71,9 @@ class ActorCritic:
         self.logInterval = loginterval
         self.plotInterval = plotinterval
         self.move_list = [(1,1) , (1,-1) , (1, 0) , (0,1) , (0,-1),(0,0) , (-1,1),(-1,0),(-1,-1)]
+        self.basePath = basePath
+        self.fileName = fileName
+
 
     def block_to_arrpos(self,window_size,x,y):
 
@@ -386,12 +389,19 @@ class ActorCritic:
             filename = 'actorCriticWindow5History'
             curDay = str(datetime.datetime.now().date())
             curtime = str(datetime.datetime.now().time())
-            basePath = 'saved-models_trainBlock' +'/evaluatedPoliciesTest/'
+            if self.basePath is None:
+                self.basePath = 'saved-models_trainBlock' +'/evaluatedPoliciesTest/'
             subPath = curDay + '/' + curtime + '/'
-            curDir = basePath + subPath
-            os.makedirs(curDir)
-            if os.path.exists(curDir):
-                print "YES"
+            curDir = self.basePath + subPath
+            plotDir = 'saved_plots/actorCritic/'
+
+            if filename==None:
+                os.makedirs(curDir)
+
+            if self.basePath is not None:
+                os.makedirs(self.basePath+'ploting_'+str(self.irlIter))
+            #if os.path.exists(curDir):
+            #    print "YES"
 
         #******************************
 
@@ -470,10 +480,15 @@ class ActorCritic:
 
             if self.StoreModels:
                 if i_episode%self.plotInterval==0:
-                    plt.savefig('saved_plots/actorCritic/plotNo{}'.format(i_episode))
+                    if self.basePath!=None:
+                        plt.savefig(self.basePath+'ploting_'+str(self.irlIter)+'/plotNo{}'.format(i_episode))
                 #print 'The running reward for episode {}:'.format(i_episode),running_reward
                 if i_episode%self.logInterval==0:
-                    torch.save(self.policy.state_dict(),'saved-models_'+ 'trainBlock' +'/evaluatedPoliciesTest/'+subPath+str(i_episode)+'-'+ filename + '-' + str(i_episode) + '.h5', )
+                    if self.fileName==None:
+                        torch.save(self.policy.state_dict(),'saved-models_'+ 'trainBlock' +'/evaluatedPoliciesTest/'+subPath+str(i_episode)+'-'+ filename + '-' + str(i_episode) + '.h5', )
+                    else:
+                        print 'Storing from here :'
+                        torch.save(self.policy.state_dict(),filename)
 
                 #save the model
             lossList.append(self.finish_episode())
