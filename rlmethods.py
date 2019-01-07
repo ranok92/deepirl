@@ -481,7 +481,7 @@ class ActorCritic:
             if self.StoreModels:
                 if i_episode%self.plotInterval==0:
                     if self.basePath!=None:
-                        plt.savefig(self.basePath+'ploting_'+str(self.irlIter)+'/plotNo{}'.format(i_episode))
+                        plt.savefig(self.basePath+'ploting_'+str(self.irlIter)+'/Rewards_plotNo{}'.format(i_episode))
                 #print 'The running reward for episode {}:'.format(i_episode),running_reward
                 if i_episode%self.logInterval==0:
                     if self.fileName==None:
@@ -496,6 +496,11 @@ class ActorCritic:
             plt.plot(runList , lossList , color = 'red')
             plt.draw()
             plt.pause(.0001)
+            if self.StoreModels:
+                if i_episode%self.plotInterval==0:
+                    if self.basePath!=None:
+                        plt.savefig(self.basePath+'ploting_'+str(self.irlIter)+'/Loss_plotNo{}'.format(i_episode))
+
             #plt.show()
             #if i_episode+1 % log_interval == 0:
             #    print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
