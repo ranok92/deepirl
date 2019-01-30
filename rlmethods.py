@@ -1,13 +1,14 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
+import torch.nn.utils.clip_grad as clip_grad
 from networks import Policy
 from networks import CostNetwork
 
 import numpy as np
 import ballenv_pygame as BE
 from matplotlib import pyplot as plt
+import matplotlib
 from torch.distributions import Categorical
 from collections import namedtuple
 import datetime
@@ -51,7 +52,7 @@ class HistoryBuffer():
 class ActorCritic:
 
 
-    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} , Gamma = .9 , Eps = .00001 , storeModels = True , fileName = None, basePath = None ,loginterval = 9 , iteration = None, plotinterval = 2):
+    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} , Gamma = .9 , Eps = .00001 , storeModels = True , fileName = None, basePath = None ,loginterval = 9 , iteration = None, plotinterval = 2 , displayBoard = False , onServer = True ):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.irlIter = iteration
@@ -61,11 +62,22 @@ class ActorCritic:
         self.eps = Eps
         self.costNet = costNetwork.to(self.device)
         self.no_of_plays = noofPlays
-        self.displayBoard = False
+
+        self.displayBoard = displayBoard
+        self.onServer = onServer
+
+        if self.onServer:
+
+            matplotlib.use('Agg')
+        
         self.env = BE.createBoard(display = self.displayBoard , static_obstacles= 0 , static_obstacle_radius= 10)
+        
+
         self.WINDOW_SIZE = 5
         self.agentRad = 10
         self.avgReturn = 0
+        
+
         self.SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
         self.StoreModels = storeModels
         self.logInterval = loginterval
@@ -168,18 +180,18 @@ class ActorCritic:
     def select_action(self,state,policy):
         #state = torch.from_numpy(state).float().unsqueeze(0)
         '''
+        print 'Start printing grad :'
         for x in policy.parameters():
             #print 'One'
-            #print 'x : ', torch.norm(x.data)
+            print 'x weight: ', torch.norm(x.data)
             if x.grad is not None:
                 print 'x grad ', torch.norm(x.grad)
-        print 'The state :',state
+        print 'The end.'
         '''
         probs ,state_value  = policy(state)
         #print 'probs :' , probs
         m = Categorical(probs)
         action = m.sample()
-        #print action
 
         policy.saved_actions.append(self.SavedAction(m.log_prob(action), state_value))
         return action.item()
@@ -226,7 +238,7 @@ class ActorCritic:
                     #print 'reward :', reward.size()
                     trajReward+=reward.item()
 
-            reward_array[i] = np.exp(trajReward)
+            reward_array[i] = np.exp(-trajReward)
             avglen[i] = t
 
 
@@ -270,7 +282,7 @@ class ActorCritic:
         multiply the prob with the state visitation for each of the trajectory
         update Z (the normalizing factor)
         '''
-        T = 400
+        T = 200
         # mu[s, t] is the prob of visiting state s at time t
         mu = np.zeros([no_of_samples, N_STATES])
 
@@ -311,11 +323,12 @@ class ActorCritic:
                 if done:
                     break
 
-            reward_array[i] = np.exp(traj_reward) #the literature suggests exp(-C(traj)) where C(traj) is the cost of the trajectory
+            reward_array[i] = np.exp(-traj_reward) #the literature suggests exp(-C(traj)) where C(traj) is the cost of the trajectory
                                                      #as because we are dealing with rewards, so I removed the negative sign
             avglen[i] = t
 
 
+        print 'traj reward :', traj_reward
         print 'The reward array :',reward_array
 
         #normalize the rewards array
@@ -324,13 +337,13 @@ class ActorCritic:
         print 'The normalized reward array :', reward_array
 
         #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
-        print 'state visitation freq :', mu
+        #print 'state visitation freq :', mu
 
         for i in range(no_of_samples):
 
             mu[i,:] = mu[i,:]*reward_array[i]
 
-        print 'state visitation freq array after norm ', mu
+        #print 'state visitation freq array after norm ', mu
         p =  np.sum(mu,axis=0)
 
         return np.expand_dims(p,axis=1)
@@ -347,9 +360,10 @@ class ActorCritic:
         return p
         '''
 
-
+#the code for actor_critic is taken from here :
+#https://github.com/pytorch/examples/blob/master/reinforcement_learning/actor_critic.py
     def finish_episode(self):
-
+        print 'Inside finish episode :'
         R = 0
         saved_actions = self.policy.saved_actions
         policy_losses = []
@@ -360,6 +374,7 @@ class ActorCritic:
             rewards.insert(0, R)
         rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + self.eps)
+        print 'rewards :',rewards
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
             policy_losses.append(-log_prob * reward)
@@ -369,6 +384,7 @@ class ActorCritic:
         self.optimizer.zero_grad()
         loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
         loss.backward()
+        clip_grad.clip_grad_norm(self.policy.parameters() , 100)
         self.optimizer.step()
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
@@ -474,6 +490,7 @@ class ActorCritic:
             #plt.plot(runList, rewardList,color='black')
             #plt.plot(runList , timeList , color= 'red')
             plt.figure(1)
+            plt.title('Plotting the Rewards :')
             plt.plot(runList , nnRewardList , color = 'blue')
             plt.draw()
             plt.pause(.0001)
@@ -493,6 +510,7 @@ class ActorCritic:
                 #save the model
             lossList.append(self.finish_episode())
             plt.figure(2)
+            plt.title('Plotting the loss :')
             plt.plot(runList , lossList , color = 'red')
             plt.draw()
             plt.pause(.0001)

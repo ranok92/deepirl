@@ -17,6 +17,7 @@ class CostNetwork(nn.Module):
         # nn_params -  a dictionary containing 3 keys : 'input' - size of input layer , 'hidden' - a list containing size of hidden layers
         #                                               'output' - size of output layer *for policy the size of the action space
         super(CostNetwork, self).__init__()
+
         self.input = nn_params['input']
         self.output = nn_params['output']
 
@@ -26,7 +27,7 @@ class CostNetwork(nn.Module):
 
         self.inputLayer = nn.Linear(self.input, self.hidden[0])
         self.hidden1 = nn.Linear(self.hidden[0], self.hidden[1])
-        self.outputLayer = nn.Linear(self.hidden[self.no_of_hidden_layers-1], self.output)
+        self.outputLayer = nn.Linear(self.hidden[self.no_of_hidden_layers-1], 1)
 
 
     def forward(self,x):
@@ -38,6 +39,8 @@ class CostNetwork(nn.Module):
         x = F.elu(self.hidden1(x))
 
         x = self.outputLayer(x)
+
+        x = F.sigmoid(x)
 
         return x
 
