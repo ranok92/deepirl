@@ -3,10 +3,10 @@ import os
 import datetime
 
 #import files for the three different modules of the pipeline
+import matplotlib
 
-import deepirl
-import rlmethods
-import featureExtractor
+#import rlmethods
+#import featureExtractor
 
 '''
 this should be the main function that takes in the 3 modules needed to run the pipeline
@@ -56,10 +56,10 @@ def read_arguments():
     parser.add_argument('--rl_iterations' , type = int , help='Number of iterations to be performed in the RL section.')
 
     #arguments for the I/O of the program
-    parser.add_argument('--display_board' , type=bool , default=False, help='True/False based on if the program needs to display the environment.')
-    parser.add_argument('--on_server' , type=bool , default= True, help='True/False based on if the program is running on server. **False when running on server?')
-    parser.add_argument('--store_results' , type=bool , default=True)
-    parser.add_argument('--plot interval' , type=int , default= 10 , help='Iterations after which the plot of the loss and the reward curve will be stored.')
+    parser.add_argument('--display_board' , type=str , default='False', help='True/False based on if the program needs to display the environment.')
+    parser.add_argument('--on_server' , type=str , default= 'True', help='True/False based on if the program is running on server. **False when running on server?')
+    parser.add_argument('--store_results' , type=str , default='True')
+    parser.add_argument('--plot_interval' , type=int , default= 10 , help='Iterations after which the plot of the loss and the reward curve will be stored.')
     parser.add_argument('--savedict_policy_interval' , type=int , default = 100, help='Iterations after which the policy network will be stored.')
     parser.add_argument('--savedict_cost_interval' , type=int , default = 1,  help='Iterations after which the cost network will be stored.')
 
@@ -68,7 +68,11 @@ def read_arguments():
     parser.add_argument('--feature_space', type=str , help='Enter the type of features to be used to get the state of the agent.')
     parser.add_argument('--irl_method' , type=str , help='Enter the IRL method to be used.')
 
+    parser.add_argument('--run_type' , type=str , default='train',help='Enter if it is a train run or a test run.(train/test).'
+                                                       'Necessary information should be provided with either of the modes.')
 
+    parser.add_argument('--no_of_testRuns' , type= int , default = 0 , help='If --run_type set to test, then this denotes the number of test runs you want to conduct.')
+    
     args = parser.parse_args()
 
     return args
@@ -121,11 +125,22 @@ def arrangeDirForStorage(irlMethod, rlMethod , costNNparams , policyNNparams):
     return storageDict
 
 
+def parseBool(stringarg):
+
+    if stringarg=='True':
+
+        return True
+    if stringarg=='False':
+
+        return False
+
+    return -1
+
 '''
 example running statements:
 
 
-python mainRun.py --state_dictionary 'no obstacle' --expert_trajectory_file 'expertstateinfolong_50.npy' --irl_iterations 10 --no_of_samples 100 --rl_iterations 200 --rl_method='Actor_Critic' --irl_method='DeepMaxEnt'
+python mainRun.py --state_dictionary 'no obstacle' --display_board 'True' --on_server 'False' --expert_trajectory_file 'expertstateinfolong_50.npy' --irl_iterations 10 --no_of_samples 100 --rl_iterations 200 --rl_method='Actor_Critic' --irl_method='DeepMaxEnt' --run_type 'test' --cost_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/CostNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_1_iteration_0.h5' --policy_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/PolicyNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_4_iterEND_1.h5' --no_of_testRuns 30
 
 '''
 
@@ -140,9 +155,12 @@ if __name__=='__main__':
     rlMethod = args.rl_method
     IRLMethod = args.irl_method
     demofile = args.expert_trajectory_file
-    saveInfo = args.store_results
-    display = args.display_board
-    onServer = args.on_server
+    saveInfo = parseBool(args.store_results)
+    display = parseBool(args.display_board)
+    onServer = parseBool(args.on_server)
+
+    runType = args.run_type
+    testRuns = args.no_of_testRuns
 
 
     #batch of conditions
@@ -160,19 +178,63 @@ if __name__=='__main__':
     policyNNparams['output'] = args.policy_network_output
 
 
-    stateDict,_ = deepirl.getstateDict(args.state_dictionary)
     irlIterations = args.irl_iterations
     sampling_no = args.no_of_samples
     rlIterations = args.rl_iterations
 
-    storageInfoDict = arrangeDirForStorage(IRLMethod , rlMethod , costNNparams , policyNNparams)
+    plotIntervals = args.plot_interval
+    rlModelStoreInterval = args.savedict_policy_interval
+    irlModelStoreInterval = args.savedict_cost_interval
 
-    deepirl.deepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict , render = display, onServer = onServer)
+    typeofEnvironment = args.state_dictionary #have to put this in the pipeline of the code, not touching this as of yet
 
 
-    #deepirl.deepMaxEntIRL() should have provision for taking in costNetwork
-    #and policyNetwork as parameter so as to load pretrained network weights
-    #if needed
+
+    print saveInfo
+    if saveInfo:
+
+        storageInfoDict = arrangeDirForStorage(IRLMethod , rlMethod , costNNparams , policyNNparams)
+
+    else:
+
+        storageInfoDict = None
+
+    if onServer:
+
+        matplotlib.use('Agg')
+
+    import deepirl
+
+    stateDict,_ = deepirl.getstateDict(args.state_dictionary)
+
+    maxEntIrl = deepirl.DeepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict ,
+                          render = display, onServer = onServer , resultPlotIntervals = plotIntervals , irlModelStoreInterval = irlModelStoreInterval , rlModelStoreInterval = rlModelStoreInterval,
+                            testIterations= testRuns)
+
+
+    if runType=='train':
+
+        maxEntIrl.runDeepMaxEntIRL()
+
+    if runType=='test':
+
+        print 'Starting test branch . . .'
+        maxEntIrl.testMaxDeepIRL()
+
+
+    else:
+
+        print 'I have not coded this option yet.'
+
+
+
+    #deepirl.deepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict ,
+    #                      render = display, onServer = onServer , resultPlotIntervals = plotIntervals , irlModelStoreInterval = irlModelStoreInterval , rlModelStoreInterval = rlModelStoreInterval)
+
+    #deepMaxEntIRL in the form of a class rather than that of a method
+
+
+    #method to separate# run related parameters from algorithm seperated parameters
 
 
 

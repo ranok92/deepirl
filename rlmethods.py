@@ -52,11 +52,22 @@ class HistoryBuffer():
 class ActorCritic:
 
 
-    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} , Gamma = .9 , Eps = .00001 , storeModels = True , fileName = None, basePath = None ,loginterval = 9 , iteration = None, plotinterval = 2 , displayBoard = False , onServer = True ):
+    def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} ,storedNetwork = None , Gamma = .9 , Eps = .00001 , storeModels = True ,
+                 fileName = None, basePath = None ,policyNetworkDir = None, plotInterval = 10 , irliteration = None , displayBoard = False , onServer = True ,
+                 modelSaveInterval = 500):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.irlIter = iteration
+        self.irlIter = irliteration
+        self.storedPolicyNetwork = storedNetwork
+
         self.policy = Policy(policy_nn_params).to(self.device)
+
+        if self.storedPolicyNetwork != None:
+
+
+	    	self.policy.load_state_dict(torch.load(self.storedPolicyNetwork))
+	    	self.policy.eval()
+
         self.optimizer = optim.Adam(self.policy.parameters(), lr=1e-2)
         self.gamma = Gamma
         self.eps = Eps
@@ -64,11 +75,8 @@ class ActorCritic:
         self.no_of_plays = noofPlays
 
         self.displayBoard = displayBoard
+
         self.onServer = onServer
-
-        if self.onServer:
-
-            matplotlib.use('Agg')
         
         self.env = BE.createBoard(display = self.displayBoard , static_obstacles= 0 , static_obstacle_radius= 10)
         
@@ -80,11 +88,12 @@ class ActorCritic:
 
         self.SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
         self.StoreModels = storeModels
-        self.logInterval = loginterval
-        self.plotInterval = plotinterval
+        self.logInterval = modelSaveInterval
+        self.plotInterval = plotInterval
         self.move_list = [(1,1) , (1,-1) , (1, 0) , (0,1) , (0,-1),(0,0) , (-1,1),(-1,0),(-1,-1)]
         self.basePath = basePath
         self.fileName = fileName
+        self.curDirPolicy = policyNetworkDir
 
 
     def block_to_arrpos(self,window_size,x,y):
@@ -402,6 +411,7 @@ class ActorCritic:
         #actorCriticXXXHistory  - state obtained from any of the above methods and using a history buffer
 
         if self.StoreModels:
+
             filename = 'actorCriticWindow5History'
             curDay = str(datetime.datetime.now().date())
             curtime = str(datetime.datetime.now().time())
@@ -411,8 +421,8 @@ class ActorCritic:
             curDir = self.basePath + subPath
             plotDir = 'saved_plots/actorCritic/'
 
-            if filename==None:
-                os.makedirs(curDir)
+            #if filename==None:
+            #    os.makedirs(curDir)
 
             if self.basePath is not None:
                 os.makedirs(self.basePath+'ploting_'+str(self.irlIter))
@@ -472,6 +482,7 @@ class ActorCritic:
                         #state = hbuffer.getHistory()
                         if i_episode%self.logInterval==0:
                             if self.displayBoard:
+                                print 'ssss'
                                 self.env.render()
                         self.policy.rewards.append(reward)
                         if done:
@@ -496,16 +507,18 @@ class ActorCritic:
             plt.pause(.0001)
 
             if self.StoreModels:
+
                 if i_episode%self.plotInterval==0:
                     if self.basePath!=None:
                         plt.savefig(self.basePath+'ploting_'+str(self.irlIter)+'/Rewards_plotNo{}'.format(i_episode))
                 #print 'The running reward for episode {}:'.format(i_episode),running_reward
                 if i_episode%self.logInterval==0:
-                    if self.fileName==None:
-                        torch.save(self.policy.state_dict(),'saved-models_'+ 'trainBlock' +'/evaluatedPoliciesTest/'+subPath+str(i_episode)+'-'+ filename + '-' + str(i_episode) + '.h5', )
-                    else:
-                        print 'Storing from here :'
-                        torch.save(self.policy.state_dict(),filename)
+                    if self.fileName!=None:
+                        torch.save(self.policy.state_dict(), self.curDirPolicy+self.fileName+str(self.irlIter)+'-'+str(i_episode)+'.h5')
+                        #torch.save(self.policy.state_dict(),'saved-models_'+ 'trainBlock' +'/evaluatedPoliciesTest/'+subPath+str(i_episode)+'-'+ filename + '-' + str(i_episode) + '.h5', )
+                    #else:
+                    #    print 'Storing from here :'
+                    #    torch.save(self.policy.state_dict(),self.filename)
 
                 #save the model
             lossList.append(self.finish_episode())
