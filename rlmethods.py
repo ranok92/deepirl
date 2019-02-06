@@ -5,6 +5,7 @@ import torch.nn.utils.clip_grad as clip_grad
 from networks import Policy
 from networks import CostNetwork
 
+import torch.cuda as cutorch
 import numpy as np
 import ballenv_pygame as BE
 from matplotlib import pyplot as plt
@@ -54,14 +55,14 @@ class ActorCritic:
 
     def __init__(self ,costNetwork = None , noofPlays = 100 , policy_nn_params = {} ,storedNetwork = None , Gamma = .9 , Eps = .00001 , storeModels = True ,
                  fileName = None, basePath = None ,policyNetworkDir = None, plotInterval = 10 , irliteration = None , displayBoard = False , onServer = True ,
-                 modelSaveInterval = 500):
+                 modelSaveInterval = 500 , verbose = False):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.irlIter = irliteration
         self.storedPolicyNetwork = storedNetwork
 
         self.policy = Policy(policy_nn_params).to(self.device)
-
+        self.verbose = verbose
         if self.storedPolicyNetwork != None:
 
 
@@ -255,7 +256,7 @@ class ActorCritic:
         #print 'sum of reward_array :', np.sum(reward_array)
         #normalize the rewards array
         reward_array = np.divide(reward_array, np.sum(reward_array))
-        print 'Avg length of the trajectories expert:', np.dot(avglen,reward_array)
+        if self.vebose : print 'Avg length of the trajectories expert:', np.dot(avglen,reward_array)
         #print 'The normalized reward array :', reward_array
 
         #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
@@ -281,7 +282,6 @@ class ActorCritic:
 
         N_STATES = len(stateDict.keys())
         N_ACTIONS = 4
-        print 'P_A_shape'
 
         no_of_samples = no_of_trajs
         '''
@@ -336,14 +336,17 @@ class ActorCritic:
                                                      #as because we are dealing with rewards, so I removed the negative sign
             avglen[i] = t
 
-
-        print 'traj reward :', traj_reward
-        print 'The reward array :',reward_array
+        if self.verbose:
+            print 'traj reward :', traj_reward
+            print 'The reward array :',reward_array
 
         #normalize the rewards array
+
         reward_array = np.divide(reward_array, sum(reward_array))
-        print 'Avg length of the trajectories :', np.dot(avglen,reward_array)
-        print 'The normalized reward array :', reward_array
+
+        if self.verbose:
+            print 'Avg length of the trajectories :', np.dot(avglen,reward_array)
+            print 'The normalized reward array :', reward_array
 
         #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
         #print 'state visitation freq :', mu
@@ -372,7 +375,8 @@ class ActorCritic:
 #the code for actor_critic is taken from here :
 #https://github.com/pytorch/examples/blob/master/reinforcement_learning/actor_critic.py
     def finish_episode(self):
-        print 'Inside finish episode :'
+        if self.verbose: print 'Inside finish episode :'
+        
         R = 0
         saved_actions = self.policy.saved_actions
         policy_losses = []
@@ -383,7 +387,7 @@ class ActorCritic:
             rewards.insert(0, R)
         rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + self.eps)
-        print 'rewards :',rewards
+        if self.verbose: print 'rewards :',rewards
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
             policy_losses.append(-log_prob * reward)
@@ -482,7 +486,7 @@ class ActorCritic:
                         #state = hbuffer.getHistory()
                         if i_episode%self.logInterval==0:
                             if self.displayBoard:
-                                print 'ssss'
+                                if self.verbose: print 'ssss'
                                 self.env.render()
                         self.policy.rewards.append(reward)
                         if done:

@@ -128,6 +128,7 @@ def getStateVisitationFrequencyExpert(demofile,stateDict):
         avglen+= len(traj)
         if maxlen < len(traj):
             maxlen = len(traj)
+
     print 'Averge length of trajectories :', float(avglen)/total_trajs
     #stateVisitationDict : a dictionary where keys are numpy arrays describing the states convereted to strings
     #and corresponding to each of the key is a numpy array of size = max length of the expert trajectories
@@ -326,7 +327,7 @@ def get_state_BallEnv(state):
 #function for the deepMax Entropy IRL method
 class DeepMaxEntIRL:
 
-    def __init__(self , expertDemofile , rlMethod , costNNparams , costNetworkDict , policyNNparams , policyNetworkDict , irliterations , samplingIterations , rliterations , store=False , storeInfo = None , render = False , onServer = True , resultPlotIntervals = 10 , irlModelStoreInterval = 1 , rlModelStoreInterval = 500 , testIterations = 0):
+    def __init__(self , expertDemofile , rlMethod , costNNparams , costNetworkDict , policyNNparams , policyNetworkDict , irliterations , samplingIterations , rliterations , store=False , storeInfo = None , render = False , onServer = True , resultPlotIntervals = 10 , irlModelStoreInterval = 1 , rlModelStoreInterval = 500 , testIterations = 0 , verbose=False):
 
         self.expertDemofile = expertDemofile
         self.rlMethod = rlMethod
@@ -349,7 +350,7 @@ class DeepMaxEntIRL:
         self.samplingIterations = samplingIterations
         self.rlIterations = rliterations
 
-
+        self.verbose = verbose
 
         #parameters for display
         self.render = render
@@ -401,7 +402,7 @@ class DeepMaxEntIRL:
         #print 'sum of reward_array :', np.sum(reward_array)
         #normalize the rewards array
         reward_array = np.divide(reward_array, np.sum(reward_array))
-        print 'Avg length of the trajectories expert:', np.dot(avglen,reward_array)
+        if self.verbose: print 'Avg length of the trajectories expert:', np.dot(avglen,reward_array)
         #print 'The normalized reward array :', reward_array
 
         #multiply each of the trajectory state visitation freqency by their corresponding normalized reward
@@ -476,17 +477,17 @@ class DeepMaxEntIRL:
 
                 rlAC = ActorCritic(costNetwork = self.costNetwork, noofPlays= gamePlayIterations , policy_nn_params = self.policyNNparams, storedNetwork = self.storedPolicyNetwork,
                                  storeModels=self.store, fileName = fileNamePolicy, policyNetworkDir = curDirPolicy, basePath = basePath, irliteration = i , displayBoard = self.render , onServer = self.onServer,
-                                 plotInterval = self.plotIntervals , modelSaveInterval = self.rlModelStoreInterval)
+                                 plotInterval = self.plotIntervals , modelSaveInterval = self.rlModelStoreInterval , verbose=  self.verbose)
                 self.policyNetwork = rlAC.actorCriticMain()
 
             expertFreq = self.compute_state_visitation_freq_Expert(stateDict)
             stateFreq = rlAC.compute_state_visitation_freq_sampling(stateDict , self.samplingIterations)
 
-
-            print 'expert freq :',expertFreq
-            print np.sum(expertFreq)
-            print 'policy freq :',stateFreq
-            print np.sum(stateFreq)
+            if self.verbose:
+                print 'expert freq :',expertFreq
+                print np.sum(expertFreq)
+                print 'policy freq :',stateFreq
+                print np.sum(stateFreq)
             #get the difference in frequency
             freq_diff = expertFreq - stateFreq
             freq_diff = torch.from_numpy(freq_diff).to(device)
@@ -501,22 +502,24 @@ class DeepMaxEntIRL:
             clip_grad.clip_grad_norm(self.costNetwork.parameters() , 100)
             optimizer.step()
             #######printing grad and weight norm##############
-            print 'Start printing grad cost network :'
-            for x in self.costNetwork.parameters():
-                #print 'One'
-                print 'x cost weight: ', torch.norm(x.data)
-                if x.grad is not None:
-                    print 'x cost grad ', torch.norm(x.grad)
-            print 'The end.'
+
+            if self.verbose:
+                print 'Start printing grad cost network :'
+                for x in self.costNetwork.parameters():
+                    #print 'One'
+                    print 'x cost weight: ', torch.norm(x.data)
+                    if x.grad is not None:
+                        print 'x cost grad ', torch.norm(x.grad)
+                print 'The end.'
 
 
-            print 'Start printing grad policy network :'
-            for x in self.policyNetwork.parameters():
-                #print 'One'
-                print 'x cost weight: ', torch.norm(x.data)
-                if x.grad is not None:
-                    print 'x cost grad ', torch.norm(x.grad)
-            print 'The end.'
+                print 'Start printing grad policy network :'
+                for x in self.policyNetwork.parameters():
+                    #print 'One'
+                    print 'x cost weight: ', torch.norm(x.data)
+                    if x.grad is not None:
+                        print 'x cost grad ', torch.norm(x.grad)
+                print 'The end.'
             #####################plotting the weight norms#######################
             if self.store:
                 if i % self.irlModelStoreInterval==0:

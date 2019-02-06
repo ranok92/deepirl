@@ -68,9 +68,8 @@ def read_arguments():
     parser.add_argument('--feature_space', type=str , help='Enter the type of features to be used to get the state of the agent.')
     parser.add_argument('--irl_method' , type=str , help='Enter the IRL method to be used.')
 
-    parser.add_argument('--run_type' , type=str , default='train',help='Enter if it is a train run or a test run.(train/test).'
-                                                       'Necessary information should be provided with either of the modes.')
-
+    parser.add_argument('--run_type' , type=str , default='train',help='Enter if it is a train run or a test run.(train/test).')
+    parser.add_argument('--verbose' ,type=str , default='False' , help='Set verbose to "True" to get a myriad of print statements crowd your terminal. Necessary information should be provided with either of the modes.')
     parser.add_argument('--no_of_testRuns' , type= int , default = 0 , help='If --run_type set to test, then this denotes the number of test runs you want to conduct.')
     
     args = parser.parse_args()
@@ -140,7 +139,7 @@ def parseBool(stringarg):
 example running statements:
 
 
-python mainRun.py --state_dictionary 'no obstacle' --display_board 'True' --on_server 'False' --expert_trajectory_file 'expertstateinfolong_50.npy' --irl_iterations 10 --no_of_samples 100 --rl_iterations 200 --rl_method='Actor_Critic' --irl_method='DeepMaxEnt' --run_type 'test' --cost_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/CostNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_1_iteration_0.h5' --policy_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/PolicyNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_4_iterEND_1.h5' --no_of_testRuns 30
+python mainRun.py --state_dictionary 'no obstacle' --display_board 'False' --on_server 'True' --expert_trajectory_file 'expertstateinfolong_50.npy' --irl_iterations 10 --no_of_samples 100 --rl_iterations 200 --rl_method='Actor_Critic' --irl_method='DeepMaxEnt' --run_type 'train' --cost_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/CostNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_1_iteration_0.h5' --policy_network '/home/abhisek/Study/Robotics/deepirl/saved-models-irl/2019-01-31/16:40:33.387966/PolicyNetwork/DeepMaxEnt-Actor_Critic-29_[256, 256]_4_iterEND_1.h5' --no_of_testRuns 0
 
 '''
 
@@ -159,6 +158,7 @@ if __name__=='__main__':
     display = parseBool(args.display_board)
     onServer = parseBool(args.on_server)
 
+    verbose = parseBool(args.verbose)
     runType = args.run_type
     testRuns = args.no_of_testRuns
 
@@ -209,7 +209,7 @@ if __name__=='__main__':
 
     maxEntIrl = deepirl.DeepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict ,
                           render = display, onServer = onServer , resultPlotIntervals = plotIntervals , irlModelStoreInterval = irlModelStoreInterval , rlModelStoreInterval = rlModelStoreInterval,
-                            testIterations= testRuns)
+                            testIterations= testRuns , verbose=verbose)
 
 
     if runType=='train':
