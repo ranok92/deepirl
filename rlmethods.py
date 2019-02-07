@@ -16,6 +16,22 @@ import datetime
 import os
 
 
+def getMemoryAllocationInfo(memoryInBytes):
+
+    result = ''
+    val = memoryInBytes
+    infoList =[0,0,0,0]
+    i = 0
+    while val > 0:
+
+        infoList[i] = val%1024
+        val/=1024
+        i+=1
+
+    result = '{} Gb, {} Mb, {} Kb ,{} b'.format(infoList[3],infoList[2], infoList[1], infoList[0])
+
+    return result
+
 class HistoryBuffer():
 
     def __init__(self,bufferSize = 10):
@@ -375,8 +391,9 @@ class ActorCritic:
 #the code for actor_critic is taken from here :
 #https://github.com/pytorch/examples/blob/master/reinforcement_learning/actor_critic.py
     def finish_episode(self):
-        if self.verbose: print 'Inside finish episode :'
-        
+        #if self.verbose:
+        print 'Inside finish episode :'
+        print getMemoryAllocationInfo(torch.cuda.memory_allocated(0))
         R = 0
         saved_actions = self.policy.saved_actions
         policy_losses = []
@@ -546,9 +563,11 @@ class ActorCritic:
         return self.policy
 
 if __name__=='__main__':
-
+    
     cNN  = {'input':29 , 'hidden': [512 , 128] , 'output':1}
     pNN = {'input':29 , 'hidden': [512 , 128] , 'output':9}
     costNetwork = CostNetwork(cNN)
     rlAC = ActorCritic(costNetwork=costNetwork , policy_nn_params= pNN ,  noofPlays = 100, Gamma = .9 , Eps = .00001 , storeModels = False , loginterval = 10 , plotinterval = 2)
     p = rlAC.actorCriticMain()
+
+
