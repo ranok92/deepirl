@@ -7,24 +7,22 @@ expert and spits out a new reward function??
 
 '''
 
-from collections import OrderedDict
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 
 import ballenv_pygame as BE
-# import torch.nn.functional as F
-
+import numpy as np
 import torch
-import torch.optim as optim
 import torch.nn.utils.clip_grad as clip_grad
+import torch.optim as optim
+from featureExtractor import localWindowFeature
+from matplotlib import pyplot as plt
 from torch.distributions import Categorical
 
-import numpy as np
-from matplotlib import pyplot as plt
+from networks import CostNetwork, Policy
 from rlmethods import ActorCritic
-from networks import CostNetwork
-from networks import Policy
 
-from featureExtractor import localWindowFeature
+# import torch.nn.functional as F
+
 
 # import os
 # import datetime
@@ -45,26 +43,17 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 plt.ion()
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
-########################################################
-# *****************utils to run the game taken from ballgameActorCritic.py*****
-
-
-# ******************************************************************************************
-
-
 # *********************utils to run the IRL module************************
 
-#demo file contains a list of states for multiple trajectories?
-#trajectories - number of expert trajectories to be taken.
+# demo file contains a list of states for multiple trajectories?
+# trajectories - number of expert trajectories to be taken.
 
 
-
-#**have to change this part. THis is not a part of the pipeline
-#but this method is called to transform raw state information from
-#expert trajectories to feature vectors that will be used to calulate the
-#state visitation frequency of the expert**change!!
-def takeExpertInfo(trajectories,WINDOW_SIZE,gridsize,device):
-
+# **have to change this part. THis is not a part of the pipeline
+# but this method is called to transform raw state information from
+# expert trajectories to feature vectors that will be used to calulate the
+# state visitation frequency of the expert**change!!
+def takeExpertInfo(trajectories, WINDOW_SIZE, gridsize, device):
     env = BE.createBoard(display=True)
     actionList = [(0, -1), (1, 0), (0, 1), (-1, 0)]
     mainStateInfo = []
@@ -73,7 +62,7 @@ def takeExpertInfo(trajectories,WINDOW_SIZE,gridsize,device):
 
         state = env.reset()
         #state = env.get_state_BallEnv(window_size=5)
-        state = localWindowFeature(state,WINDOW_SIZE,gridsize,device)
+        state = localWindowFeature(state, WINDOW_SIZE, gridsize, device)
         done = False
         env.render()
         trajInfo = []
@@ -83,8 +72,9 @@ def takeExpertInfo(trajectories,WINDOW_SIZE,gridsize,device):
             action = env.take_action_from_userKeyboard()
             action = actionList[action]
 
-            next_state , reward , done , _ = env.step(action)
-            next_state = localWindowFeature(state,WINDOW_SIZE,gridsize,device)
+            next_state, reward, done, _ = env.step(action)
+            next_state = localWindowFeature(
+                state, WINDOW_SIZE, gridsize, device)
 
             trajInfo.append(next_state)
             env.render()
@@ -98,9 +88,12 @@ def takeExpertInfo(trajectories,WINDOW_SIZE,gridsize,device):
 
 
 def getstateDict(str):
-    # returns 2 things: a lookuptable : a dictionary where key is a string and corresponding value is a numpy array
-                                        # describing the state
-    #                  a statedict : a dictionary where the key is a string and value is an integer
+    '''
+    returns 2 things: a lookuptable : a dictionary where key is a string and
+    corresponding value is a numpy array describing the state
+    a statedict : a dictionary where the key is a string and value is an
+    integer
+    '''
 
     stateDict = OrderedDict()
     lookuptable = OrderedDict()
@@ -144,7 +137,7 @@ def getStateVisitationFrequencyExpert(demofile, stateDict):
     for key in stateDict.keys():
         # initialize a numpy array of size (maxlen,) corresponding to each of the states
         stateVisitationDict[key] = 0
-    #stateDict = OrderedDict()
+    # stateDict = OrderedDict()
     for trajinfo in info:
 
         # iterating through a single trajectory ,  i is basically the time
@@ -178,7 +171,7 @@ def getStateVisitationFrequencyExpert(demofile, stateDict):
     stateLookup = OrderedDict()
     for i in range(len(stateDict.keys())):
 
-        #print stateDict[i]
+        # print stateDict[i]
         freqarray[i] = stateVisitationDict[stateDict.keys()[i]]
         stateLookup[stateDict.keys()[i]] = i
 
@@ -331,7 +324,12 @@ def select_action(state, policy):
 # function for the deepMax Entropy IRL method
 class DeepMaxEntIRL:
 
-    def __init__(self, expertDemofile, rlMethod, costNNparams, costNetworkDict, policyNNparams, policyNetworkDict, irliterations, samplingIterations, rliterations, store=False, storeInfo=None, render=False, onServer=True, resultPlotIntervals=10, irlModelStoreInterval=1, rlModelStoreInterval=500, testIterations=0, verbose=False):
+    def __init__(self, expertDemofile, rlMethod, costNNparams, costNetworkDict,
+                 policyNNparams, policyNetworkDict, irliterations,
+                 samplingIterations, rliterations, store=False, storeInfo=None,
+                 render=False, onServer=True, resultPlotIntervals=10,
+                 irlModelStoreInterval=1, rlModelStoreInterval=500,
+                 testIterations=0, verbose=False):
 
         self.expertDemofile = expertDemofile
         self.rlMethod = rlMethod
@@ -440,13 +438,7 @@ class DeepMaxEntIRL:
         optimizer = optim.Adam(
             self.costNetwork.parameters(), lr=0.002, weight_decay=.1)
 
-        # create the game board
-
-        # env = BE.createBoard(display =True , static_obstacle_radius= 10 ,
-        # static_obstacles= 10)
-
         # if storeInfo is true create stuff to store intermediate results
-
         if self.store:
 
             basePath = self.storeDirsInfo['basepath']
@@ -458,10 +450,6 @@ class DeepMaxEntIRL:
         else:
 
             basePath = curDirPolicy = curDirCost = fileNameCost = fileNamePolicy = None
-
-        # w = [[] for i in range(10)]
-        # exit()
-        # xaxis = []
 
         # the main IRL loop
         for i in range(self.irlIterations):
@@ -520,7 +508,6 @@ class DeepMaxEntIRL:
             if self.verbose:
                 print 'Start printing grad cost network :'
                 for x in self.costNetwork.parameters():
-                    #print 'One'
                     print 'x cost weight: ', torch.norm(x.data)
                     if x.grad is not None:
                         print 'x cost grad ', torch.norm(x.grad)
@@ -528,7 +515,6 @@ class DeepMaxEntIRL:
 
                 print 'Start printing grad policy network :'
                 for x in self.policyNetwork.parameters():
-                    #print 'One'
                     print 'x cost weight: ', torch.norm(x.data)
                     if x.grad is not None:
                         print 'x cost grad ', torch.norm(x.grad)
@@ -549,7 +535,7 @@ class DeepMaxEntIRL:
             size of the environment
             number of obstacles
             agent radius
-            window size for state transformation (this should match with the
+            window size for state transformation(this should match with the
                 parameters of the policynetwork model being used for the run)
 
         Given the above information, this method shows the performance of the current model in the
@@ -590,8 +576,8 @@ class DeepMaxEntIRL:
 
             state = env.reset()
 
-            #convert the state to usabe state information array
-            state = localWindowFeature(state,WINDOW_SIZE,GRID_SIZE,device) 
+            # convert the state to usabe state information array
+            state = localWindowFeature(state, WINDOW_SIZE, GRID_SIZE, device)
 
             rewardPerRun = []
             xListPerRun = []
@@ -610,7 +596,8 @@ class DeepMaxEntIRL:
 
                 nextState, reward, done, _ = env.step(action)
 
-                nextState = localWindowFeature(nextState,WINDOW_SIZE,GRID_SIZE,device)
+                nextState = localWindowFeature(
+                    nextState, WINDOW_SIZE, GRID_SIZE, device)
                 reward = self.costNetwork(nextState)
 
                 totalReward += reward
@@ -640,7 +627,7 @@ class DeepMaxEntIRL:
 
 if __name__ == '__main__':
 
-    #info = takeExpertInfo(50)
+    # info = takeExpertInfo(50)
 
     #frqarray = getStateVisitationFrequencyExpert('expertstateinfolong_50.npy',stateDict)
 
@@ -662,5 +649,5 @@ if __name__ == '__main__':
     policyNNparams = {}
     iterations = 10
 
-    deepMaxEntIRL(costNNparams , policyNNparams , iterations)
+    deepMaxEntIRL(costNNparams, policyNNparams, iterations)
     '''
