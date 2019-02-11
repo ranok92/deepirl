@@ -1,9 +1,10 @@
+"""  store RL algorithms in this file """
+
 import datetime
 import os
 from collections import namedtuple
 
 import ballenv_pygame as BE
-import matplotlib
 import numpy as np
 import torch
 import torch.cuda as cutorch
@@ -18,6 +19,10 @@ from networks import CostNetwork, Policy
 
 
 def getMemoryAllocationInfo(memoryInBytes):
+    """Converts bytes into GB/MB/KB/B string.
+
+    :param memoryInBytes: memory in bytes.
+    """
 
     result = ''
     val = memoryInBytes
@@ -35,7 +40,7 @@ def getMemoryAllocationInfo(memoryInBytes):
     return result, infoList
 
 
-class HistoryBuffer():
+class HistoryBuffer:
 
     def __init__(self, bufferSize=10):
 
@@ -58,13 +63,11 @@ class HistoryBuffer():
     def getHistory(self):
 
         arrSize = self.buffer[0].shape[1]
-        #print 'ArraySize',arrSize
         arrayHist = np.asarray(self.buffer)
 
         arrayHist = np.reshape(arrayHist, (1, arrSize*self.bufferSize))
         state = torch.from_numpy(arrayHist).to(self.device)
         state = state.type(torch.cuda.FloatTensor)
-        #state = state.unsqueeze(0)
 
         return state
 
@@ -97,8 +100,7 @@ class ActorCritic:
 
         self.onServer = onServer
 
-        self.env = BE.createBoard(display=self.displayBoard,
-                                  static_obstacles=0,
+        self.env = BE.createBoard(static_obstacles=0,
                                   static_obstacle_radius=10)
 
         self.WINDOW_SIZE = 5
@@ -193,7 +195,8 @@ class ActorCritic:
         #print 'sum of reward_array :', np.sum(reward_array)
         # normalize the rewards array
         reward_array = np.divide(reward_array, np.sum(reward_array))
-        if self.vebose:
+
+        if self.verbose:
             print 'Avg length of the trajectories expert:', np.dot(
                 avglen, reward_array)
         #print 'The normalized reward array :', reward_array
@@ -220,7 +223,10 @@ class ActorCritic:
 
         no_of_samples = no_of_trajs
         '''
+<<<<<<< HEAD
 
+=======
+>>>>>>> minor formatting: typo fix, package import reordering, remove display arguments from rlmethods.py
         run a bunch of trajectories, get the cost for each of them c_theta(tao)
         prob of a trajectory is directly proportional to the cost it obtains exp(-c_theta(tao)
         multiply the prob with the state visitation for each of the trajectory
