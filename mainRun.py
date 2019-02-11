@@ -286,8 +286,16 @@ if __name__ == '__main__':
 
     stateDict, _ = deepirl.getstateDict(args.state_dictionary)
 
-    maxEntIrl = deepirl.DeepMaxEntIRL(demofile, rlMethod,  costNNparams, costNetwork, policyNNparams, policyNetwork, irlIterations, sampling_no,  rlIterations, store=saveInfo, storeInfo=storageInfoDict,
-                                      render=display, onServer=onServer, resultPlotIntervals=plotIntervals, irlModelStoreInterval=irlModelStoreInterval, rlModelStoreInterval=rlModelStoreInterval,
+    maxEntIrl = deepirl.DeepMaxEntIRL(demofile, rlMethod, costNNparams,
+                                      costNetwork, policyNNparams,
+                                      policyNetwork, irlIterations,
+                                      sampling_no, rlIterations,
+                                      store=saveInfo,
+                                      storeInfo=storageInfoDict,
+                                      render=display, onServer=onServer,
+                                      resultPlotIntervals=plotIntervals,
+                                      irlModelStoreInterval=irlModelStoreInterval,
+                                      rlModelStoreInterval=rlModelStoreInterval,
                                       testIterations=testRuns, verbose=verbose)
 
     if runType == 'train':
@@ -302,10 +310,3 @@ if __name__ == '__main__':
     else:
 
         print 'I have not coded this option yet.'
-
-    # deepirl.deepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict ,
-    #                      render = display, onServer = onServer , resultPlotIntervals = plotIntervals , irlModelStoreInterval = irlModelStoreInterval , rlModelStoreInterval = rlModelStoreInterval)
-
-    # deepMaxEntIRL in the form of a class rather than that of a method
-
-    # method to separate# run related parameters from algorithm seperated parameters
