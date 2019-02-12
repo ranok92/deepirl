@@ -1,6 +1,5 @@
 """  store RL algorithms in this file """
 
-import datetime
 import os
 from collections import namedtuple
 
@@ -74,18 +73,22 @@ class HistoryBuffer:
 
 class ActorCritic:
 
-    def __init__(self, costNetwork=None, noofPlays=100, policy_nn_params={}, storedNetwork=None, Gamma=.9, Eps=.00001, storeModels=True,
-                 fileName=None, basePath=None, policyNetworkDir=None, plotInterval=10, irliteration=None, displayBoard=False, onServer=True,
-                 modelSaveInterval=500, verbose=False):
+    def __init__(self, costNetwork=None, noofPlays=100, policy_nn_params={},
+                 storedNetwork=None, Gamma=.9, Eps=.00001, storeModels=True,
+                 fileName=None, basePath=None, policyNetworkDir=None,
+                 plotInterval=10, irliteration=None, displayBoard=False,
+                 onServer=True, modelSaveInterval=500, verbose=False):
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
+
+        # store passed parameters
         self.irlIter = irliteration
         self.storedPolicyNetwork = storedNetwork
 
         self.policy = Policy(policy_nn_params).to(self.device)
         self.verbose = verbose
-        if self.storedPolicyNetwork != None:
+        if self.storedPolicyNetwork is not None:
 
             self.policy.load_state_dict(torch.load(self.storedPolicyNetwork))
             self.policy.eval()
@@ -362,43 +365,30 @@ class ActorCritic:
         # actorCriticWindow-windowsize - state obtained from local window
         # actorCriticFeaures - state obtained from features
         # actirCriticFeaturesFull - state obtained from using all features
-        # actorCriticXXXHistory  - state obtained from any of the above methods and using a history buffer
+        # actorCriticXXXHistory  - state obtained from any of the above methods
+        # and using a history buffer
 
         if self.StoreModels:
 
-            filename = 'actorCriticWindow5History'
-            curDay = str(datetime.datetime.now().date())
-            curtime = str(datetime.datetime.now().time())
             if self.basePath is None:
                 self.basePath = 'saved-models_trainBlock' + '/evaluatedPoliciesTest/'
-            subPath = curDay + '/' + curtime + '/'
-            curDir = self.basePath + subPath
-            plotDir = 'saved_plots/actorCritic/'
-
-            # if filename==None:
-            #    os.makedirs(curDir)
 
             if self.basePath is not None:
                 os.makedirs(self.basePath+'ploting_'+str(self.irlIter))
-            # if os.path.exists(curDir):
-            #    print "YES"
-
-        # ******************************
 
         state = self.env.reset()
         rewardList = []
         lossList = []
         nnRewardList = []
         runList = []
-        timeList = []
-        #fig = plt.figure(1)
-        #lossFig = plt.figure(2)
         plt.clf()
+
         for i_episode in range(self.no_of_plays):
             running_reward = self.eps
             state = self.env.reset()
-            # env.render()
+
             print 'Starting episode :', i_episode
+
             result, infoList = getMemoryAllocationInfo(
                 torch.cuda.memory_allocated(0))
             print 'Current memory usage :', result
@@ -410,10 +400,11 @@ class ActorCritic:
                     torch.cuda.memory_allocated(0))
                 print 'Memory usage after clearing cache:', result
             state = localWindowFeature(state, 5, 2, self.device)
+
             hbuffer.addState(state)
-            #state = hbuffer.getHistory()
-            #state = env.sensor_readings
+
             rewardPerRun = 0
+
             for t in range(500):  # Don't create infinite loop while learning
 
                 if t <= historySize:
@@ -456,15 +447,12 @@ class ActorCritic:
                         running_reward += reward
                     else:
                         continue
-                # if t%500==0:
-                    #print "T :",t
+
             #running_reward = running_reward * 0.99 + t * 0.01
             nnRewardList.append(rewardPerRun)
             rewardList.append(self.env.total_reward_accumulated)
             runList.append(i_episode)
-            timeList.append(float(t)/500)
-            #plt.plot(runList, rewardList,color='black')
-            #plt.plot(runList , timeList , color= 'red')
+
             plt.figure(1)
             plt.title('Plotting the Rewards :')
             plt.plot(runList, nnRewardList, color='blue')
@@ -476,18 +464,16 @@ class ActorCritic:
                 if i_episode % self.plotInterval == 0:
                     if self.basePath != None:
                         plt.savefig(
-                            self.basePath+'ploting_'+str(self.irlIter)+'/Rewards_plotNo{}'.format(i_episode))
-                #print 'The running reward for episode {}:'.format(i_episode),running_reward
+                            self.basePath+'ploting_'+str(self.irlIter) +
+                            '/Rewards_plotNo{}'.format(i_episode))
+
                 if i_episode % self.logInterval == 0:
                     if self.fileName != None:
-                        torch.save(self.policy.state_dict(
-                        ), self.curDirPolicy+self.fileName+str(self.irlIter)+'-'+str(i_episode)+'.h5')
-                        #torch.save(self.policy.state_dict(),'saved-models_'+ 'trainBlock' +'/evaluatedPoliciesTest/'+subPath+str(i_episode)+'-'+ filename + '-' + str(i_episode) + '.h5', )
-                    # else:
-                    #    print 'Storing from here :'
-                    #    torch.save(self.policy.state_dict(),self.filename)
+                        torch.save(self.policy.state_dict(),
+                                   self.curDirPolicy+self.fileName +
+                                   str(self.irlIter)+'-'+str(i_episode)+'.h5')
 
-                # save the model
+            # save the model
             lossList.append(self.finish_episode())
             plt.figure(2)
             plt.title('Plotting the loss :')
@@ -498,13 +484,8 @@ class ActorCritic:
                 if i_episode % self.plotInterval == 0:
                     if self.basePath != None:
                         plt.savefig(
-                            self.basePath+'ploting_'+str(self.irlIter)+'/Loss_plotNo{}'.format(i_episode))
-
-            # plt.show()
-            # if i_episode+1 % log_interval == 0:
-            #    print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-            #        i_episode, t, running_reward))
-                # env.render()
+                            self.basePath+'ploting_'+str(self.irlIter) +
+                            '/Loss_plotNo{}'.format(i_episode))
 
         return self.policy
 
@@ -529,6 +510,9 @@ if __name__ == '__main__':
     cNN = {'input': 29, 'hidden': [512, 128], 'output': 1}
     pNN = {'input': 29, 'hidden': [512, 128], 'output': 9}
     costNetwork = CostNetwork(cNN)
-    rlAC = ActorCritic(costNetwork=costNetwork, policy_nn_params=pNN,  noofPlays=100,
-                       Gamma=.9, Eps=.00001, storeModels=False, loginterval=10, plotinterval=2)
+
+    # TODO: Error in argument list below, not relevant atm
+    rlAC = ActorCritic(costNetwork=costNetwork, policy_nn_params=pNN,
+                       noofPlays=100, Gamma=.9, Eps=.00001, storeModels=False,
+                       loginterval=10, plotinterval=2)
     p = rlAC.actorCriticMain()
