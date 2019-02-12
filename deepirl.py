@@ -24,6 +24,7 @@ from rlmethods import ActorCritic
 from networks import CostNetwork
 from networks import Policy
 
+from featureExtractor import localWindowFeature
 
 import os
 import datetime
@@ -57,7 +58,14 @@ SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 #demo file contains a list of states for multiple trajectories?
 #trajectories - number of expert trajectories to be taken.
-def takeExpertInfo(trajectories):
+
+
+
+#**have to change this part. THis is not a part of the pipeline
+#but this method is called to transform raw state information from
+#expert trajectories to feature vectors that will be used to calulate the
+#state visitation frequency of the expert**change!!
+def takeExpertInfo(trajectories,WINDOW_SIZE,gridsize,device):
 
     env = BE.createBoard(display=True)
     actionList = [(0,-1),(1,0),(0,1),(-1,0)]
@@ -66,7 +74,8 @@ def takeExpertInfo(trajectories):
     for i in range(trajectories):
 
         state = env.reset()
-        state = env.get_state_BallEnv(window_size=5)
+        #state = env.get_state_BallEnv(window_size=5)
+        state = localWindowFeature(state,WINDOW_SIZE,gridsize,device)
         done = False
         env.render()
         trajInfo = []
@@ -77,7 +86,8 @@ def takeExpertInfo(trajectories):
             action = actionList[action]
 
             next_state , reward , done , _ = env.step(action)
-            next_state = env.get_state_BallEnv()
+            #next_state = env.get_state_BallEnv()
+            next_state = localWindowFeature(state,WINDOW_SIZE,gridsize,device)
             trajInfo.append(next_state)
             env.render()
 
@@ -229,88 +239,90 @@ def select_action(state,policy):
     return action.item()
 
 
-def checkOverlap(obj1Pos,obj1rad, obj2Pos, obj2rad):
 
-    xdiff = obj1Pos[0]-obj2Pos[0]
-    ydiff = obj1Pos[1]-obj2Pos[1]
-
-    if (np.hypot(xdiff,ydiff)-obj1rad-obj2rad) > 0:
-
-        return False
-    else:
-        return True
-
-def block_to_arrpos(window_size,x,y):
-
-    a = (window_size**2-1)/2
-    b = window_size
-    pos = a+(b*y)+x
-    return int(pos)
-
-
-
-def get_state_BallEnv(state):
-
-    #state is a list of info where 1st position holds the position of the
-    #agent, 2nd the position of the goal , 3rd the distance after that,
-    #the positions of the obstacles in the world
-        #print(state)
-    WINDOW_SIZE = 5
-    agentRad = 10
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    window_size = WINDOW_SIZE
-    block_width = 2
-
-    window_rows = window_size
-    row_start =  (window_rows-1)/2
-    window_cols = window_size
-    col_start = (window_cols-1)/2
-
-    ref_state = np.zeros(4+window_size**2)
-    #print(ref_state.shape)
-    a = (window_size**2-1)/2
-    ref_state[a+4] = 1
-    agent_pos = state[0]
-    goal_pos = state[1]
-    diff_x = goal_pos[0] - agent_pos[0]
-    diff_y = goal_pos[1] - agent_pos[1]
-    if diff_x >= 0 and diff_y >= 0:
-        ref_state[1] = 1
-    elif diff_x < 0  and diff_y >= 0:
-        ref_state[0] = 1
-    elif diff_x < 0 and diff_y < 0:
-        ref_state[3] = 1
-    else:
-        ref_state[2] = 1
-
-    for i in range(3,len(state)):
-
-        #as of now this just measures the distance from the center of the obstacle
-        #this distance has to be measured from the circumferance of the obstacle
-
-        #new method, simulate overlap for each of the neighbouring places
-        #for each of the obstacles
-        obs_pos = state[i][0:2]
-        obs_rad = state[i][2]
-        for r in range(-row_start,row_start+1,1):
-            for c in range(-col_start,col_start+1,1):
-                #c = x and r = y
-                temp_pos = (agent_pos[0] + c*block_width , agent_pos[1] + r*block_width)
-                if checkOverlap(temp_pos,agentRad, obs_pos, obs_rad):
-                    pos = block_to_arrpos(window_size,r,c)
-
-                    ref_state[pos]=1
-
-    #state is as follows:
-        #first - tuple agent position
-        #second -
-    state = torch.from_numpy(ref_state).to(device)
-    state = state.type(torch.cuda.FloatTensor)
-    state = state.unsqueeze(0)
-
-    return state
-
+####################################################################################
+# def checkOverlap(obj1Pos,obj1rad, obj2Pos, obj2rad):
+#
+#     xdiff = obj1Pos[0]-obj2Pos[0]
+#     ydiff = obj1Pos[1]-obj2Pos[1]
+#
+#     if (np.hypot(xdiff,ydiff)-obj1rad-obj2rad) > 0:
+#
+#         return False
+#     else:
+#         return True
+#
+# def block_to_arrpos(window_size,x,y):
+#
+#     a = (window_size**2-1)/2
+#     b = window_size
+#     pos = a+(b*y)+x
+#     return int(pos)
+#
+#
+#
+# def get_state_BallEnv(state):
+#
+#     #state is a list of info where 1st position holds the position of the
+#     #agent, 2nd the position of the goal , 3rd the distance after that,
+#     #the positions of the obstacles in the world
+#         #print(state)
+#     WINDOW_SIZE = 5
+#     agentRad = 10
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#
+#     window_size = WINDOW_SIZE
+#     block_width = 2
+#
+#     window_rows = window_size
+#     row_start =  (window_rows-1)/2
+#     window_cols = window_size
+#     col_start = (window_cols-1)/2
+#
+#     ref_state = np.zeros(4+window_size**2)
+#     #print(ref_state.shape)
+#     a = (window_size**2-1)/2
+#     ref_state[a+4] = 1
+#     agent_pos = state[0]
+#     goal_pos = state[1]
+#     diff_x = goal_pos[0] - agent_pos[0]
+#     diff_y = goal_pos[1] - agent_pos[1]
+#     if diff_x >= 0 and diff_y >= 0:
+#         ref_state[1] = 1
+#     elif diff_x < 0  and diff_y >= 0:
+#         ref_state[0] = 1
+#     elif diff_x < 0 and diff_y < 0:
+#         ref_state[3] = 1
+#     else:
+#         ref_state[2] = 1
+#
+#     for i in range(3,len(state)):
+#
+#         #as of now this just measures the distance from the center of the obstacle
+#         #this distance has to be measured from the circumferance of the obstacle
+#
+#         #new method, simulate overlap for each of the neighbouring places
+#         #for each of the obstacles
+#         obs_pos = state[i][0:2]
+#         obs_rad = state[i][2]
+#         for r in range(-row_start,row_start+1,1):
+#             for c in range(-col_start,col_start+1,1):
+#                 #c = x and r = y
+#                 temp_pos = (agent_pos[0] + c*block_width , agent_pos[1] + r*block_width)
+#                 if checkOverlap(temp_pos,agentRad, obs_pos, obs_rad):
+#                     pos = block_to_arrpos(window_size,r,c)
+#
+#                     ref_state[pos]=1
+#
+#     #state is as follows:
+#         #first - tuple agent position
+#         #second -
+#     state = torch.from_numpy(ref_state).to(device)
+#     state = state.type(torch.cuda.FloatTensor)
+#     state = state.unsqueeze(0)
+#
+#     return state
+#
 
 #************************************************************************
 
@@ -563,11 +575,18 @@ class DeepMaxEntIRL:
         plt.figure(1)
         plt.title('Plotting rewards across multiple runs:')
 
+        ##
+        WINDOW_SIZE = 5
+        GRID_SIZE = 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        ##
+
         print 'Number of runs to be done :', self.testRuns
         for run_i in range(self.testRuns):
 
             state = env.reset()
-            state = get_state_BallEnv(state) #convert the state to usabe state information array
+
+            state = localWindowFeature(state,WINDOW_SIZE,GRID_SIZE,device) #convert the state to usabe state information array
 
             rewardPerRun = []
             xListPerRun = []
@@ -586,7 +605,7 @@ class DeepMaxEntIRL:
 
                 nextState , reward, done , _ = env.step(action)
 
-                nextState = get_state_BallEnv(nextState)
+                nextState = localWindowFeature(nextState,WINDOW_SIZE,GRID_SIZE,device)
                 reward = self.costNetwork(nextState)
 
                 totalReward += reward
@@ -618,11 +637,14 @@ if __name__=='__main__':
 
     #info = takeExpertInfo(50)
 
-    stateDict,_ = getstateDict('no obstacle')
+    #stateDict,_ = getstateDict('no obstacle')
     #frqarray = getStateVisitationFrequencyExpert('expertstateinfolong_50.npy',stateDict)
 
     demofile = 'expertstateinfolong_50.npy'
-    print stateDict
+    info = np.load(demofile)
+
+    print info
+    '''
     #p = compute_state_visitation_freq_sampling(stateDict, 10, policy)
     nn_params ={'input': 29 , 'hidden': [256,128] , 'output':4}
     costNNparams = nn_params
@@ -632,7 +654,7 @@ if __name__=='__main__':
     samplingIter = 2000 #no of samples to be played inorder to get the agent state frequency
     gameplayIter = 1000 #no of iterations in the Actor Critic method to be played
     deepMaxEntIRL(demofile, costNNparams , policyNNparams , iterations_irl , samplingIter , gameplayIter ,storeInfo=True)
-    '''
+    
     costNNparams = {}
     policyNNparams = {}
     iterations = 10

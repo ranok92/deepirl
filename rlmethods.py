@@ -4,6 +4,9 @@ import torch.optim as optim
 import torch.nn.utils.clip_grad as clip_grad
 from networks import Policy
 from networks import CostNetwork
+from featureExtractor import localWindowFeature
+
+
 
 import torch.cuda as cutorch
 import numpy as np
@@ -114,85 +117,166 @@ class ActorCritic:
         self.fileName = fileName
         self.curDirPolicy = policyNetworkDir
 
+    #
+    # def block_to_arrpos(self,window_size,x,y):
+    #
+    #     a = (window_size**2-1)/2
+    #     b = window_size
+    #     pos = a+(b*y)+x
+    #     return int(pos)
+    #
+    #
+    # def get_state_BallEnv(self,state):
+    #
+    # #state is a list of info where 1st position holds the position of the
+    # #agent, 2nd the position of the goal , 3rd the distance after that,
+    # #the positions of the obstacles in the world
+    #     #print(state)
+    #     window_size = self.WINDOW_SIZE
+    #     block_width = 2
+    #
+    #     window_rows = window_size
+    #     row_start =  (window_rows-1)/2
+    #     window_cols = window_size
+    #     col_start = (window_cols-1)/2
+    #
+    #     ref_state = np.zeros(4+window_size**2)
+    #     #print(ref_state.shape)
+    #     a = (window_size**2-1)/2
+    #     ref_state[a+4] = 1
+    #     agent_pos = state[0]
+    #     goal_pos = state[1]
+    #     diff_x = goal_pos[0] - agent_pos[0]
+    #     diff_y = goal_pos[1] - agent_pos[1]
+    #     if diff_x >= 0 and diff_y >= 0:    #
+    # def block_to_arrpos(self,window_size,x,y):
+    #
+    #     a = (window_size**2-1)/2
+    #     b = window_size
+    #     pos = a+(b*y)+x
+    #     return int(pos)
+    #
+    #
+    # def get_state_BallEnv(self,state):
+    #
+    # #state is a list of info where 1st position holds the position of the
+    # #agent, 2nd the position of the goal , 3rd the distance after that,
+    # #the positions of the obstacles in the world
+    #     #print(state)
+    #     window_size = self.WINDOW_SIZE
+    #     block_width = 2
+    #
+    #     window_rows = window_size
+    #     row_start =  (window_rows-1)/2
+    #     window_cols = window_size
+    #     col_start = (window_cols-1)/2
+    #
+    #     ref_state = np.zeros(4+window_size**2)
+    #     #print(ref_state.shape)
+    #     a = (window_size**2-1)/2
+    #     ref_state[a+4] = 1
+    #     agent_pos = state[0]
+    #     goal_pos = state[1]
+    #     diff_x = goal_pos[0] - agent_pos[0]
+    #     diff_y = goal_pos[1] - agent_pos[1]
+    #     if diff_x >= 0 and diff_y >= 0:
+    #         ref_state[1] = 1
+    #     elif diff_x < 0  and diff_y >= 0:
+    #         ref_state[0] = 1
+    #     elif diff_x < 0 and diff_y < 0:
+    #         ref_state[3] = 1
+    #     else:
+    #         ref_state[2] = 1
+    #
+    #     for i in range(3,len(state)):
+    #
+    #         #as of now this just measures the distance from the center of the obstacle
+    #         #this distance has to be measured from the circumferance of the obstacle
+    #
+    #         #new method, simulate overlap for each of the neighbouring places
+    #         #for each of the obstacles
+    #         obs_pos = state[i][0:2]
+    #         obs_rad = state[i][2]
+    #         for r in range(-row_start,row_start+1,1):
+    #             for c in range(-col_start,col_start+1,1):
+    #                 #c = x and r = y
+    #                 temp_pos = (agent_pos[0] + c*block_width , agent_pos[1] + r*block_width)
+    #                 if self.checkOverlap(temp_pos,self.agentRad, obs_pos, obs_rad):
+    #                     pos = self.block_to_arrpos(window_size,r,c)
+    #
+    #                     ref_state[pos]=1
+    #
+    #     #state is as follows:
+    #         #first - tuple agent position
+    #         #second -
+    #     state = torch.from_numpy(ref_state).to(self.device)
+    #     state = state.type(torch.cuda.FloatTensor)
+    #     state = state.unsqueeze(0)
+    #
+    #     return state
+    #
+    #
+    # #returns true if there is an overlap
+    # def checkOverlap(self,obj1Pos,obj1rad, obj2Pos, obj2rad):
+    #
+    #     xdiff = obj1Pos[0]-obj2Pos[0]
+    #     ydiff = obj1Pos[1]-obj2Pos[1]
+    #
+    #     if (np.hypot(xdiff,ydiff)-obj1rad-obj2rad) > 0:
+    #
+    #         return False
+    #     else:
+    #         return True
 
-    def block_to_arrpos(self,window_size,x,y):
-
-        a = (window_size**2-1)/2
-        b = window_size
-        pos = a+(b*y)+x
-        return int(pos)
-
-
-    def get_state_BallEnv(self,state):
-
-    #state is a list of info where 1st position holds the position of the
-    #agent, 2nd the position of the goal , 3rd the distance after that,
-    #the positions of the obstacles in the world
-        #print(state)
-        window_size = self.WINDOW_SIZE
-        block_width = 2
-
-        window_rows = window_size
-        row_start =  (window_rows-1)/2
-        window_cols = window_size
-        col_start = (window_cols-1)/2
-
-        ref_state = np.zeros(4+window_size**2)
-        #print(ref_state.shape)
-        a = (window_size**2-1)/2
-        ref_state[a+4] = 1
-        agent_pos = state[0]
-        goal_pos = state[1]
-        diff_x = goal_pos[0] - agent_pos[0]
-        diff_y = goal_pos[1] - agent_pos[1]
-        if diff_x >= 0 and diff_y >= 0:
-            ref_state[1] = 1
-        elif diff_x < 0  and diff_y >= 0:
-            ref_state[0] = 1
-        elif diff_x < 0 and diff_y < 0:
-            ref_state[3] = 1
-        else:
-            ref_state[2] = 1
-
-        for i in range(3,len(state)):
-
-            #as of now this just measures the distance from the center of the obstacle
-            #this distance has to be measured from the circumferance of the obstacle
-
-            #new method, simulate overlap for each of the neighbouring places
-            #for each of the obstacles
-            obs_pos = state[i][0:2]
-            obs_rad = state[i][2]
-            for r in range(-row_start,row_start+1,1):
-                for c in range(-col_start,col_start+1,1):
-                    #c = x and r = y
-                    temp_pos = (agent_pos[0] + c*block_width , agent_pos[1] + r*block_width)
-                    if self.checkOverlap(temp_pos,self.agentRad, obs_pos, obs_rad):
-                        pos = self.block_to_arrpos(window_size,r,c)
-
-                        ref_state[pos]=1
-
-        #state is as follows:
-            #first - tuple agent position
-            #second -
-        state = torch.from_numpy(ref_state).to(self.device)
-        state = state.type(torch.cuda.FloatTensor)
-        state = state.unsqueeze(0)
-
-        return state
+    #         ref_state[1] = 1
+    #     elif diff_x < 0  and diff_y >= 0:
+    #         ref_state[0] = 1
+    #     elif diff_x < 0 and diff_y < 0:
+    #         ref_state[3] = 1
+    #     else:
+    #         ref_state[2] = 1
+    #
+    #     for i in range(3,len(state)):
+    #
+    #         #as of now this just measures the distance from the center of the obstacle
+    #         #this distance has to be measured from the circumferance of the obstacle
+    #
+    #         #new method, simulate overlap for each of the neighbouring places
+    #         #for each of the obstacles
+    #         obs_pos = state[i][0:2]
+    #         obs_rad = state[i][2]
+    #         for r in range(-row_start,row_start+1,1):
+    #             for c in range(-col_start,col_start+1,1):
+    #                 #c = x and r = y
+    #                 temp_pos = (agent_pos[0] + c*block_width , agent_pos[1] + r*block_width)
+    #                 if self.checkOverlap(temp_pos,self.agentRad, obs_pos, obs_rad):
+    #                     pos = self.block_to_arrpos(window_size,r,c)
+    #
+    #                     ref_state[pos]=1
+    #
+    #     #state is as follows:
+    #         #first - tuple agent position
+    #         #second -
+    #     state = torch.from_numpy(ref_state).to(self.device)
+    #     state = state.type(torch.cuda.FloatTensor)
+    #     state = state.unsqueeze(0)
+    #
+    #     return state
+    #
+    #
+    # #returns true if there is an overlap
+    # def checkOverlap(self,obj1Pos,obj1rad, obj2Pos, obj2rad):
+    #
+    #     xdiff = obj1Pos[0]-obj2Pos[0]
+    #     ydiff = obj1Pos[1]-obj2Pos[1]
+    #
+    #     if (np.hypot(xdiff,ydiff)-obj1rad-obj2rad) > 0:
+    #
+    #         return False
+    #     else:
+    #         return True
 
 
-    #returns true if there is an overlap
-    def checkOverlap(self,obj1Pos,obj1rad, obj2Pos, obj2rad):
-
-        xdiff = obj1Pos[0]-obj2Pos[0]
-        ydiff = obj1Pos[1]-obj2Pos[1]
-
-        if (np.hypot(xdiff,ydiff)-obj1rad-obj2rad) > 0:
-
-            return False
-        else:
-            return True
 
     def agent_action_to_WorldActionSimplified(self,action):
         if action==0: #move front
@@ -320,8 +404,7 @@ class ActorCritic:
         for i in range(no_of_samples):
 
             state = self.env.reset() #reset returns the original state info , but here we need the local 29 x 1 vector
-            state = self.env.get_state_BallEnv(window_size=5)
-
+            state = localWindowFeature(state,self.WINDOW_SIZE,2,self.device).squeeze().cpu().numpy()
             stateIndex = stateDict[np.array2string(state)]
             mu[i][stateIndex]+=1
             done = False
@@ -335,7 +418,7 @@ class ActorCritic:
                 next_state ,reward , done, _ = self.env.step(action)
                 #******IMP**** state returned from env.step() is different from the state representation being used for the
                 #networks
-                next_state = self.env.get_state_BallEnv(window_size=5)
+                next_state = localWindowFeature(next_state,self.WINDOW_SIZE,2,self.device).squeeze().cpu().numpy()
                 next_state_Index = stateDict[np.array2string(next_state)]
                 #print 'type of next state', next_state.dtype
 
@@ -477,7 +560,7 @@ class ActorCritic:
                 torch.cuda.empty_cache()
                 result,infoList = getMemoryAllocationInfo(torch.cuda.memory_allocated(0))
                 print 'Memory usage after clearing cache:' ,result
-            state = self.get_state_BallEnv(state)
+            state = localWindowFeature(state,5,2,self.device)
             hbuffer.addState(state)
             #state = hbuffer.getHistory()
             #state = env.sensor_readings
@@ -491,7 +574,7 @@ class ActorCritic:
                     state, reward , done , _ = self.env.step(action)
 
 
-                    state = self.get_state_BallEnv(state)
+                    state = localWindowFeature(state,self.WINDOW_SIZE,2,self.device)
                     reward = self.costNet(state)
                     hbuffer.addState(state)
                 else:
@@ -504,7 +587,7 @@ class ActorCritic:
                         #print action
                         state, reward, done, _ = self.env.step(action)
 
-                        state = self.get_state_BallEnv(state)
+                        state = localWindowFeature(state,self.WINDOW_SIZE,2,self.device)
 
                         reward = self.costNet(state)
                         rewardPerRun+=reward

@@ -205,6 +205,7 @@ if __name__=='__main__':
 
     import deepirl
 
+
     stateDict,_ = deepirl.getstateDict(args.state_dictionary)
 
     maxEntIrl = deepirl.DeepMaxEntIRL(demofile , rlMethod,  costNNparams , costNetwork , policyNNparams , policyNetwork , irlIterations , sampling_no ,  rlIterations , store=saveInfo , storeInfo=storageInfoDict ,
