@@ -42,19 +42,18 @@ def getMemoryAllocationInfo(memoryInBytes):
 class HistoryBuffer:
 
     def __init__(self, bufferSize=10):
-
         self.bufferSize = bufferSize
         self.buffer = []
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
-    # add a state to the history buffer
-    # each state is assumed to be of shape ( 1 x S )
 
     def addState(self, state):
+        """ add a state to the history buffer each state is assumed to be of
+        shape ( 1 x S ) """
 
         if len(self.buffer) >= self.bufferSize:
-
             del self.buffer[0]  # remove the oldest state
+
         self.buffer.append(state.cpu().numpy())
 
     # returns the 10 states in the buffer in the form of a torch tensor in the order in which they
@@ -131,18 +130,18 @@ class ActorCritic:
             return np.asarray([-5, 0])
 
     def select_action(self, state, policy):
-        #state = torch.from_numpy(state).float().unsqueeze(0)
+        # state = torch.from_numpy(state).float().unsqueeze(0)
         '''
         print 'Start printing grad :'
         for x in policy.parameters():
-            #print 'One'
+            # print 'One'
             print 'x weight: ', torch.norm(x.data)
             if x.grad is not None:
                 print 'x grad ', torch.norm(x.grad)
         print 'The end.'
         '''
         probs, state_value = policy(state)
-        #print 'probs :' , probs
+        # print 'probs :' , probs
         m = Categorical(probs)
         action = m.sample()
 
@@ -169,10 +168,11 @@ class ActorCritic:
         # trajectoryFile was created using a list of lists
         info = np.load(trajectoryFile)
         # info is an array of size (no_of_samples_taken,)
-        # for each pos of info, i.e. info[0] is a list of length : number of timesteps in that trajectory
+        # for each pos of info, i.e. info[0] is a list of length : number of
+        # timesteps in that trajectory
         # for each timestep there is an array that stores the state information.
         # i.e. info[i][j] is an array describing the state information
-        #print info
+        # print info
         no_of_samples = len(info)
         mu = np.zeros([no_of_samples, N_STATES])
         reward_array = np.zeros(no_of_samples)
@@ -188,30 +188,25 @@ class ActorCritic:
 
                     state_tensor = self.toTensor(state)
                     reward = self.costNet(state_tensor)
-                    #print 'reward :', reward.size()
+                    # print 'reward :', reward.size()
                     trajReward += reward.item()
 
             reward_array[i] = np.exp(-trajReward)
             avglen[i] = t
 
-        #print 'The reward array :',reward_array
-        #print 'sum of reward_array :', np.sum(reward_array)
         # normalize the rewards array
         reward_array = np.divide(reward_array, np.sum(reward_array))
 
         if self.verbose:
             print 'Avg length of the trajectories expert:', np.dot(
                 avglen, reward_array)
-        #print 'The normalized reward array :', reward_array
 
-        # multiply each of the trajectory state visitation freqency by their corresponding normalized reward
-        #print 'state visitation freq :', mu
+        # multiply each of the trajectory state visitation freqency by their
+        # corresponding normalized reward
 
         for i in range(no_of_samples):
-
             mu[i, :] = mu[i, :]*reward_array[i]
 
-        #print 'state visitation freq array after norm ', mu
         p = np.sum(mu, axis=0)
 
         return np.expand_dims(p, axis=1)
@@ -262,13 +257,13 @@ class ActorCritic:
                 action = self.agent_action_to_WorldActionSimplified(action)
 
                 next_state, reward, done, _ = self.env.step(action)
+
                 # ******IMP**** state returned from env.step() is different from the state representation being used for the
                 # networks
                 next_state = localWindowFeature(
                     next_state, self.WINDOW_SIZE, 2, self.device).squeeze().cpu().numpy()
 
                 next_state_Index = stateDict[np.array2string(next_state)]
-                #print 'type of next state', next_state.dtype
 
                 next_state_tensor = self.toTensor(next_state)
                 reward = self.costNet(next_state_tensor)
@@ -298,14 +293,12 @@ class ActorCritic:
                 avglen, reward_array)
             print 'The normalized reward array :', reward_array
 
-        # multiply each of the trajectory state visitation freqency by their corresponding normalized reward
-        #print 'state visitation freq :', mu
-
+        # multiply each of the trajectory state visitation freqency by their
+        # corresponding normalized reward
         for i in range(no_of_samples):
-
             mu[i, :] = mu[i, :]*reward_array[i]
 
-        #print 'state visitation freq array after norm ', mu
+        # print 'state visitation freq array after norm ', mu
         p = np.sum(mu, axis=0)
 
         return np.expand_dims(p, axis=1)
@@ -317,7 +310,7 @@ class ActorCritic:
             mu[:,t] = np.divide(mu[:,t],no_of_samples)
 
         p = np.sum(mu,1)
-        #p = np.divide(p,no_of_samples)
+        # p = np.divide(p,no_of_samples)
         p = np.expand_dims(p,axis=1)
         return p
         '''
@@ -334,28 +327,35 @@ class ActorCritic:
         policy_losses = []
         value_losses = []
         rewards = []
+
         for r in self.policy.rewards[::-1]:
             R = r + self.gamma * R
             rewards.insert(0, R)
+
         rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + self.eps)
+
         if self.verbose:
             print 'rewards :', rewards
+
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
             policy_losses.append(-log_prob * reward)
-            #print value.shape
-            #print torch.tensor([r]).to(device).shape
+            # print value.shape
+            # print torch.tensor([r]).to(device).shape
             value_losses.append(F.smooth_l1_loss(
                 value, torch.tensor([r]).to(self.device).unsqueeze(0)))
+
         self.optimizer.zero_grad()
         loss = torch.stack(policy_losses).sum() + \
             torch.stack(value_losses).sum()
         loss.backward()
         clip_grad.clip_grad_norm(self.policy.parameters(), 100)
         self.optimizer.step()
+
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
+
         return loss
 
     def actorCriticMain(self):
@@ -420,11 +420,9 @@ class ActorCritic:
                 else:
                     state = hbuffer.getHistory()
                     action = self.select_action(state, self.policy)
-                    #print action
+                    # print action
                     if action != None:
                         action = self.move_list[action]
-                        #action = agent_action_to_WorldActionSimplified(action)
-                        #print action
                         state, reward, done, _ = self.env.step(action)
 
                         state = localWindowFeature(
@@ -432,9 +430,9 @@ class ActorCritic:
 
                         reward = self.costNet(state)
                         rewardPerRun += reward
-                        #state = env.sensor_readings
+                        # state = env.sensor_readings
                         hbuffer.addState(state)
-                        #state = hbuffer.getHistory()
+                        # state = hbuffer.getHistory()
                         if i_episode % self.logInterval == 0:
                             if self.displayBoard:
                                 if self.verbose:
@@ -442,13 +440,13 @@ class ActorCritic:
                                 self.env.render()
                         self.policy.rewards.append(reward)
                         if done:
-                            #print done
+                            # print done
                             break
                         running_reward += reward
                     else:
                         continue
 
-            #running_reward = running_reward * 0.99 + t * 0.01
+            # running_reward = running_reward * 0.99 + t * 0.01
             nnRewardList.append(rewardPerRun)
             rewardList.append(self.env.total_reward_accumulated)
             runList.append(i_episode)
