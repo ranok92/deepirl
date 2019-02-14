@@ -56,8 +56,8 @@ class HistoryBuffer:
 
         self.buffer.append(state.cpu().numpy())
 
-    # returns the 10 states in the buffer in the form of a torch tensor in the order in which they
-    # were encountered
+    # returns the 10 states in the buffer in the form of a torch tensor in the
+    # order in which they were encountered
     def getHistory(self):
 
         arrSize = self.buffer[0].shape[1]
@@ -130,18 +130,7 @@ class ActorCritic:
             return np.asarray([-5, 0])
 
     def select_action(self, state, policy):
-        # state = torch.from_numpy(state).float().unsqueeze(0)
-        '''
-        print 'Start printing grad :'
-        for x in policy.parameters():
-            # print 'One'
-            print 'x weight: ', torch.norm(x.data)
-            if x.grad is not None:
-                print 'x grad ', torch.norm(x.grad)
-        print 'The end.'
-        '''
         probs, state_value = policy(state)
-        # print 'probs :' , probs
         m = Categorical(probs)
         action = m.sample()
 
@@ -149,9 +138,6 @@ class ActorCritic:
             self.SavedAction(m.log_prob(action), state_value))
         return action.item()
 
-    # stateDict - OrderedDict : key : state(string) , value : integer
-    # trajs - number of trajectories to simulate
-    # policy network
 
     def toTensor(self, state):
 
@@ -220,16 +206,14 @@ class ActorCritic:
         N_ACTIONS = 4
 
         no_of_samples = no_of_trajs
-        '''
-<<<<<<< HEAD
 
-=======
->>>>>>> minor formatting: typo fix, package import reordering, remove display arguments from rlmethods.py
+        '''
         run a bunch of trajectories, get the cost for each of them c_theta(tao)
         prob of a trajectory is directly proportional to the cost it obtains exp(-c_theta(tao)
         multiply the prob with the state visitation for each of the trajectory
         update Z (the normalizing factor)
         '''
+
         T = 200
         # mu[s, t] is the prob of visiting state s at time t
         mu = np.zeros([no_of_samples, N_STATES])
