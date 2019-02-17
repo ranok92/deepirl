@@ -30,10 +30,10 @@ SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 class Policy(nn.Module):
     """Policy network"""
-    def __init__(self):
+    def __init__(self, state_dims, action_dims):
         super(Policy, self).__init__()
-        self.affine1 = nn.Linear(4, 128)
-        self.action_head = nn.Linear(128, 2)
+        self.affine1 = nn.Linear(state_dims, 128)
+        self.action_head = nn.Linear(128, action_dims)
         self.value_head = nn.Linear(128, 1)
 
         self.saved_actions = []
@@ -59,7 +59,7 @@ class ActorCritic:
 
         # initialize a policy if none is passed.
         if policy is None:
-            self.policy = Policy()
+            self.policy = Policy(env.reset().shape[0], env.action_space.n)
         else:
             self.policy = policy
 
@@ -73,6 +73,8 @@ class ActorCritic:
 
         :param state: Current state in environment.
         """
+        state = np.asarray(state)
+
         state = torch.from_numpy(state).float()
         probs, state_value = self.policy(state)
         m = Categorical(probs)
@@ -119,13 +121,15 @@ class ActorCritic:
 
         running_reward = 10
         for i_episode in count(1):
-            state = self.env.reset()
+            state = np.asarray(self.env.reset())
 
             # number of timesteps taken
             t = 0
             for t in range(10000):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
+                state = np.asarray(state)
+
                 if args.render:
                     self.env.render()
                 self.policy.rewards.append(reward)
@@ -143,7 +147,6 @@ class ActorCritic:
                       "the last episode runs to {} time \
                       steps!".format(running_reward, t))
                 break
-
 
 if __name__ == '__main__':
     args = parser.parse_args()
