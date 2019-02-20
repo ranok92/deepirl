@@ -36,3 +36,21 @@ class HistoryBuffer:
         state = state.type(torch.cuda.FloatTensor)
 
         return state
+
+
+def to_oh(idx, size):
+    '''
+    creates a one-hot array of length 'size' and sets indexes in list 'idx' to
+    be ones.
+
+    params:
+        idx: list or numpy array of indices to be one.
+        size: size of output vector.
+
+    return:
+        output numpy vector of size ('size' x 1)
+    '''
+    out = np.zeros(size)
+    out[idx] = 1
+
+    return out

@@ -1,5 +1,6 @@
 '''An environment independant actor critic method.'''
 import argparse
+import pdb
 from itertools import count
 from collections import namedtuple
 import gym
@@ -10,6 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
+
+import sys
+sys.path.insert(0, '..')
+from gym_envs import np_frozenlake  # NOQA: E402
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -23,13 +28,12 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='interval between training status logs (default: 10)')
 
 
-
-
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 
 class Policy(nn.Module):
     """Policy network"""
+
     def __init__(self, state_dims, action_dims):
         super(Policy, self).__init__()
         self.affine1 = nn.Linear(state_dims, 128)
@@ -44,6 +48,7 @@ class Policy(nn.Module):
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
+
 
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
@@ -83,7 +88,6 @@ class ActorCritic:
                                                      state_value))
         return action.item()
 
-
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
         required variables and histories used in the training cycle one an
@@ -107,7 +111,7 @@ class ActorCritic:
 
         self.optimizer.zero_grad()
         loss = torch.stack(policy_losses).sum() + \
-                torch.stack(value_losses).sum()
+            torch.stack(value_losses).sum()
 
         loss.backward()
         self.optimizer.step()
@@ -115,20 +119,25 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-
     def train(self):
         """Train actor critic method on given gym environment."""
 
-        running_reward = 10
+        running_reward = 0
+
         for i_episode in count(1):
-            state = np.asarray(self.env.reset())
+            state = self.env.reset()
 
             # number of timesteps taken
             t = 0
+
+            # rewards obtained in this episode
+            ep_reward = 0
+
             for t in range(10000):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
-                state = np.asarray(state)
+
+                ep_reward += reward
 
                 if args.render:
                     self.env.render()
@@ -136,22 +145,24 @@ class ActorCritic:
                 if done:
                     break
 
-            running_reward = running_reward * 0.99 + t * 0.01
+            running_reward = running_reward * 0.9 + ep_reward * 0.1
             self.finish_episode()
 
             if i_episode % args.log_interval == 0:
-                print('Ep {}\tLast length: {:5d}\tAvg. length: {:.2f}'.format(
+                print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                     i_episode, t, running_reward))
+
             if running_reward > self.env.spec.reward_threshold:
                 print("Solved! Running reward is now {} and "
                       "the last episode runs to {} time \
                       steps!".format(running_reward, t))
                 break
 
+
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    _env = gym.make('CartPole-v0')
+    _env = gym.make('FrozenLakeNP-v0')
     _env.seed(args.seed)
     torch.manual_seed(args.seed)
 
