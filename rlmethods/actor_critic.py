@@ -42,7 +42,7 @@ def getMemoryAllocationInfo(memoryInBytes):
 
 class ActorCritic:
 
-    def __init__(self, costNetwork=None, noofPlays=100, policy_nn_params={},
+    def __init__(self, environment = None, costNetwork=None, noofPlays=100, policy_nn_params={},
                  storedNetwork=None, Gamma=.9, Eps=.00001, storeModels=True,
                  fileName=None, basePath=None, policyNetworkDir=None,
                  plotInterval=10, irliteration=None, displayBoard=False,
@@ -72,8 +72,7 @@ class ActorCritic:
 
         self.onServer = onServer
 
-        self.env = BE.createBoard(static_obstacles=0,
-                                  static_obstacle_radius=10)
+        self.env = environment
 
         self.WINDOW_SIZE = 5
         self.agentRad = 10

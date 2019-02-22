@@ -2,7 +2,15 @@ import torch
 import numpy as numpy
 from envs import gridworld as gw
 from rlmethods import actor_critic
+from networks import Policy
+
+
+policyNetwork = 
+
 world = gw.Gridworld(display=True,rows=10,cols=10, width=10)
+
+
+
 
 for i in range(10):
 
