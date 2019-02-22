@@ -15,6 +15,7 @@ from torch.distributions import Categorical
 import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
+import utils #NOQA: E402
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -36,7 +37,12 @@ class Policy(nn.Module):
 
     def __init__(self, state_dims, action_dims):
         super(Policy, self).__init__()
+
         self.affine1 = nn.Linear(state_dims, 128)
+        self.affine2 = nn.Linear(128, 128)
+        self.affine3 = nn.Linear(128, 128)
+        self.affine4 = nn.Linear(128, 128)
+
         self.action_head = nn.Linear(128, action_dims)
         self.value_head = nn.Linear(128, 1)
 
@@ -45,6 +51,10 @@ class Policy(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
+        x = F.relu(self.affine2(x))
+        x = F.relu(self.affine3(x))
+        x = F.relu(self.affine4(x))
+
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
@@ -59,8 +69,13 @@ class ActorCritic:
         :param env: environment to act in. Uses the same interface as gym
         environments.
         """
-        self.env = env
         self.gamma = gamma
+
+        self.env = env
+
+        # decorate environment's functions to return torch tensors
+        self.env.step = utils.step_torch_state()(self.env.step)
+        self.env.reset = utils.reset_torch_state()(self.env.reset)
 
         # initialize a policy if none is passed.
         if policy is None:
@@ -68,8 +83,14 @@ class ActorCritic:
         else:
             self.policy = policy
 
+        # use gpu if available
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else 'cpu')
+
+        self.policy = self.policy.to(self.device)
+
         # optimizer setup
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-2)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-4)
         self.EPS = np.finfo(np.float32).eps.item()
 
     def select_action(self, state):
@@ -78,9 +99,8 @@ class ActorCritic:
 
         :param state: Current state in environment.
         """
-        state = np.asarray(state)
 
-        state = torch.from_numpy(state).float()
+        # state = torch.from_numpy(state).float()
         probs, state_value = self.policy(state)
         m = Categorical(probs)
         action = m.sample()
@@ -107,7 +127,13 @@ class ActorCritic:
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
             policy_losses.append(-log_prob * reward)
-            value_losses.append(F.smooth_l1_loss(value, torch.tensor([r])))
+
+            r_tensor = torch.tensor([r])
+
+            if torch.cuda.is_available:
+                r_tensor = r_tensor.cuda()
+
+            value_losses.append(F.smooth_l1_loss(value, r_tensor))
 
         self.optimizer.zero_grad()
         loss = torch.stack(policy_losses).sum() + \
@@ -122,10 +148,20 @@ class ActorCritic:
     def train(self):
         """Train actor critic method on given gym environment."""
 
+        # keeps running avg of rewards through episodes
         running_reward = 0
+
+        # keeps histogram of states visited
+        state_visitation_histogram = torch.zeros(self.env.reset().shape[0],
+                                                dtype=torch.float32).cuda()
 
         for i_episode in count(1):
             state = self.env.reset()
+
+            # if torch.cuda.is_available():
+                # state = torch.from_numpy(state).cuda().type(dtype=torch.float32)
+
+            state_visitation_histogram += state
 
             # number of timesteps taken
             t = 0
@@ -137,6 +173,7 @@ class ActorCritic:
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
 
+                state_visitation_histogram += state
                 ep_reward += reward
 
                 if args.render:
@@ -151,6 +188,7 @@ class ActorCritic:
             if i_episode % args.log_interval == 0:
                 print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                     i_episode, t, running_reward))
+                print(state_visitation_histogram.reshape((4,4)))
 
             if running_reward > self.env.spec.reward_threshold:
                 print("Solved! Running reward is now {} and "
