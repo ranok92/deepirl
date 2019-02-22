@@ -13,12 +13,6 @@ from utils import to_oh
 
 class FrozenLakeNP(frozen_lake.FrozenLakeEnv):
 
-    # def __init__(self, *args, **kwargs):
-        # super().__init__(self, args, kwargs)
-
-        # # best reward is 95% of max reward, R=1
-        # self.spec.reward_threshold = 0.95
-
     def reset(self, *args, **kwargs):
         state = super().reset(*args, **kwargs)
         return to_oh(state, self.nS)
