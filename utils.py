@@ -24,8 +24,8 @@ class HistoryBuffer:
 
     def getHistory(self):
         """
-         returns the 10 states in the buffer in the form of a torch tensor in the
-         order in which they were encountered
+         returns the 10 states in the buffer in the form of a torch tensor in
+         the order in which they were encountered
         """
 
         arrSize = self.buffer[0].shape[1]
@@ -54,3 +54,54 @@ def to_oh(idx, size):
     out[idx] = 1
 
     return out
+
+def reset_torch_state(dtype=torch.float32):
+    """decorator to return a torch tensor from gym's env.reset() function.
+
+    :param f: function being decorated, in this case env.reset().
+    """
+
+    def real_decorator(f):
+        """real decorator, taking into account the dtype.
+
+        :param f: env.reset() being decorated.
+        """
+        def inner(*args, **kwargs):
+            """returns a torch tensor for cpu or gpu when appropriate."""
+
+            s = f(*args, **kwargs)
+
+            if torch.cuda.is_available():
+                return torch.from_numpy(s).cuda().type(dtype)
+
+            return torch.from_numpy(s)
+        return inner
+    return real_decorator
+
+
+def step_torch_state(dtype=torch.float32):
+    """decorator to return a torch tensor from gym's env.step() function.
+
+    :param f: function being decorated, in this case env.step().
+    """
+
+    def real_decorator(f):
+        """real decorator, taking into account the dtype.
+
+        :param f: env.step() being decorated.
+        """
+        def inner(*args, **kwargs):
+            """returns a torch tensor for cpu or gpu when appropriate."""
+
+            s, r, d, p = f(*args, **kwargs)
+
+            if torch.cuda.is_available():
+                s = torch.from_numpy(s).cuda().type(dtype)
+
+            else:
+                s = torch.from_numpy(s)
+
+            return s, r, d, p
+
+        return inner
+    return real_decorator
