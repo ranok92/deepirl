@@ -63,13 +63,18 @@ class Policy(nn.Module):
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
-    def __init__(self, env, policy=None, gamma=0.99):
+    def __init__(self, env, policy=None, gamma=0.99, render=False,
+                 log_interval=100):
+
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
         environments.
         """
+
         self.gamma = gamma
+        self.render = render
+        self.log_interval = log_interval
 
         self.env = env
 
@@ -176,19 +181,22 @@ class ActorCritic:
                 state_visitation_histogram += state
                 ep_reward += reward
 
-                if args.render:
+                if self.render:
                     self.env.render()
+
                 self.policy.rewards.append(reward)
+
                 if done:
                     break
 
             running_reward = running_reward * 0.9 + ep_reward * 0.1
             self.finish_episode()
 
-            if i_episode % args.log_interval == 0:
+            if i_episode % self.log_interval == 0:
                 print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                     i_episode, t, running_reward))
-                print(state_visitation_histogram.reshape((4,4)))
+                # print(state_visitation_histogram.reshape((4,4)))
+                print(state_visitation_histogram)
 
             if running_reward > self.env.spec.reward_threshold:
                 print("Solved! Running reward is now {} and "
@@ -204,5 +212,7 @@ if __name__ == '__main__':
     _env.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    model = ActorCritic(_env, gamma=args.gamma)
+    model = ActorCritic(_env, gamma=args.gamma, render=args.render,
+                        log_interval = args.log_interval)
+
     model.train()
