@@ -16,13 +16,15 @@ class GridWorld:
         self.rows = rows
         self.cols = cols
         self.cellWidth = width
-        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
+        self.upperLimit = np.asarray([self.cols-1, self.rows-1])
         self.lowerLimit = np.asarray([0,0])
 
 
-        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
+        self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
+        self.state = self.onehotrep() 
+
         if goal_state==None:
-            self.goal_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
+            self.goal_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
         else:
             self.goal_state = goal_state
 
@@ -46,10 +48,10 @@ class GridWorld:
         #does not matter if none or not.
         self.obstacles = obstacles
         # 0: up, 1: right, 2: down, 3: left
-        self.actionArray = [np.asarray([0,-1]),np.asarray([1,0]),np.asarray([0,1]),
-                            np.asarray([-1,0]),np.asarray([0,0])]
-        self.stepReward = 0.1
-
+        self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
+                            np.asarray([0,-1]),np.asarray([0,0])]
+        self.stepReward = 0
+	
         # TODO: Remove the below mock environment in favor of gym.space
         # creates a mock object mimicking action_space to obtain number of
         # actions
@@ -73,14 +75,14 @@ class GridWorld:
 
     def reset(self):
 
-        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
+        self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
-        self.gameDisplay = pygame.display.set_mode((self.rows*self.cellWidth,self.cols*self.cellWidth))
+        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
         pygame.display.set_caption('Your friendly grid environment')
-
+        self.state = self.onehotrep()
         if self.display:
             self.render()
-        return self.agent_state
+        return self.state
 
     #action is a number which points to the index of the action to be taken
     def step(self,action):
@@ -92,7 +94,8 @@ class GridWorld:
             self.render()
 
         # step should return fourth element 'info'
-        return self.agent_state, reward, done, None
+        self.state = self.onehotrep()
+        return self.state, reward, done, None
 
     #the tricky part
     def render(self):
@@ -105,12 +108,12 @@ class GridWorld:
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[0]*self.cellWidth,obs[1]*self.cellWidth,self.cellWidth, self.cellWidth])
+                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]*self.cellWidth,obs[0]*self.cellWidth,self.cellWidth, self.cellWidth])
             
         #render goal
-        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[0]*self.cellWidth, self.goal_state[1]*self.cellWidth,self.cellWidth, self.cellWidth])
+        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]*self.cellWidth, self.goal_state[0]*self.cellWidth,self.cellWidth, self.cellWidth])
         #render agent
-        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[0]*self.cellWidth, self.agent_state[1]*self.cellWidth, self.cellWidth, self.cellWidth])
+        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]*self.cellWidth, self.agent_state[0]*self.cellWidth, self.cellWidth, self.cellWidth])
         pygame.display.update()
         return 0
 
@@ -161,8 +164,11 @@ class GridWorld:
 
         return reward, done
 
+    def onehotrep(self):
 
-
+        onehot = np.zeros(self.rows*self.cols)
+        onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
+        return onehot
 
 
 if __name__=="__main__":
@@ -178,7 +184,8 @@ if __name__=="__main__":
 
             action = world.takeUserAction()
             next_state, reward,done,_ = world.step(action)
-
+            print(world.agent_state)
+            print(next_state)
             totalReward+=reward
             if done:
                 break
