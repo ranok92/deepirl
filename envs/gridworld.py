@@ -43,14 +43,14 @@ class GridWorld:
         self.red = (255,0,0)
         self.clock = pygame.time.Clock()
 
-        self.tickSpeed = 30
+        self.tickSpeed = 60
         self.agent_action_keyboard = [False for i in range(4)]
         #does not matter if none or not.
         self.obstacles = obstacles
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
                             np.asarray([0,-1]),np.asarray([0,0])]
-        self.stepReward = 0
+        self.stepReward = 0.01
 	
         # TODO: Remove the below mock environment in favor of gym.space
         # creates a mock object mimicking action_space to obtain number of
@@ -70,7 +70,7 @@ class GridWorld:
             def __init__(self, reward_threshold):
                 self.reward_threshold = reward_threshold
 
-        self.spec = MockSpec(10.0)
+        self.spec = MockSpec(1.0)
 
 
     def reset(self):
@@ -160,14 +160,16 @@ class GridWorld:
             reward = (self.distanceFromgoal - newdist)*self.stepReward
 
             self.distanceFromgoal = newdist
-
+        
         return reward, done
 
     def onehotrep(self):
 
-        onehot = np.zeros(self.rows*self.cols)
-        onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
-        return onehot
+        # onehot = np.zeros(self.rows*self.cols)
+        # onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
+        # return onehot
+
+        return self.agent_state
 
 
 if __name__=="__main__":

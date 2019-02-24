@@ -64,7 +64,8 @@ class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, policy=None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0):
+                 log_interval=100, max_episodes=0, max_ep_length=200,
+                 reward_threshold_ratio=0.99):
 
         """__init__
 
@@ -76,6 +77,8 @@ class ActorCritic:
         self.render = render
         self.log_interval = log_interval
         self.max_episodes = max_episodes
+        self.max_ep_length = max_ep_length
+        self.reward_threshold_ratio = reward_threshold_ratio
 
         self.env = env
 
@@ -177,9 +180,10 @@ class ActorCritic:
             t = 0
 
             # rewards obtained in this episode
+            # ep_reward = self.max_ep_length
             ep_reward = 0
 
-            for t in range(30):  # Don't infinite loop while learning
+            for t in range(self.max_ep_length):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
 
@@ -194,7 +198,9 @@ class ActorCritic:
                 if done:
                     break
 
-            running_reward = running_reward * 0.9 + ep_reward * 0.1
+            running_reward = running_reward * self.reward_threshold_ratio +\
+                    ep_reward * (1-self.reward_threshold_ratio)
+
             self.finish_episode()
 
             if i_episode % self.log_interval == 0:
