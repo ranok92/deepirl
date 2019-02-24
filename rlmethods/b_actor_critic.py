@@ -127,7 +127,11 @@ class ActorCritic:
             R = r + self.gamma * R
             rewards.insert(0, R)
         rewards = torch.tensor(rewards)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
+
+        # if single rewards, do not normalize mean distribution
+        if len(rewards) > 1:
+            rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
+
 
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
@@ -174,7 +178,7 @@ class ActorCritic:
             # rewards obtained in this episode
             ep_reward = 0
 
-            for t in range(10000):  # Don't infinite loop while learning
+            for t in range(30):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
 
@@ -195,8 +199,6 @@ class ActorCritic:
             if i_episode % self.log_interval == 0:
                 print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                     i_episode, t, running_reward))
-                # print(state_visitation_histogram.reshape((4,4)))
-                print(state_visitation_histogram)
 
             if running_reward > self.env.spec.reward_threshold:
                 print("Solved! Running reward is now {} and "
