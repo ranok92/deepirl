@@ -86,7 +86,6 @@ class GridWorld:
 
     #action is a number which points to the index of the action to be taken
     def step(self,action):
-        self.clock.tick(self.tickSpeed)
         #print('printing the keypress status',self.agent_action_keyboard)
         self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
         reward, done = self.calculateReward()

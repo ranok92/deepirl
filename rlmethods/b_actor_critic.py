@@ -64,7 +64,7 @@ class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, policy=None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=1000):
+                 log_interval=100, max_episodes=0):
 
         """__init__
 
@@ -208,7 +208,7 @@ class ActorCritic:
                 break
 
             # terminate if max episodes exceeded
-            if i_episode > self.max_episodes:
+            if i_episode > self.max_episodes and self.max_episodes > 0:
                 break
 
 
