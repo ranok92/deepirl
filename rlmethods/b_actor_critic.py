@@ -64,7 +64,7 @@ class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, policy=None, gamma=0.99, render=False,
-                 log_interval=100):
+                 log_interval=100, max_episodes=1000):
 
         """__init__
 
@@ -75,6 +75,7 @@ class ActorCritic:
         self.gamma = gamma
         self.render = render
         self.log_interval = log_interval
+        self.max_episodes = max_episodes
 
         self.env = env
 
@@ -204,6 +205,10 @@ class ActorCritic:
                 print("Solved! Running reward is now {} and "
                       "the last episode runs to {} time \
                       steps!".format(running_reward, t))
+                break
+
+            # terminate if max episodes exceeded
+            if i_episode > self.max_episodes:
                 break
 
 

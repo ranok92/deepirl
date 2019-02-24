@@ -10,7 +10,7 @@ from rlmethods.b_actor_critic import ActorCritic
 def main():
     env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
 
-    model = ActorCritic(env, gamma=0.9, log_interval=1)
+    model = ActorCritic(env, gamma=0.9, log_interval=10, max_episodes=10)
     model.train()
 
 
