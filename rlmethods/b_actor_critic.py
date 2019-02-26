@@ -137,7 +137,6 @@ class ActorCritic:
         :param state: Current state in environment.
         """
 
-        # state = torch.from_numpy(state).float()
         probs, state_value = self.policy(state)
         m = Categorical(probs)
         action = m.sample()
@@ -197,7 +196,7 @@ class ActorCritic:
 
             r_tensor = torch.tensor([r])
 
-            if torch.cuda.is_available:
+            if torch.cuda.is_available():
                 r_tensor = r_tensor.cuda()
 
             value_losses.append(F.smooth_l1_loss(value, r_tensor))
@@ -218,17 +217,8 @@ class ActorCritic:
         # keeps running avg of rewards through episodes
         running_reward = 0
 
-        # keeps histogram of states visited
-        state_visitation_histogram = torch.zeros(self.env.reset().shape[0],
-                                                 dtype=torch.float32).cuda()
-
         for i_episode in count(1):
             state = self.env.reset()
-
-            # if torch.cuda.is_available():
-            # state = torch.from_numpy(state).cuda().type(dtype=torch.float32)
-
-            state_visitation_histogram += state
 
             # number of timesteps taken
             t = 0
@@ -241,7 +231,6 @@ class ActorCritic:
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
 
-                state_visitation_histogram += state
                 ep_reward += reward
 
                 if self.render:

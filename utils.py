@@ -74,7 +74,7 @@ def reset_torch_state(dtype=torch.float32):
             if torch.cuda.is_available():
                 return torch.from_numpy(s).cuda().type(dtype)
 
-            return torch.from_numpy(s)
+            return torch.from_numpy(s).type(dtype)
         return inner
     return real_decorator
 
@@ -99,7 +99,7 @@ def step_torch_state(dtype=torch.float32):
                 s = torch.from_numpy(s).cuda().type(dtype)
 
             else:
-                s = torch.from_numpy(s)
+                s = torch.from_numpy(s).type(dtype)
 
             return s, r, d, p
 
