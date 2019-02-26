@@ -8,9 +8,10 @@ class GridWorld:
     #the numbering starts from 0,0 from topleft corner and goes down and right
     #the obstacles should be a list of 2 dim numpy array stating the position of the 
     #obstacle
-    def __init__(self, rows = 10 , cols = 10 , width = 10, goal_state = None, obstacles = None , display = True ,stepReward=0.001):
+    def __init__(self ,seed = 10,rows = 10 , cols = 10 , width = 10, goal_state = None, obstacles = None , display = True ,stepReward=0.001):
 
         #environment information
+        np.random.seed(seed)
         pygame.init()
         pygame.key.set_repeat(1,200)
         self.rows = rows
@@ -18,8 +19,6 @@ class GridWorld:
         self.cellWidth = width
         self.upperLimit = np.asarray([self.cols-1, self.rows-1])
         self.lowerLimit = np.asarray([0,0])
-
-
         self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
         self.state = self.onehotrep() 
 
@@ -50,7 +49,7 @@ class GridWorld:
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
                             np.asarray([0,-1]),np.asarray([0,0])]
-        self.stepReward = 0
+        self.stepReward = 0.01
 	
         # TODO: Remove the below mock environment in favor of gym.space
         # creates a mock object mimicking action_space to obtain number of
@@ -172,8 +171,8 @@ class GridWorld:
 
 
 if __name__=="__main__":
-
-    world = GridWorld(display=True, obstacles=[np.asarray([1,2])])
+    
+    world = GridWorld(display=True, seed = 0 , obstacles=[np.asarray([1,2])])
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -184,8 +183,8 @@ if __name__=="__main__":
 
             action = world.takeUserAction()
             next_state, reward,done,_ = world.step(action)
-            print(world.agent_state)
-            print(next_state)
+            #print(world.agent_state)
+            #print(next_state)
             totalReward+=reward
             if done:
                 break
