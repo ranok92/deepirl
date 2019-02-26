@@ -64,7 +64,8 @@ class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, policy=None, gamma=0.99, render=False,
-                 log_interval=100):
+                 log_interval=100, max_episodes=0, max_ep_length=200,
+                 reward_threshold_ratio=0.99):
 
         """__init__
 
@@ -75,6 +76,9 @@ class ActorCritic:
         self.gamma = gamma
         self.render = render
         self.log_interval = log_interval
+        self.max_episodes = max_episodes
+        self.max_ep_length = max_ep_length
+        self.reward_threshold_ratio = reward_threshold_ratio
 
         self.env = env
 
@@ -127,7 +131,11 @@ class ActorCritic:
             R = r + self.gamma * R
             rewards.insert(0, R)
         rewards = torch.tensor(rewards)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
+
+        # if single rewards, do not normalize mean distribution
+        if len(rewards) > 1:
+            rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
+
 
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
@@ -172,9 +180,10 @@ class ActorCritic:
             t = 0
 
             # rewards obtained in this episode
+            # ep_reward = self.max_ep_length
             ep_reward = 0
 
-            for t in range(10000):  # Don't infinite loop while learning
+            for t in range(self.max_ep_length):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
 
@@ -189,19 +198,23 @@ class ActorCritic:
                 if done:
                     break
 
-            running_reward = running_reward * 0.9 + ep_reward * 0.1
+            running_reward = running_reward * self.reward_threshold_ratio +\
+                    ep_reward * (1-self.reward_threshold_ratio)
+
             self.finish_episode()
 
             if i_episode % self.log_interval == 0:
                 print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                     i_episode, t, running_reward))
-                # print(state_visitation_histogram.reshape((4,4)))
-                print(state_visitation_histogram)
 
             if running_reward > self.env.spec.reward_threshold:
                 print("Solved! Running reward is now {} and "
                       "the last episode runs to {} time \
                       steps!".format(running_reward, t))
+                break
+
+            # terminate if max episodes exceeded
+            if i_episode > self.max_episodes and self.max_episodes > 0:
                 break
 
 

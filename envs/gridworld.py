@@ -42,7 +42,7 @@ class GridWorld:
         self.red = (255,0,0)
         self.clock = pygame.time.Clock()
 
-        self.tickSpeed = 30
+        self.tickSpeed = 60
         self.agent_action_keyboard = [False for i in range(4)]
         #does not matter if none or not.
         self.obstacles = obstacles
@@ -69,7 +69,7 @@ class GridWorld:
             def __init__(self, reward_threshold):
                 self.reward_threshold = reward_threshold
 
-        self.spec = MockSpec(10.0)
+        self.spec = MockSpec(1.0)
 
 
     def reset(self):
@@ -85,7 +85,6 @@ class GridWorld:
 
     #action is a number which points to the index of the action to be taken
     def step(self,action):
-        self.clock.tick(self.tickSpeed)
         #print('printing the keypress status',self.agent_action_keyboard)
         self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
         reward, done = self.calculateReward()
@@ -160,14 +159,16 @@ class GridWorld:
             reward = (self.distanceFromgoal - newdist)*self.stepReward
 
             self.distanceFromgoal = newdist
-
+        
         return reward, done
 
     def onehotrep(self):
 
-        onehot = np.zeros(self.rows*self.cols)
-        onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
-        return onehot
+        # onehot = np.zeros(self.rows*self.cols)
+        # onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
+        # return onehot
+
+        return self.agent_state
 
 
 if __name__=="__main__":
