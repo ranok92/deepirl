@@ -147,10 +147,6 @@ class ActorCritic:
 
     def generate_trajectory(self, num_trajs, path):
 
-        # all actions and states from all trajectories
-        traj_action_tensors = []
-        traj_state_tensors = []
-
         for traj_i in range(num_trajs):
 
             # action and states lists for current trajectory
@@ -165,16 +161,16 @@ class ActorCritic:
                 state, rewards, done, _ = self.env.step(action)
                 states.append(state)
 
-            traj_action_tensors.append(torch.stack(actions))
-            traj_state_tensors.append(torch.stack(states))
+            actions_tensor = torch.tensor(actions)
+            states_tensor = torch.stack(states)
 
-        traj_actions = torch.stack(traj_action_tensors)
-        traj_states = torch.stack(traj_state_tensors)
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-        torch.save(traj_actions, os.path.join(path, 'traj.actions'))
-        torch.save(traj_states, os.path.join(path, 'traj.states'))
+            torch.save(actions_tensor,
+                       os.path.join(path, 'traj%s.acts' % str(traj_i)))
 
-
+            torch.save(states_tensor,
+                       os.path.join(path, 'traj%s.states' % str(traj_i)))
 
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
@@ -274,7 +270,6 @@ class ActorCritic:
             # terminate if max episodes exceeded
             if i_episode > self.max_episodes and self.max_episodes > 0:
                 break
-
 
 
 if __name__ == '__main__':

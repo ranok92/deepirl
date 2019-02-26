@@ -35,6 +35,8 @@ def main():
             model.policy.save('./saved-models/')
 
     if args.play:
+        env.display = True
+        env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
         model.generate_trajectory(10, './trajs/ac_gridworld/')
 
