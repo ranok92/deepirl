@@ -29,8 +29,6 @@ def main():
     if not args.play:
         model.train()
 
-        pdb.set_trace()
-
         if not args.dont_save:
             model.policy.save('./saved-models/')
 
