@@ -1,6 +1,9 @@
 '''An environment independant actor critic method.'''
 import argparse
 import pdb
+import os
+import pathlib
+import datetime
 from itertools import count
 from collections import namedtuple
 import gym
@@ -15,7 +18,7 @@ from torch.distributions import Categorical
 import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
-import utils #NOQA: E402
+import utils  # NOQA: E402
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -59,6 +62,32 @@ class Policy(nn.Module):
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
 
+    def save(self, path):
+        """Save the model.
+
+        :param path: path in which to save the model.
+        """
+        model_i = 0
+
+        # os.makedirs(path, parents=True, exist_ok=True)
+
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+        while os.path.exists(os.path.join(path, '%s.pt' % model_i)):
+            model_i += 1
+
+        filename = os.path.join(path, '%s.pt' % model_i)
+
+        torch.save(self.state_dict(), filename)
+
+    def load(self, path):
+        """load the model.
+
+        :param path: path from which to load the model.
+        """
+        self.load_state_dict(torch.load(path))
+        self.eval()
+
 
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
@@ -66,7 +95,6 @@ class ActorCritic:
     def __init__(self, env, policy=None, gamma=0.99, render=False,
                  log_interval=100, max_episodes=0, max_ep_length=200,
                  reward_threshold_ratio=0.99):
-
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
@@ -117,6 +145,33 @@ class ActorCritic:
                                                      state_value))
         return action.item()
 
+    def generate_trajectory(self, num_trajs, path):
+
+        for traj_i in range(num_trajs):
+
+            # action and states lists for current trajectory
+            actions = []
+            states = [self.env.reset()]
+
+            done = False
+            while not done:
+                action = self.select_action(states[-1])
+                actions.append(action)
+
+                state, rewards, done, _ = self.env.step(action)
+                states.append(state)
+
+            actions_tensor = torch.tensor(actions)
+            states_tensor = torch.stack(states)
+
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+            torch.save(actions_tensor,
+                       os.path.join(path, 'traj%s.acts' % str(traj_i)))
+
+            torch.save(states_tensor,
+                       os.path.join(path, 'traj%s.states' % str(traj_i)))
+
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
         required variables and histories used in the training cycle one an
@@ -135,7 +190,6 @@ class ActorCritic:
         # if single rewards, do not normalize mean distribution
         if len(rewards) > 1:
             rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
-
 
         for (log_prob, value), r in zip(saved_actions, rewards):
             reward = r - value.item()
@@ -166,13 +220,13 @@ class ActorCritic:
 
         # keeps histogram of states visited
         state_visitation_histogram = torch.zeros(self.env.reset().shape[0],
-                                                dtype=torch.float32).cuda()
+                                                 dtype=torch.float32).cuda()
 
         for i_episode in count(1):
             state = self.env.reset()
 
             # if torch.cuda.is_available():
-                # state = torch.from_numpy(state).cuda().type(dtype=torch.float32)
+            # state = torch.from_numpy(state).cuda().type(dtype=torch.float32)
 
             state_visitation_histogram += state
 
@@ -199,7 +253,7 @@ class ActorCritic:
                     break
 
             running_reward = running_reward * self.reward_threshold_ratio +\
-                    ep_reward * (1-self.reward_threshold_ratio)
+                ep_reward * (1-self.reward_threshold_ratio)
 
             self.finish_episode()
 
@@ -226,6 +280,6 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
 
     model = ActorCritic(_env, gamma=args.gamma, render=args.render,
-                        log_interval = args.log_interval)
+                        log_interval=args.log_interval)
 
     model.train()

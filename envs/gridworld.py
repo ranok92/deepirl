@@ -8,7 +8,7 @@ class GridWorld:
     #the numbering starts from 0,0 from topleft corner and goes down and right
     #the obstacles should be a list of 2 dim numpy array stating the position of the 
     #obstacle
-    def __init__(self ,seed = 10,rows = 10 , cols = 10 , width = 10, goal_state = None, obstacles = None , display = True ,stepReward=0.001):
+    def __init__(self ,seed = 7,rows = 10 , cols = 10 , width = 10, goal_state = None, obstacles = None , display = True ,stepReward=0.001):
 
         #environment information
         np.random.seed(seed)
