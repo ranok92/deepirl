@@ -55,7 +55,7 @@ def to_oh(idx, size):
 
     return out
 
-def reset_torch_state(dtype=torch.float32):
+def reset_torch_state(dtype=torch.float64):
     """decorator to return a torch tensor from gym's env.reset() function.
 
     :param f: function being decorated, in this case env.reset().
@@ -79,7 +79,7 @@ def reset_torch_state(dtype=torch.float32):
     return real_decorator
 
 
-def step_torch_state(dtype=torch.float32):
+def step_torch_state(dtype=torch.float64):
     """decorator to return a torch tensor from gym's env.step() function.
 
     :param f: function being decorated, in this case env.step().
