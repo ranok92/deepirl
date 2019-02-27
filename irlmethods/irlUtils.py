@@ -89,7 +89,8 @@ def toTorch(nparray):
 def toNumpy(torchTensor):
 	return torchTensor.to("cpu").detach().numpy()
 
-def getStateVisitationFreq(policyfile , rows = 10 , cols = 10 , num_actions = 5):
+def getStateVisitationFreq(policyfile , rows = 10 , cols = 10 , num_actions = 5,
+						goal_state = np.asarray([3,3])):
 	
 	'''
 	The state visitation frequency for a given policy is the probability of being
@@ -108,6 +109,7 @@ def getStateVisitationFreq(policyfile , rows = 10 , cols = 10 , num_actions = 5)
 
 	TIMESTEPS = 5
 	TOTALSTATES = rows*cols
+	GOALSTATE = (goal_state[0]*cols)+goal_state[1]
 	stateVisitationMatrix = np.zeros([TOTALSTATES,TIMESTEPS])
 	env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
 	policy =  Policy(env.reset().shape[0], env.action_space.n)
@@ -129,10 +131,11 @@ def getStateVisitationFreq(policyfile , rows = 10 , cols = 10 , num_actions = 5)
 			#start state
 			if i==0:
 				stateVisitationMatrix[s,i] = startStateDist[s]
+				stateVisitationMatrix[GOALSTATE,i] = 0
 			else:
 				for s_prev in range(TOTALSTATES):
 					for a in range(env.action_space.n):
-
+						stateVisitationMatrix[GOALSTATE,i] = 0
 						stateVisitationMatrix[s,i] += stateVisitationMatrix[s_prev,i-1]* \
 											stateTransitionMatrix[s,a,s_prev]*stateActionTable[a,s_prev]
 
@@ -144,7 +147,8 @@ if __name__=='__main__':
 
 	r = 10
 	c = 10
-	statevisit = getStateVisitationFreq("/home/abhisek/Study/Robotics/deepirl/experiments/saved-models/1.pt" , rows = r, cols = c, num_actions = 5)
+	statevisit = getStateVisitationFreq("/home/abhisek/Study/Robotics/deepirl/experiments/saved-models/2.pt" ,
+										rows = r, cols = c, num_actions = 5 )
 	print(type(statevisit))
 	print(statevisit)
 	statevisitMat = np.resize(statevisit,(r,c))
