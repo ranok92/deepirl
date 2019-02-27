@@ -34,6 +34,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Policy(nn.Module):
     """Policy network"""
@@ -85,7 +86,7 @@ class Policy(nn.Module):
 
         :param path: path from which to load the model.
         """
-        self.load_state_dict(torch.load(path))
+        self.load_state_dict(torch.load(path, map_location=DEVICE))
         self.eval()
 
 
