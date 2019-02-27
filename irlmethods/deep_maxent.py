@@ -1,3 +1,4 @@
+
 '''
 Deep maxent as defined by Wulfmeier et. al.
 '''
@@ -5,6 +6,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+
+import sys
+sys.path.insert(0, '..')
+import utils  # NOQA: E402
+from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 
 
 class RewardNet(nn.Module):
@@ -50,8 +56,8 @@ class RewardNet(nn.Module):
 
 
 class DeepMaxent():
-    def __init__():
-        pass
+    def __init__(rlmethod):
+        self.rl = rlmethod
 
     def expert_svf():
         pass
