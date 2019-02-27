@@ -14,12 +14,15 @@ import sys
 sys.path.insert(0, '..')
 
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#for visual
+import matplotlib.pyplot as plt
 
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
 
 
-def createStateActionTable(policy, rows=10, cols=10, num_actions=4):
+def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
     given a particular policy and info about the environment on which it is trained
     returns a matrix of size A x S where A is the 
@@ -29,9 +32,9 @@ def createStateActionTable(policy, rows=10, cols=10, num_actions=4):
     '''
     stateActionTable = np.zeros([num_actions, (rows*cols)])
     '''
-	the states are linearized in the following way row*cols+cols = col 
-	of the state visitation freq table 
-	'''
+    the states are linearized in the following way row*cols+cols = col 
+    of the state visitation freq table 
+    '''
     for i in range(rows):
         for j in range(cols):
             state = np.asarray([i, j])
@@ -43,37 +46,38 @@ def createStateActionTable(policy, rows=10, cols=10, num_actions=4):
 
 def createStateTransitionMatix(rows=10, cols=10, action_space=5):
     '''
-    Creates a matrix of dimension (total_states X total_states X total_actions)
+    Creates a matrix of dimension (total_states X total_actionsX total_states)
     As the environment is deterministic all the entries here should be either 
     0 or 1
+    TranstionMatirx[next_state , action , prev_state]
     '''
     total_states = rows*cols
-    transitionMatrix = np.zeros([total_states, action_space, total_states])
+    transitionMatrix = np.zeros([total_states,action_space,total_states])
     for i in range(total_states):
 
-        # check for boundary cases before making changes
-        # check left if true then not boundary case
-        if int(i/cols) == int((i-1)/cols):
-            transitionMatrix[i, 3, i-1] = 1
+        #check for boundary cases before making changes
+        #check left if true then not boundary case
+        if int(i/cols)==int((i-1)/cols):
+            transitionMatrix[i-1,3,i] = 1
         else:
-            transitionMatrix[i, 3, i] = 1
-        # check right
-        if (int(i/cols) == int((i+1)/cols)):
-            transitionMatrix[i, 1, i+1] = 1
+            transitionMatrix[i,3,i] = 1
+        #check right
+        if (int(i/cols)==int((i+1)/cols)):
+            transitionMatrix[i+1,1,i] = 1
         else:
-            transitionMatrix[i, 1, i] = 1
-        # check top
+            transitionMatrix[i,1,i] = 1
+        #check top
         if (math.floor((i-cols)/cols) >= 0):
-            transitionMatrix[i, 0, i-cols] = 1
+            transitionMatrix[i-cols,0,i] = 1
         else:
-            transitionMatrix[i, 0, i] = 1
-        # check down
+            transitionMatrix[i,0,i] = 1
+        #check down
         if (math.floor((i+cols)/cols)) < cols:
-            transitionMatrix[i, 2, i+cols] = 1
+            transitionMatrix[i+cols,2,i] = 1
         else:
-            transitionMatrix[i, 2, i] = 1
+            transitionMatrix[i,2,i] = 1
 
-        transitionMatrix[i, 4, i] = 1
+        transitionMatrix[i,4,i] = 1
 
     return transitionMatrix
 
@@ -137,7 +141,9 @@ def getStateVisitationFreq(policyfile, rows=10, cols=10, num_actions=5):
                             stateTransitionMatrix[s, a, s_prev] * \
                             stateActionTable[a, s_prev]
 
-    return np.sum(stateVisitationMatrix, axis=1)
+    print("summing over time")
+    print(np.sum(stateVisitationMatrix,axis = 0))
+    return np.sum(stateVisitationMatrix,axis=1)
 
 
 def expert_svf(traj_path, ncols=10, nrows=10):
@@ -157,10 +163,16 @@ def expert_svf(traj_path, ncols=10, nrows=10):
 
 if __name__ == '__main__':
 
-    statevisit = getStateVisitationFreq(
-        "/home/abhisek/Study/Robotics/deepirl/experiments/saved-models/0.pt", rows=10, cols=10, num_actions=5)
+    r = 10
+    c = 10
+    statevisit = getStateVisitationFreq("/home/abhisek/Study/Robotics/deepirl/experiments/saved-models/1.pt" , rows = r, cols = c, num_actions = 5)
     print(type(statevisit))
     print(statevisit)
-    # print(stateactiontable)
-    # print(np.sum(stateactiontable,axis=0))
+    statevisitMat = np.resize(statevisit,(r,c))
+    statevisitMat/=5
+    plt.imshow(statevisitMat)
+    plt.colorbar()
+    plt.show()
+    #print(stateactiontable)
+    #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
