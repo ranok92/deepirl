@@ -14,11 +14,12 @@ parser.add_argument('--play', action='store_true',
                     help='play given or latest stored policy.')
 parser.add_argument('--dont-save', action='store_true',
                    help="don't save the policy network weights.")
+parser.add_argument('--render', action='store_true', help="show the env.")
 
 def main():
     args = parser.parse_args()
 
-    env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=10**6,
                         max_ep_length=30)
