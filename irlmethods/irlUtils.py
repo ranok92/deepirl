@@ -151,14 +151,23 @@ def expert_svf(traj_path, ncols=10, nrows=10):
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
 
-    # histogram to accumulate state visitations
-    state_hist = np.zeros(ncols*nrows)
+    state_hists = []
 
-    for state_file in states:
-        torch_state = torch.load(state_file, map_device=DEVICE)
+    for idx, state_file in enumerate(states):
+        torch_state = torch.load(state_file, map_location=DEVICE)
 
-        state = torch_state.numpy().reshape(-1)
-        pdb.set_trace()
+        state = torch_state.type(torch.long)
+
+        # histogram to accumulate state visitations
+        state_hist = torch.zeros((1,ncols,nrows))
+
+        for row_i, row in enumerate(state):
+            state_hist[row_i, row[0], row[1]] = 1
+            zero_layer = torch.zeros((1,ncols,nrows))
+            state_hist = torch.stack((state_hist, zero_layer))
+
+            pdb.set_trace()
+
 
 
 if __name__ == '__main__':
