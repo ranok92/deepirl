@@ -35,7 +35,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+dtype = torch.float32
 class Policy(nn.Module):
     """Policy network"""
 
@@ -212,9 +212,10 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-    def train(self):
+    def train(self, rewardNetwork=None, featureExtractor = None):
         """Train actor critic method on given gym environment."""
-
+        #train() now takes in a 3rd party rewardNetwork as an option
+        #train() now returns the optimal policy
         # keeps running avg of rewards through episodes
         running_reward = 0
 
@@ -231,6 +232,13 @@ class ActorCritic:
             for t in range(self.max_ep_length):  # Don't infinite loop while learning
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
+
+                if rewardNetwork is None:
+
+                    reward = reward
+                else:
+                    reward = rewardNetwork(torch.from_numpy(state).type(dtype))
+                    reward = reward.item()
 
                 ep_reward += reward
 
@@ -260,6 +268,8 @@ class ActorCritic:
             # terminate if max episodes exceeded
             if i_episode > self.max_episodes and self.max_episodes > 0:
                 break
+
+        return self.policy
 
 
 if __name__ == '__main__':
