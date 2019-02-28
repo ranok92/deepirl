@@ -20,7 +20,11 @@ import matplotlib.pyplot as plt
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
+'''
 
+All the methods here are created with environments with relatively small statespace.
+It is also assumed that we know all the possible states.
+'''
 
 def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
@@ -92,7 +96,7 @@ def toNumpy(torchTensor):
     return torchTensor.to("cpu").detach().numpy()
 
 
-def getStateVisitationFreq(policyfile, rows=10, cols=10, num_actions=5):
+def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5):
     '''
     The state visitation frequency for a given policy is the probability of being
     at a particular state at a particular time for the agent given:
@@ -112,11 +116,18 @@ def getStateVisitationFreq(policyfile, rows=10, cols=10, num_actions=5):
     TOTALSTATES = rows*cols
     stateVisitationMatrix = np.zeros([TOTALSTATES, TIMESTEPS])
     env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+
+    '''
+    The lines below were necessary if a policy dictionary file was passed as an argument to the 
+    function. But if an actual policy (neural network) is passed in the arguments, the lines below will
+    not be necessary.
+
     policy = Policy(env.reset().shape[0], env.action_space.n)
     policy.load_state_dict(torch.load(policyfile, map_location=DEVICE))
     policy.eval()
     policy.to(DEVICE)
 
+    '''
     stateActionTable = createStateActionTable(
         policy, rows, cols, env.action_space.n)
     stateTransitionMatrix = createStateTransitionMatix(
@@ -167,6 +178,23 @@ def expert_svf(traj_path, ncols=10, nrows=10):
             state_hist = torch.stack((state_hist, zero_layer))
 
             pdb.set_trace()
+
+
+    
+def getperStateReward(rewardNetwork, rows=10 , cols =10):
+
+    stateRewardTable = np.zeros([(rows*cols),1])
+    '''
+    the states are linearized in the following way row*cols+cols = col 
+    of the state visitation freq table 
+    '''
+    for i in range(rows):
+        for j in range(cols):
+            state = np.asarray([i, j])
+            stateRewardTable[i*cols+j,1] = rewardNetwork(toTorch(state))
+
+
+    return stateRewardTable
 
 
 
