@@ -15,6 +15,7 @@ parser.add_argument('--play', action='store_true',
 parser.add_argument('--dont-save', action='store_true',
                    help="don't save the policy network weights.")
 parser.add_argument('--render', action='store_true', help="show the env.")
+parser.add_argument('--num-trajs', type=int, default=10)
 
 def main():
     args = parser.parse_args()
@@ -36,7 +37,7 @@ def main():
     if args.play:
         env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
-        model.generate_trajectory(10, './trajs/ac_gridworld/')
+        model.generate_trajectory(args.num_trajs, './trajs/ac_gridworld/')
 
 if __name__ == '__main__':
     main()
