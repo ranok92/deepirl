@@ -152,8 +152,6 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5):
                             stateTransitionMatrix[s, a, s_prev] * \
                             stateActionTable[a, s_prev]
 
-    print("summing over time")
-    print(np.sum(stateVisitationMatrix,axis = 0))
     return np.sum(stateVisitationMatrix,axis=1)
 
 
@@ -199,7 +197,7 @@ def expert_svf(traj_path, ncols=10, nrows=10):
 
     svf /= len(states)
 
-    return svf
+    return svf.reshape(-1)
 
 def getperStateReward(rewardNetwork, rows=10 , cols =10):
 

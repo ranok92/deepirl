@@ -1,7 +1,9 @@
-
 '''
 Deep maxent as defined by Wulfmeier et. al.
 '''
+import pdb
+import itertools
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +15,8 @@ import sys
 import os
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
-from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
+from irlmethods import irlUtils
+# from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 
 
 class RewardNet(nn.Module):
@@ -64,16 +67,20 @@ class RewardNet(nn.Module):
 '''
 
 
-class DeepMaxent():
-    def __init__(self, rlmethod=None, env=None, iterations=10, log_intervals=1):
+class DeepMaxEnt():
+    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10, log_intervals=1):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
         self.env = env
 
         self.max_episodes = iterations
-        self.env.step = utils.step_torch_state()(self.env.step)
-        self.env.reset = utils.reset_torch_state()(self.env.reset)
+        self.traj_path = traj_path
+
+        # TODO: These functions are replaced in the rl method already, this
+        # needs to be made independant somehow
+        # self.env.step = utils.step_torch_state()(self.env.step)
+        # self.env.reset = utils.reset_torch_state()(self.env.reset)
 
         self.reward = RewardNet(env.reset().shape[0])
         self.optimizer = optim.Adam(self.reward.parameters(), lr=3e-4)
@@ -85,18 +92,26 @@ class DeepMaxent():
         self.dtype = torch.float32
 
     def expert_svf(self):
-        return irlUtils.expert_svf()
+        return irlUtils.expert_svf(self.traj_path).type(self.dtype)
 
-    def policy_svf(self):
-        pass
+    def policy_svf(self, policy, rows, cols, actions_space=5):
+        return irlUtils.getStateVisitationFreq(policy, rows, cols, actions_space)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
-
         optimizer.zero_grad()
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
         dotProd.backward()
 
-    def train():
+    def per_state_reward(self, reward_function, rows, cols):
+        all_states = itertools.product(range(rows), range(cols))
+
+        all_states = torch.tensor(list(all_states), dtype=torch.float)
+
+        return reward_function(all_states)
+
+
+
+    def train(self):
         '''
         Contains the code for the main training loop of the irl method. Includes calling the RL and
         environment from within
@@ -106,22 +121,20 @@ class DeepMaxent():
 
         for i in range(self.max_episodes):
 
-            current_agent_policy = self.rlmethod.policy
+            current_agent_policy = self.rl.policy
 
-            current_agent_svf = policy_svf(
-                current_agent_policy, self.env.rows, self.env.cols, self.env.action_space)
+            current_agent_svf = self.policy_svf( current_agent_policy,
+                                                self.env.rows, self.env.cols)
 
-            diff_freq = expertdemo_svf - current_agent_svf  # these are in numpy
+            diff_freq = expertdemo_svf - torch.from_numpy(current_agent_svf).type(self.dtype)
 
-            diff_freq = torch.from_numpy(diff_freq).to(
-                self.device).type(self.dtype)
+            # diff_freq = torch.from_numpy(diff_freq).to(
+                # self.device).type(self.dtype)
 
             # returns a tensor of size (no_of_states x 1)
-            reward_per_state = getperStateReward(
+            reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
 
-            calculate_grads(self.optimizer, reward_per_state, diff_freq)
+            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
-            optimizer.step()
-
-        pass
+            self.optimizer.step()
