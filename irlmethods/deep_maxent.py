@@ -58,7 +58,11 @@ class RewardNet(nn.Module):
 ***Passing the parameters for the RL block :
     Directly to the RL block in the experiment folder and not through the IRL block as before
 '''
-class DeepMaxent():
+'''
+    the parameters rlmethod and env take objects of rlmethod and env respectively
+
+'''
+class DeepMaxEnt():
     def __init__(rlmethod=None, env=None ,iterations = 10 , log_intervals = 1):
 
         #pass the actual object of the class of RL method of your choice
@@ -69,7 +73,7 @@ class DeepMaxent():
         self.env.step = utils.step_torch_state()(self.env.step)
         self.env.reset = utils.reset_torch_state()(self.env.reset)
 
-        self.reward = RewardNet(env.reset().shape[0])
+        self.rewardNN = RewardNet(env.reset().shape[0])
         self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-4)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
@@ -77,11 +81,17 @@ class DeepMaxent():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float32
 
+
+    #calls the expert_svf() from the irlUtils file
     def expert_svf():
         pass
 
-    def policy_svf():
-        pass
+
+    #calls the getStateVisitationFreq() from irlUtils file
+    def policy_svf(policy,rows,cols):
+
+        return getStateVisitationFreq(policy,rows,cols)
+        
 
     def calculate_grads(optimizer, stateRewards, freq_diff):
 
@@ -96,16 +106,16 @@ class DeepMaxent():
         environment from within
 
         '''
-        expertdemo_svf = exepert_svf() #get the expert state visitation frequency
+        expertdemo_svf = expert_svf() #get the expert state visitation frequency
 
         for i in range(self.max_episodes):
 
-            current_agent_policy = self.rlmethod.policy
+            current_agent_policy = self.rlmethod.train(self.rewardNN)
 
             current_agent_svf = policy_svf(current_agent_policy , self.env.rows, self.env.cols , self.env.action_space)
 
             diff_freq = expertdemo_svf - current_agent_svf # these are in numpy
-            
+
             diff_freq = torch.from_numpy(diff_freq).to(self.device).type(self.dtype)
 
             #returns a tensor of size (no_of_states x 1)
@@ -115,4 +125,5 @@ class DeepMaxent():
 
             optimizer.step()
 
-        pass
+
+        return self.rewardNN
