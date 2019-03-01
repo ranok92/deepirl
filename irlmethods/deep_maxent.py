@@ -84,7 +84,7 @@ class DeepMaxEnt():
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
 
         self.reward = RewardNet(env.reset().shape[0])
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=3e-4)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
@@ -115,6 +115,17 @@ class DeepMaxEnt():
         return reward_function(all_states)
 
 
+    def plot(self, image):
+        # display_reward = reward_per_state.detach().cpu().numpy()
+        display_reward = image.detach().cpu().numpy()
+        display_reward = display_reward.reshape(self.env.rows,
+                                                self.env.cols)
+
+        im = plt.imshow(display_reward)
+        cb = plt.colorbar(im)
+        plt.pause(1.0)
+        cb.remove()
+
 
     def train(self):
         '''
@@ -144,12 +155,8 @@ class DeepMaxEnt():
             reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
 
-            display_reward = reward_per_state.detach().cpu().numpy()
-            display_reward = display_reward.reshape(self.env.rows,
-                                                    self.env.cols)
-
-            plt.imshow(display_reward)
-            plt.pause(1.0)
+            
+            self.plot(diff_freq)
 
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
