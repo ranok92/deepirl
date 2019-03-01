@@ -3,6 +3,7 @@ Deep maxent as defined by Wulfmeier et. al.
 '''
 import pdb
 import itertools
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -91,6 +92,9 @@ class DeepMaxEnt():
             "cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float32
 
+        self.reward = self.reward.to(self.device)
+
+
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path).type(self.dtype)
 
@@ -105,7 +109,8 @@ class DeepMaxEnt():
     def per_state_reward(self, reward_function, rows, cols):
         all_states = itertools.product(range(rows), range(cols))
 
-        all_states = torch.tensor(list(all_states), dtype=torch.float)
+        all_states = torch.tensor(list(all_states),
+                                  dtype=torch.float).to(self.device)
 
         return reward_function(all_states)
 
@@ -120,13 +125,17 @@ class DeepMaxEnt():
         expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
 
         for i in range(self.max_episodes):
+            print('starting iteration %s ...'% str(i))
 
-            current_agent_policy = self.rl.policy
+            # current_agent_policy = self.rl.policy
+            current_agent_policy = self.rl.train(rewardNetwork=self.reward,
+                                                irl=True)
 
             current_agent_svf = self.policy_svf( current_agent_policy,
                                                 self.env.rows, self.env.cols)
 
             diff_freq = expertdemo_svf - torch.from_numpy(current_agent_svf).type(self.dtype)
+            diff_freq = diff_freq.to(self.device)
 
             # diff_freq = torch.from_numpy(diff_freq).to(
                 # self.device).type(self.dtype)
@@ -135,6 +144,17 @@ class DeepMaxEnt():
             reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
 
+            display_reward = reward_per_state.detach().cpu().numpy()
+            display_reward = display_reward.reshape(self.env.rows,
+                                                    self.env.cols)
+
+            plt.imshow(display_reward)
+            plt.pause(1.0)
+
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
+
+            print(' done')
+
+        plt.show()

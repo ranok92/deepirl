@@ -27,7 +27,7 @@ def main():
 
     # intialize RL method
     rlMethod = ActorCritic(env, gamma=0.99, log_interval=100,
-                           max_episodes=10**4, max_ep_length=30)
+                           max_episodes=3000, max_ep_length=30)
 
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
