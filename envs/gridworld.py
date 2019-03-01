@@ -93,6 +93,7 @@ class GridWorld:
 
         # step should return fourth element 'info'
         self.state = self.onehotrep()
+
         return self.state, reward, done, None
 
     #the tricky part

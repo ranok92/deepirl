@@ -212,7 +212,7 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-    def train(self, rewardNetwork=None, featureExtractor = None):
+    def train(self, rewardNetwork=None, featureExtractor = None, irl=False):
         """Train actor critic method on given gym environment."""
         #train() now takes in a 3rd party rewardNetwork as an option
         #train() now returns the optimal policy
@@ -237,7 +237,8 @@ class ActorCritic:
 
                     reward = reward
                 else:
-                    reward = rewardNetwork(torch.from_numpy(state).type(dtype))
+                    # reward = rewardNetwork(torch.from_numpy(state).type(dtype))
+                    reward = rewardNetwork(state)
                     reward = reward.item()
 
                 ep_reward += reward
@@ -255,19 +256,28 @@ class ActorCritic:
 
             self.finish_episode()
 
-            if i_episode % self.log_interval == 0:
-                print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                    i_episode, t, running_reward))
+            # if not in an IRL setting, solve environment according to specs
+            if not irl:
+                if i_episode % self.log_interval == 0:
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                        i_episode, t, running_reward))
 
-            if running_reward > self.env.spec.reward_threshold:
-                print("Solved! Running reward is now {} and "
-                      "the last episode runs to {} time \
-                      steps!".format(running_reward, t))
-                break
+                if running_reward > self.env.spec.reward_threshold:
+                    print("Solved! Running reward is now {} and "
+                          "the last episode runs to {} time \
+                          steps!".format(running_reward, t))
+                    break
 
-            # terminate if max episodes exceeded
-            if i_episode > self.max_episodes and self.max_episodes > 0:
-                break
+                # terminate if max episodes exceeded
+                if i_episode > self.max_episodes and self.max_episodes > 0:
+                    break
+            else:
+                assert self.max_episodes>0
+
+                # terminate if max episodes exceeded
+                if i_episode > self.max_episodes:
+                    break
+
 
         return self.policy
 

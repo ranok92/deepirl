@@ -14,11 +14,14 @@ parser.add_argument('--play', action='store_true',
                     help='play given or latest stored policy.')
 parser.add_argument('--dont-save', action='store_true',
                    help="don't save the policy network weights.")
+parser.add_argument('--render', action='store_true', help="show the env.")
+parser.add_argument('--num-trajs', type=int, default=10)
 
 def main():
     args = parser.parse_args()
 
-    env = GridWorld(display=True, obstacles=[np.asarray([5, 5]) , np.asarray([6,6]) , np.asarray([6,5])])
+
+    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=10**4,
                         max_ep_length=30)
@@ -33,10 +36,10 @@ def main():
             model.policy.save('./saved-models/')
 
     if args.play:
-        env.display = True
         env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
-        model.generate_trajectory(1000, './trajs/ac_gridworld/')
+
+        model.generate_trajectory(args.num_trajs, './trajs/ac_gridworld/')
 
 if __name__ == '__main__':
     main()

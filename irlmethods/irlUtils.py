@@ -152,8 +152,6 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5):
                             stateTransitionMatrix[s, a, s_prev] * \
                             stateActionTable[a, s_prev]
 
-    print("summing over time")
-    print(np.sum(stateVisitationMatrix,axis = 0))
     return np.sum(stateVisitationMatrix,axis=1)
 
 
@@ -163,15 +161,44 @@ def expert_svf(traj_path, ncols=10, nrows=10):
     states = glob.glob(os.path.join(traj_path, '*.states'))
 
     # histogram to accumulate state visitations
-    state_hist = np.zeros(ncols*nrows)
+    state_hist = torch.zeros((1,ncols,nrows))
 
-    for state_file in states:
-        torch_state = torch.load(state_file, map_device=DEVICE)
+    svf = torch.zeros((ncols, nrows))
 
-        state = torch_state.numpy().reshape(-1)
-        pdb.set_trace()
+    for idx, state_file in enumerate(states):
+        # load states from trajectory file
+        torch_state = torch.load(state_file, map_location=DEVICE)
 
-    
+        # states can only be indecies if they are of type long
+        state = torch_state.type(torch.long)
+
+        # list of all time-slices of the histogram
+        hist_slices = []
+
+        for row_i, row in enumerate(state):
+            # if this timestep has already been encountered, then increment in
+            # existing histogram timeslice
+            if row_i < len(hist_slices):
+                hist_slices[row_i][row[0], row[1]] += 1
+
+            # else initialize new histogram timeslice and append to hist_slices
+            else:
+                hist_slice = torch.zeros(ncols, nrows)
+                hist_slice[row[0], row[1]] += 1
+                hist_slices.append(hist_slice)
+
+        # normalize each timestep
+        for hist in hist_slices:
+            hist /= hist.sum()
+
+        # accumulate frequencies through time
+
+        svf += torch.stack(hist_slices).sum(0)
+
+    svf /= len(states)
+
+    return svf.reshape(-1)
+
 def getperStateReward(rewardNetwork, rows=10 , cols =10):
 
     stateRewardTable = np.zeros([(rows*cols),1])
