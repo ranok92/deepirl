@@ -6,9 +6,7 @@ import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 
 from envs.gridworld import GridWorld
-from rlmethods.b_actor_critic import ActorCritic
-from irlmethods.deep_maxent import DeepMaxEnt
-import irlmethods.irlUtils as irlUtils
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -27,8 +25,11 @@ def main():
 
     if args.on_server:
         
-        matplotlib.use('Agg')   
-
+        matplotlib.use('Agg')
+           
+    from rlmethods.b_actor_critic import ActorCritic
+    from irlmethods.deep_maxent import DeepMaxEnt
+    import irlmethods.irlUtils as irlUtils
 
     # initialize the environment
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
