@@ -126,24 +126,28 @@ class DeepMaxEnt():
         return reward_function(all_states)
 
 
-    def plot(self, image):
-        # display_reward = reward_per_state.detach().cpu().numpy()
-        display_reward = image.detach().cpu().numpy()
-        display_reward = display_reward.reshape(self.env.rows,
-                                                self.env.cols)
+    def plot(self, images, titles):
 
-        im = plt.imshow(display_reward)
-        cb = plt.colorbar(im)
+        nrows = max(1,int(len(images)/2)+1)
+        ncols = 2
+        colorbars = []
+
+        for image_idx, image in enumerate(images):
+            plt.subplot(nrows, ncols, image_idx+1)
+            plt.title(titles[image_idx])
+
+            im = plt.imshow(image)
+            colorbars.append(plt.colorbar(im))
+
         plt.pause(1.0)
-        cb.remove()
+
+        for cb in colorbars:
+            cb.remove()
 
     def plotLoss(self,x_axis,lossList):
-
         plt.plot(x_axis, lossList)
         plt.draw()
         plt.pause(.0001)
-
-
 
     def train(self):
         '''
@@ -162,10 +166,6 @@ class DeepMaxEnt():
         lossList = []
         x_axis = []
 
-        if not self.on_server:
-            plt.figure(0)
-        self.plot(torch.from_numpy(expertdemo_svf).type(self.dtype))
-
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
 
@@ -177,15 +177,8 @@ class DeepMaxEnt():
                                                 self.env.rows, self.env.cols,
                                                 np.array([3,3]))
 
-            if not self.on_server:
-                plt.figure(3)
-            self.plot(torch.from_numpy(current_agent_svf).type(self.dtype))
             diff_freq = torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
-
             diff_freq = diff_freq.to(self.device)
-
-            # diff_freq = torch.from_numpy(diff_freq).to(
-                # self.device).type(self.dtype)
 
             # returns a tensor of size (no_of_states x 1)
             reward_per_state = self.per_state_reward(
@@ -196,13 +189,18 @@ class DeepMaxEnt():
             lossList.append(diffabs)
             x_axis.append(i)
 
-            if not self.on_server:
-                plt.figure(1)
+            # PLOT
+            to_plot = []
+            to_plot.append(diff_freq.cpu().numpy().reshape((10,10)))
+            to_plot.append(expertdemo_svf.reshape((10,10)))
+            to_plot.append(current_agent_svf.reshape((10,10)))
 
-            self.plotLoss(x_axis,lossList)
+            to_plot_descriptions = []
+            to_plot_descriptions.append('SVF difference (L)')
+            to_plot_descriptions.append('expert SVF')
+            to_plot_descriptions.append('policy SVF')
 
-            plt.figure(2)
-            self.plot(diff_freq)
+            self.plot(to_plot, to_plot_descriptions)
 
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
