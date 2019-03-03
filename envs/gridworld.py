@@ -13,7 +13,7 @@ class GridWorld:
         #environment information
         np.random.seed(seed)
         pygame.init()
-        pygame.key.set_repeat(1,200)
+        #pygame.key.set_repeat(1,200)
         self.rows = rows
         self.cols = cols
         self.cellWidth = width
@@ -76,10 +76,11 @@ class GridWorld:
 
         self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
-        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
-        pygame.display.set_caption('Your friendly grid environment')
+
         self.state = self.onehotrep()
         if self.display:
+            self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+            pygame.display.set_caption('Your friendly grid environment')
             self.render()
         return self.state
 

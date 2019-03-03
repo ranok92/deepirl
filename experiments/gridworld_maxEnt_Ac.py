@@ -17,17 +17,20 @@ parser.add_argument('--play', action='store_true',
 parser.add_argument('--dont-save', action='store_true',
                     help="don't save the policy network weights.")
 parser.add_argument('--render', action='store_true', help="show the env.")
+parser.add_argument('--on-server', action='store_true', help="True if the code is being run on a server.")
+parser.add_argument('--store-train-results' , action='store_true' , help='True if you want to store intermediate results')
+parser.add_argument('--store-interval' , action='store_true' , help = 'Interval of storing the results.')
 
 
 def main():
     args = parser.parse_args()
-
+    
     # initialize the environment
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 
     # intialize RL method
     rlMethod = ActorCritic(env, gamma=0.99, log_interval=100,
-                           max_episodes=3000, max_ep_length=30)
+                           max_episodes=1000, max_ep_length=30)
 
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
