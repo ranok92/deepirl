@@ -11,6 +11,8 @@ import torch.optim as optim
 
 import numpy as np
 
+import pathlib
+
 import sys
 import os
 sys.path.insert(0, '..')
@@ -154,8 +156,9 @@ class DeepMaxEnt():
         expert_policy = Policy(2,5)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/1.pt')
-        expertdemo_svf = self.policy_svf( expert_policy,
-                                                self.env.rows, self.env.cols, goalState = np.array([3,3]))
+        expertdemo_svf = self.policy_svf( expert_policy, self.env.rows,
+                                         self.env.cols,
+                                         goalState = np.array([3,3]))
         lossList = []
         x_axis = []
 
@@ -170,10 +173,9 @@ class DeepMaxEnt():
             current_agent_policy = self.rl.train(rewardNetwork=self.reward,
                                                 irl=True)
 
-           
-
             current_agent_svf = self.policy_svf( current_agent_policy,
-                                                self.env.rows, self.env.cols, np.array([3,3]))
+                                                self.env.rows, self.env.cols,
+                                                np.array([3,3]))
 
             if not self.on_server:
                 plt.figure(3)
@@ -196,7 +198,7 @@ class DeepMaxEnt():
 
             if not self.on_server:
                 plt.figure(1)
-          
+
             self.plotLoss(x_axis,lossList)
 
             plt.figure(2)
@@ -210,4 +212,4 @@ class DeepMaxEnt():
 
         plt.show()
 
-        return self.rewardNN
+        return self.reward
