@@ -1,6 +1,6 @@
 import pdb
 import argparse
-
+import matplotlib
 import numpy as np
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
@@ -24,7 +24,12 @@ parser.add_argument('--store-interval' , action='store_true' , help = 'Interval 
 
 def main():
     args = parser.parse_args()
-    
+
+    if args.on_server:
+        
+        matplotlib.use('Agg')   
+
+    import matplotlib.pyplot as plt 
     # initialize the environment
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 
@@ -41,6 +46,7 @@ def main():
                            iterations=100, log_intervals=5)
 
     rewardNetwork = irlMethod.train()
+
 
     if not args.dont_save:
         rewardNetwork.save('./saved-models-rewards/')

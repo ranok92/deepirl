@@ -3,7 +3,6 @@ Deep maxent as defined by Wulfmeier et. al.
 '''
 import pdb
 import itertools
-import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
