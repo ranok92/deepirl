@@ -3,7 +3,7 @@ Deep maxent as defined by Wulfmeier et. al.
 '''
 import pdb
 import itertools
-
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -74,7 +74,8 @@ class RewardNet(nn.Module):
 
 
 class DeepMaxEnt():
-    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10, log_intervals=1):
+    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10, 
+                log_intervals=1 , on_server = True):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
@@ -99,6 +100,8 @@ class DeepMaxEnt():
 
         self.reward = self.reward.to(self.device)
 
+        #making it run on server
+        self.on_server = on_server
 
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path).type(self.dtype)
@@ -155,7 +158,9 @@ class DeepMaxEnt():
                                                 self.env.rows, self.env.cols, goalState = np.array([3,3]))
         lossList = []
         x_axis = []
-        plt.figure(0)
+
+        if not self.on_server:
+            plt.figure(0)
         self.plot(torch.from_numpy(expertdemo_svf).type(self.dtype))
 
         for i in range(self.max_episodes):
@@ -170,8 +175,8 @@ class DeepMaxEnt():
             current_agent_svf = self.policy_svf( current_agent_policy,
                                                 self.env.rows, self.env.cols, np.array([3,3]))
 
-
-            plt.figure(3)
+            if not self.on_server:
+                plt.figure(3)
             self.plot(torch.from_numpy(current_agent_svf).type(self.dtype))
             diff_freq = torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
 
@@ -188,7 +193,9 @@ class DeepMaxEnt():
             print ('Loss :',diffabs)
             lossList.append(diffabs)
             x_axis.append(i)
-            plt.figure(1)
+
+            if not self.on_server:
+                plt.figure(1)
           
             self.plotLoss(x_axis,lossList)
 

@@ -29,7 +29,7 @@ def main():
         
         matplotlib.use('Agg')   
 
-    import matplotlib.pyplot as plt 
+
     # initialize the environment
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 
@@ -43,7 +43,8 @@ def main():
     # initialize IRL method
     trajectory_path = './trajs/ac_gridworld/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
-                           iterations=100, log_intervals=5)
+                           iterations=100, log_intervals=5 ,
+                            on_server = args.on_server)
 
     rewardNetwork = irlMethod.train()
 
