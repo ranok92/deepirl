@@ -4,14 +4,16 @@ import pdb
 import os
 import glob
 import numpy as np
+import sys
+sys.path.insert(0, '..')
+
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
 import math
 from envs.gridworld import GridWorld
 import torch
 import pdb
-import sys
-sys.path.insert(0, '..')
+
 
 
 #for visual
@@ -113,7 +115,7 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
             total_states x 1
     '''
 
-    TIMESTEPS = 100
+    TIMESTEPS = 30
     TOTALSTATES = rows*cols
     GOALSTATE = (goal_state[0]*cols)+goal_state[1]
 
@@ -145,9 +147,10 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
 
         for s in range(TOTALSTATES):
             # start state
+            stateVisitationMatrix[GOALSTATE,i] = 0
             if i == 0:
                 stateVisitationMatrix[s, i] = startStateDist[s]
-                stateVisitationMatrix[GOALSTATE,i] = 0
+                
             else:
                 for s_prev in range(TOTALSTATES):
                     for a in range(env.action_space.n):
@@ -224,7 +227,12 @@ if __name__ == '__main__':
 
     r = 10
     c = 10
-    statevisit = getStateVisitationFreq("/home/abhisek/Study/Robotics/deepirl/experiments/saved-models/1.pt" , rows = r, cols = c, num_actions = 5)
+    env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+    policy = Policy(env.reset().shape[0], env.action_space.n)
+    policy.load_state_dict(torch.load('../experiments/saved-models/1.pt', map_location=DEVICE))
+    policy.eval()
+    policy.to(DEVICE)
+    statevisit = getStateVisitationFreq(policy , rows = r, cols = c, num_actions = 5 , goal_state = np.asarray([3,3]))
     print(type(statevisit))
     print(statevisit)
     statevisitMat = np.resize(statevisit,(r,c))

@@ -19,6 +19,8 @@ import utils  # NOQA: E402
 from irlmethods import irlUtils
 # from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 
+from rlmethods.b_actor_critic import Policy
+
 
 class RewardNet(nn.Module):
     """Reward network"""
@@ -103,8 +105,8 @@ class DeepMaxEnt():
         return irlUtils.expert_svf(self.traj_path).type(self.dtype)
 
 
-    def policy_svf(self, policy, rows, cols, actions_space=5):
-        return irlUtils.getStateVisitationFreq(policy, rows, cols, actions_space)
+    def policy_svf(self, policy, rows, cols, actions_space=5 , goalState= np.asarray([0,0])):
+        return irlUtils.getStateVisitationFreq(policy, rows, cols, actions_space , goalState)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
@@ -131,6 +133,13 @@ class DeepMaxEnt():
         plt.pause(1.0)
         cb.remove()
 
+    def plotLoss(self,x_axis,lossList):
+
+        plt.plot(x_axis, lossList)
+        plt.draw()
+        plt.pause(.0001)
+
+
 
     def train(self):
         '''
@@ -139,7 +148,16 @@ class DeepMaxEnt():
 
         '''
 
-        expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
+        #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
+        expert_policy = Policy(2,5)
+        expert_policy.to(self.device)
+        expert_policy.load('./saved-models/1.pt')
+        expertdemo_svf = self.policy_svf( expert_policy,
+                                                self.env.rows, self.env.cols, goalState = np.array([3,3]))
+        lossList = []
+        x_axis = []
+        plt.figure(0)
+        self.plot(torch.from_numpy(expertdemo_svf).type(self.dtype))
 
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
@@ -148,10 +166,16 @@ class DeepMaxEnt():
             current_agent_policy = self.rl.train(rewardNetwork=self.reward,
                                                 irl=True)
 
-            current_agent_svf = self.policy_svf( current_agent_policy,
-                                                self.env.rows, self.env.cols)
+           
 
-            diff_freq = expertdemo_svf - torch.from_numpy(current_agent_svf).type(self.dtype)
+            current_agent_svf = self.policy_svf( current_agent_policy,
+                                                self.env.rows, self.env.cols, np.array([3,3]))
+
+
+            plt.figure(3)
+            self.plot(torch.from_numpy(current_agent_svf).type(self.dtype))
+            diff_freq = torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
+
             diff_freq = diff_freq.to(self.device)
 
             # diff_freq = torch.from_numpy(diff_freq).to(
@@ -161,14 +185,22 @@ class DeepMaxEnt():
             reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
 
-            
+            diffabs = diff_freq.abs().sum().item()
+            print ('Loss :',diffabs)
+            lossList.append(diffabs)
+            x_axis.append(i)
+            plt.figure(1)
+          
+            self.plotLoss(x_axis,lossList)
+
+            plt.figure(2)
             self.plot(diff_freq)
 
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
 
-            print(' done')
+            print('done')
 
         plt.show()
 
