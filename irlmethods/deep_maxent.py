@@ -211,15 +211,18 @@ class DeepMaxEnt():
             to_plot.append(diff_freq.cpu().numpy().reshape((10,10)))
             to_plot.append(expertdemo_svf.reshape((10,10)))
             to_plot.append(current_agent_svf.reshape((10,10)))
+            to_plot.append(reward_per_state.detach().numpy().reshape((10,10)))
 
             to_plot_descriptions = []
             to_plot_descriptions.append('SVF difference (L)')
             to_plot_descriptions.append('expert SVF')
             to_plot_descriptions.append('policy SVF')
+            to_plot_descriptions.append('Reward per state')
 
             self.plot(to_plot, to_plot_descriptions,
                       save_path=self.plot_save_folder)
 
+            # GRAD AND BACKPROP
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
