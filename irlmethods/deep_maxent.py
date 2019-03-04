@@ -223,7 +223,7 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
 
             # GRAD AND BACKPROP
-            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
+            self.calculate_grads(self.optimizer, reward_per_state, -diff_freq)
 
             self.optimizer.step()
 
