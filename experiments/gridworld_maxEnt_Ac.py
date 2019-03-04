@@ -51,7 +51,8 @@ def main():
     trajectory_path = './trajs/ac_gridworld/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
-                           on_server=args.on_server)
+                           on_server=args.on_server,
+                           plot_save_folder='./plots/')
 
     rewardNetwork = irlMethod.train()
 

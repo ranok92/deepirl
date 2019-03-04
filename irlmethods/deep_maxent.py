@@ -3,7 +3,9 @@ Deep maxent as defined by Wulfmeier et. al.
 '''
 import pdb
 import itertools
+
 import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -76,8 +78,8 @@ class RewardNet(nn.Module):
 
 
 class DeepMaxEnt():
-    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10, 
-                log_intervals=1 , on_server = True):
+    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10,
+                log_intervals=1 , on_server = True, plot_save_folder=None):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
@@ -85,6 +87,8 @@ class DeepMaxEnt():
 
         self.max_episodes = iterations
         self.traj_path = traj_path
+
+        self.plot_save_folder = plot_save_folder
 
         # TODO: These functions are replaced in the rl method already, this
         # needs to be made independant somehow
@@ -126,7 +130,7 @@ class DeepMaxEnt():
         return reward_function(all_states)
 
 
-    def plot(self, images, titles):
+    def plot(self, images, titles, save_path=None):
 
         nrows = max(1,int(len(images)/2)+1)
         ncols = 2
@@ -140,6 +144,19 @@ class DeepMaxEnt():
             colorbars.append(plt.colorbar(im))
 
         plt.pause(1.0)
+
+        # save the plot
+        if save_path:
+            pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+
+            img_i = 0
+
+            while os.path.exists(os.path.join(save_path, '%s.png' % img_i)):
+                img_i += 1
+
+            filename = os.path.join(save_path, '%s.png' % img_i)
+
+            plt.savefig(filename, bbox_inches='tight')
 
         for cb in colorbars:
             cb.remove()
@@ -200,14 +217,13 @@ class DeepMaxEnt():
             to_plot_descriptions.append('expert SVF')
             to_plot_descriptions.append('policy SVF')
 
-            self.plot(to_plot, to_plot_descriptions)
+            self.plot(to_plot, to_plot_descriptions,
+                      save_path=self.plot_save_folder)
 
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
 
             print('done')
-
-        plt.show()
 
         return self.reward
