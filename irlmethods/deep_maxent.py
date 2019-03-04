@@ -37,8 +37,15 @@ class RewardNet(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
-
-        return self.reward_head(x)
+        x = x.view(x.size(0), -1)
+        x = F.normalize(x)
+        x = x.squeeze(1)
+        x = self.reward_head(x)
+        x = x.view(x.size(0), -1)
+        x = F.normalize(x)
+        x = x.squeeze(1)
+        
+        return x
 
     def save(self, path):
         """Save the model.
