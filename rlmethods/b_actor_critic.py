@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.multiprocessing as mp
 from torch.distributions import Categorical
 
 import sys
@@ -210,7 +211,7 @@ class ActorCritic:
         self.optimizer.step()
 
         del self.policy.rewards[:]
-        del self.policy.saved_actions[:]
+        del saved_actions[:]
 
     def train(self, rewardNetwork=None, featureExtractor = None, irl=False):
         """Train actor critic method on given gym environment."""
@@ -281,6 +282,64 @@ class ActorCritic:
 
         return self.policy
 
+    def train_episode(self, reward_acc, rewardNetwork=None, featureExtractor=None):
+        """
+        performs a single RL training iterations.
+        """
+        state = self.env.reset()
+
+        # rewards obtained in this episode
+        ep_reward = 0
+
+        for t in range(self.max_ep_length):  # Don't infinite loop while learning
+            action = self.select_action(state)
+            state, reward, done, _ = self.env.step(action)
+
+            if rewardNetwork is None:
+                reward = reward
+
+            else:
+                reward = rewardNetwork(state)
+                reward = reward.item()
+
+            ep_reward += reward
+
+            g = self.gamma
+            reward_acc.value = g * reward_acc.value + (1-g)* ep_reward
+
+            self.policy.rewards.append(reward)
+
+            if done:
+                break
+
+        self.finish_episode()
+
+    def train_mp(self, n_jobs=1, max_episodes=20000, reward_net=None,
+            feature_extractor=None, irl=False, log_interval=100):
+
+        self.policy.share_memory()
+
+        ep_idx = 0
+        running_reward = mp.Value('d', 0.0)
+
+        while ep_idx < max_episodes:
+            processes = []
+            for i in range(n_jobs):
+                p = mp.Process(target=self.train_episode,
+                        args=(running_reward, reward_net, feature_extractor))
+                p.start()
+                processes.append(p)
+
+            for p in processes:
+                p.join()
+
+            ep_idx += n_jobs
+
+            if ep_idx % log_interval == 0:
+                print("ep: {} \t running reward: {}".format(ep_idx,
+                    running_reward.value))
+
+        return self.policy
 
 if __name__ == '__main__':
     args = parser.parse_args()
