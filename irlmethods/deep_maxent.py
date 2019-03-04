@@ -96,7 +96,7 @@ class DeepMaxEnt():
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
 
         self.reward = RewardNet(env.reset().shape[0])
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-1)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
