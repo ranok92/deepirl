@@ -4,7 +4,7 @@ sys.path.insert(0, '..')  # NOQA: E402
 
 import numpy as np
 import argparse
-
+import torch.multiprocessing as mp
 from envs.gridworld import GridWorld
 from rlmethods.b_actor_critic import ActorCritic
 
@@ -19,7 +19,7 @@ parser.add_argument('--num-trajs', type=int, default=10)
 
 def main():
     args = parser.parse_args()
-
+    mp.set_start_method('spawn')
 
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
 

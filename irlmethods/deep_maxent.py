@@ -37,8 +37,15 @@ class RewardNet(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
-
-        return self.reward_head(x)
+        x = x.view(x.size(0), -1)
+        x = F.normalize(x)
+        x = x.squeeze(1)
+        x = self.reward_head(x)
+        x = x.view(x.size(0), -1)
+        x = F.normalize(x)
+        x = x.squeeze(1)
+        
+        return x
 
     def save(self, path):
         """Save the model.
@@ -166,6 +173,14 @@ class DeepMaxEnt():
         plt.draw()
         plt.pause(.0001)
 
+    def resetPolicy(self):
+
+        newNN = Policy(2,5)
+        newNN.to(self.device)
+        self.rl.policy = newNN
+
+
+
     def train(self):
         '''
         Contains the code for the main training loop of the irl method. Includes calling the RL and
@@ -187,6 +202,9 @@ class DeepMaxEnt():
             print('starting iteration %s ...'% str(i))
 
             # current_agent_policy = self.rl.policy
+
+            self.resetPolicy()
+
             current_agent_policy = self.rl.train(rewardNetwork=self.reward,
                                                 irl=True)
 
