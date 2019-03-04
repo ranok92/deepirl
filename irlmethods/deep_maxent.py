@@ -143,7 +143,7 @@ class DeepMaxEnt():
             im = plt.imshow(image)
             colorbars.append(plt.colorbar(im))
 
-        plt.pause(1.0)
+        plt.pause(0.0001)
 
         # save the plot
         if save_path:

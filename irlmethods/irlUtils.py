@@ -97,7 +97,6 @@ def toTorch(nparray):
 def toNumpy(torchTensor):
     return torchTensor.to("cpu").detach().numpy()
 
-
 def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
                             goal_state = np.asarray([3,3])):
     '''
