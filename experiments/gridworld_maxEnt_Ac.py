@@ -1,4 +1,6 @@
 import pdb
+import os
+
 import argparse
 import matplotlib
 import numpy as np
@@ -30,7 +32,11 @@ def main():
     args = parser.parse_args()
 
     if args.on_server:
+        # matplotlib without monitor
         matplotlib.use('Agg')
+
+        # pygame without monitor
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
