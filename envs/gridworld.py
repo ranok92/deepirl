@@ -3,6 +3,14 @@ import numpy as np
 import torch
 import time
 
+class MockActionspace:
+    def __init__(self, n):
+        self.n = n
+
+class MockSpec:
+    def __init__(self, reward_threshold):
+        self.reward_threshold = reward_threshold
+
 class GridWorld:
 
     #the numbering starts from 0,0 from topleft corner and goes down and right
@@ -50,14 +58,10 @@ class GridWorld:
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
                             np.asarray([0,-1]),np.asarray([0,0])]
         self.stepReward = 0.01
-	
+
         # TODO: Remove the below mock environment in favor of gym.space
         # creates a mock object mimicking action_space to obtain number of
         # actions
-
-        class MockActionspace:
-            def __init__(self, n):
-                self.n = n
 
         self.action_space = MockActionspace(len(self.actionArray))
 
@@ -65,9 +69,6 @@ class GridWorld:
         # creates an environment spec containing useful info, notably reward
         # threshold at which the env is considered to be solved
 
-        class MockSpec:
-            def __init__(self, reward_threshold):
-                self.reward_threshold = reward_threshold
 
         self.spec = MockSpec(1.0)
 
