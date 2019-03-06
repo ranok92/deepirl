@@ -63,7 +63,8 @@ def createStateTransitionMatix(rows=10, cols=10, action_space=5):
 
         #check for boundary cases before making changes
         #check left if true then not boundary case
-        if int(i/cols)==int((i-1)/cols):
+
+        if math.floor(i/cols)==math.floor((i-1)/cols):
             transitionMatrix[i-1,3,i] = 1
         else:
             transitionMatrix[i,3,i] = 1
@@ -85,6 +86,9 @@ def createStateTransitionMatix(rows=10, cols=10, action_space=5):
 
         transitionMatrix[i,4,i] = 1
 
+
+    print ("the transition matrix :")
+    print (transitionMatrix[:,:,9])
     return transitionMatrix
 
 
