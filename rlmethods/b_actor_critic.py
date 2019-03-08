@@ -113,8 +113,8 @@ class ActorCritic:
         self.env = env
 
         # decorate environment's functions to return torch tensors
-        self.env.step = utils.step_torch_state()(self.env.step)
-        self.env.reset = utils.reset_torch_state()(self.env.reset)
+        # self.env.step = utils.step_torch_state()(self.env.step)
+        # self.env.reset = utils.reset_torch_state()(self.env.reset)
 
         # initialize a policy if none is passed.
         if policy is None:
