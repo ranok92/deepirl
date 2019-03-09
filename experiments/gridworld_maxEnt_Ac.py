@@ -7,7 +7,8 @@ import numpy as np
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 
-from envs.gridworld import GridWorld
+from envs.gridworld_clockless import GridWorld
+import utils
 
 
 parser = argparse.ArgumentParser()
@@ -43,7 +44,9 @@ def main():
     import irlmethods.irlUtils as irlUtils
 
     # initialize the environment
-    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
+    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])], 
+                   step_wrapper=utils.step_wrapper,
+                    reset_wrapper=utils.reset_wrapper)
 
     # intialize RL method
     rlMethod = ActorCritic(env, gamma=0.99, log_interval=100,

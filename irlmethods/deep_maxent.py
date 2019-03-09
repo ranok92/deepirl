@@ -37,7 +37,7 @@ class RewardNet(nn.Module):
 
     def forward(self, x):
         x = F.elu(self.affine1(x))
-   
+
         x = self.reward_head(x)
 
         return x
@@ -200,8 +200,11 @@ class DeepMaxEnt():
 
             self.resetPolicy()
 
-            current_agent_policy = self.rl.train(rewardNetwork=self.reward,
-                                                irl=True)
+            current_agent_policy = self.rl.train_mp(
+                n_jobs=4,
+                reward_net=self.reward,
+                irl=True
+            )
 
             current_agent_svf = self.policy_svf( current_agent_policy,
                                                 self.env.rows, self.env.cols,
@@ -213,11 +216,6 @@ class DeepMaxEnt():
             # returns a tensor of size (no_of_states x 1)
             reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
-
-            diffabs = diff_freq.abs().sum().item()
-            print ('Loss :',diffabs)
-            lossList.append(diffabs)
-            x_axis.append(i)
 
             # PLOT
             to_plot = []

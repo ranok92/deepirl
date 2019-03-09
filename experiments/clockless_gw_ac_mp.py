@@ -20,7 +20,6 @@ parser.add_argument('--num-trajs', type=int, default=10)
 
 def main():
     args = parser.parse_args()
-    mp.set_start_method('spawn')
 
     env = GridWorld(
         display=args.render,

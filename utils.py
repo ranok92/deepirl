@@ -132,6 +132,7 @@ def step_wrapper(s, r, d, p, dtype=torch.float):
 
 
 def reset_wrapper(s, dtype=torch.float):
+
     if torch.cuda.is_available():
         return torch.from_numpy(s).cuda().type(dtype)
 

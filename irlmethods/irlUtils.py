@@ -86,9 +86,6 @@ def createStateTransitionMatix(rows=10, cols=10, action_space=5):
 
         transitionMatrix[i,4,i] = 1
 
-
-    print ("the transition matrix :")
-    print (transitionMatrix[:,:,9])
     return transitionMatrix
 
 

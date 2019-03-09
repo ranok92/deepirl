@@ -112,9 +112,7 @@ class ActorCritic:
 
         self.env = env
 
-        # decorate environment's functions to return torch tensors
-        # self.env.step = utils.step_torch_state()(self.env.step)
-        # self.env.reset = utils.reset_torch_state()(self.env.reset)
+        mp.set_start_method('spawn')
 
         # initialize a policy if none is passed.
         if policy is None:
@@ -277,6 +275,7 @@ class ActorCritic:
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
+                    print(i_episode)
                     break
 
 
@@ -314,8 +313,14 @@ class ActorCritic:
 
         self.finish_episode()
 
-    def train_mp(self, n_jobs=1, max_episodes=20000, reward_net=None,
-            feature_extractor=None, irl=False, log_interval=100):
+    def train_mp(
+        self,
+        n_jobs=1,
+        reward_net=None,
+        feature_extractor=None,
+        irl=False,
+        log_interval=100
+    ):
 
         self.policy.share_memory()
 
@@ -342,7 +347,7 @@ class ActorCritic:
         processes = []
         for _ in range(n_jobs):
             p = mp.Process(target=self.train,
-                    args=(reward_net, feature_extractor))
+                    args=(reward_net, feature_extractor, irl))
             p.start()
             processes.append(p)
 
