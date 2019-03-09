@@ -1,6 +1,7 @@
 import pdb
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
+import utils
 
 import numpy as np
 import argparse
@@ -21,7 +22,12 @@ def main():
     args = parser.parse_args()
 
 
-    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])])
+    env = GridWorld(
+        display=args.render,
+        obstacles=[np.asarray([1, 2])],
+        step_wrapper=utils.step_wrapper,
+        reset_wrapper=utils.reset_wrapper,
+    )
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=10**4,
                         max_ep_length=30)

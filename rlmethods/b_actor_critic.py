@@ -322,22 +322,32 @@ class ActorCritic:
         ep_idx = 0
         running_reward = mp.Value('d', 0.0)
 
-        while ep_idx < max_episodes:
-            processes = []
-            for i in range(n_jobs):
-                p = mp.Process(target=self.train_episode,
-                        args=(running_reward, reward_net, feature_extractor))
-                p.start()
-                processes.append(p)
+        # while ep_idx < max_episodes:
+            # processes = []
+            # for i in range(n_jobs):
+                # p = mp.Process(target=self.train_episode,
+                        # args=(running_reward, reward_net, feature_extractor))
+                # p.start()
+                # processes.append(p)
 
-            for p in processes:
-                p.join()
+            # for p in processes:
+                # p.join()
 
-            ep_idx += n_jobs
+            # ep_idx += n_jobs
 
-            if ep_idx % log_interval == 0:
-                print("ep: {} \t running reward: {}".format(ep_idx,
-                    running_reward.value))
+            # if ep_idx % log_interval == 0:
+                # print("ep: {} \t running reward: {}".format(ep_idx,
+                    # running_reward.value))
+
+        processes = []
+        for _ in range(n_jobs):
+            p = mp.Process(target=self.train,
+                    args=(reward_net, feature_extractor))
+            p.start()
+            processes.append(p)
+
+        for p in processes:
+            p.join()
 
         return self.policy
 

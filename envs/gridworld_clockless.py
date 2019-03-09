@@ -45,10 +45,8 @@ class GridWorld:
         # environment information
         np.random.seed(seed)
 
-        # prevent printing of welcome message
-        os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1"
-
         pygame.init()
+
         self.rows = rows
         self.cols = cols
         self.cellWidth = width
