@@ -357,7 +357,13 @@ class ActorCritic:
         if reward_net:
             reward_net.share_memory()
 
-        mp.spawn(train_spawnable, args=(self, reward_net, feature_extractor, irl),nprocs=4)
+        # TODO: The target method here is weirdly setup, where part of the
+        # functionality MUST lie outside of any class. How to fix this?
+        mp.spawn(
+            train_spawnable,
+            args=(self, reward_net, feature_extractor, irl),
+            nprocs=n_jobs
+        )
 
         return self.policy
 
