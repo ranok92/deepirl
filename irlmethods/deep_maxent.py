@@ -177,18 +177,19 @@ class DeepMaxEnt():
 
     def train(self):
         '''
-        Contains the code for the main training loop of the irl method. Includes calling the RL and
-        environment from within
-
+        Contains the code for the main training loop of the irl method.
+        Includes calling the RL and environment from within
         '''
 
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
         expert_policy = Policy(2,5)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/1.pt')
+
         expertdemo_svf = self.policy_svf( expert_policy, self.env.rows,
                                          self.env.cols,
                                          goalState = np.array([3,3]))
+
         lossList = []
         x_axis = []
 
@@ -233,7 +234,7 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
 
             # GRAD AND BACKPROP
-            self.calculate_grads(self.optimizer, reward_per_state, -diff_freq)
+            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
 

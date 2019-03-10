@@ -44,7 +44,7 @@ class GridWorld:
         self.upperLimit = np.asarray([self.cols-1, self.rows-1])
         self.lowerLimit = np.asarray([0,0])
         self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
-        self.state = self.onehotrep() 
+        self.state = self.onehotrep()
 
         # these wrappers ensure correct output format
         self.step_wrapper = step_wrapper

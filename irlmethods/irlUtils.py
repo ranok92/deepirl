@@ -1,5 +1,6 @@
 # contains the calculation of the state visitation frequency method for the
 # gridworld environment
+import itertools
 import pdb
 import os
 import glob
@@ -31,15 +32,15 @@ It is also assumed that we know all the possible states.
 def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
     given a particular policy and info about the environment on which it is trained
-    returns a matrix of size A x S where A is the 
+    returns a matrix of size A x S where A is the
     size of the action space and S is the size of the state space
-    things are hard coded here for the gridworld method but you can fiddle 
+    things are hard coded here for the gridworld method but you can fiddle
     with the size of the environment
     '''
     stateActionTable = np.zeros([num_actions, (rows*cols)])
     '''
-    the states are linearized in the following way row*cols+cols = col 
-    of the state visitation freq table 
+    the states are linearized in the following way row*cols+cols = col
+    of the state visitation freq table
     '''
     for i in range(rows):
         for j in range(cols):
@@ -150,7 +151,7 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
             stateVisitationMatrix[GOALSTATE,i] = 0
             if i == 0:
                 stateVisitationMatrix[s, i] = startStateDist[s]
-                
+
             else:
                 for s_prev in range(TOTALSTATES):
                     for a in range(env.action_space.n):

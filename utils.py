@@ -117,7 +117,7 @@ def identity_dec(f):
     return same_func
 
 
-def identity_wrapper(output):
+def identity_wrapper(*output):
     return output
 
 
