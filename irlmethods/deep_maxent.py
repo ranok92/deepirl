@@ -1,6 +1,7 @@
 '''
 Deep maxent as defined by Wulfmeier et. al.
 '''
+
 import pdb
 import itertools
 
@@ -173,8 +174,6 @@ class DeepMaxEnt():
         newNN = Policy(2,5)
         newNN.to(self.device)
         self.rl.policy = newNN
-
-
 
     def train(self):
         '''

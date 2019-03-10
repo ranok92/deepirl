@@ -275,9 +275,7 @@ class ActorCritic:
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
-                    print(i_episode)
                     break
-
 
         return self.policy
 
@@ -313,6 +311,7 @@ class ActorCritic:
 
         self.finish_episode()
 
+
     def train_mp(
         self,
         n_jobs=1,
@@ -344,17 +343,28 @@ class ActorCritic:
                 # print("ep: {} \t running reward: {}".format(ep_idx,
                     # running_reward.value))
 
-        processes = []
-        for _ in range(n_jobs):
-            p = mp.Process(target=self.train,
-                    args=(reward_net, feature_extractor, irl))
-            p.start()
-            processes.append(p)
+        # processes = []
+        # for _ in range(n_jobs):
+            # p = mp.Process(target=self.train,
+                    # args=(reward_net, feature_extractor, irl))
+            # p.start()
+            # processes.append(p)
 
-        for p in processes:
-            p.join()
+        # for p in processes:
+            # p.join()
+
+        # share the reward network memory if it exists
+        if reward_net:
+            reward_net.share_memory()
+
+        mp.spawn(train_spawnable, args=(self, reward_net, feature_extractor, irl),nprocs=4)
 
         return self.policy
+
+
+def train_spawnable(process_index, rl, *args):
+    print("%d process spawned." % process_index)
+    rl.train(*args)
 
 if __name__ == '__main__':
     args = parser.parse_args()
