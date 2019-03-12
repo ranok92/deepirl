@@ -118,6 +118,12 @@ def identity_dec(f):
 
 
 def identity_wrapper(*output):
+    if len(output)==1:
+
+        return output[0]
+    elif len(output)==0:
+        return None
+
     return output
 
 
