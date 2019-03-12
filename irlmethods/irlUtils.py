@@ -43,7 +43,7 @@ def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
     for i in range(rows):
         for j in range(cols):
-            state = np.asarray([i, j])
+            state = np.asarray([j, i]) #***
             action, _ = policy(toTorch(state))
             stateActionTable[:, i*cols+j] = toNumpy(action)
 
@@ -87,8 +87,7 @@ def createStateTransitionMatix(rows=10, cols=10, action_space=5):
         transitionMatrix[i,4,i] = 1
 
 
-    print ("the transition matrix :")
-    print (transitionMatrix[:,:,9])
+  
     return transitionMatrix
 
 

@@ -116,12 +116,13 @@ class DeepMaxEnt():
 
 
     def policy_svf(self, policy, rows, cols, actions_space=5 , goalState= np.asarray([0,0])):
-        return irlUtils.getStateVisitationFreq(policy, rows, cols, actions_space , goalState)
+        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=action_space , goal_state=goalState)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
         dotProd.backward()
+
 
     def per_state_reward(self, reward_function, rows, cols):
         all_states = itertools.product(range(rows), range(cols))
@@ -187,8 +188,8 @@ class DeepMaxEnt():
         expert_policy = Policy(2,5)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/1.pt')
-        expertdemo_svf = self.policy_svf( expert_policy, self.env.rows,
-                                         self.env.cols,
+        expertdemo_svf = self.policy_svf( expert_policy, rows=self.env.rows,
+                                         cols=self.env.cols,
                                          goalState = np.array([3,3]))
         lossList = []
         x_axis = []
