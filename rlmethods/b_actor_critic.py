@@ -16,6 +16,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.distributions import Categorical
 
+import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
@@ -219,7 +220,8 @@ class ActorCritic:
         #train() now returns the optimal policy
         # keeps running avg of rewards through episodes
         running_reward = 0
-
+        #rvlist = []
+        #xaxis = []
         for i_episode in count(1):
             state = self.env.reset()
 
@@ -255,6 +257,8 @@ class ActorCritic:
             running_reward = running_reward * self.reward_threshold_ratio +\
                 ep_reward * (1-self.reward_threshold_ratio)
 
+            ##rvlist.append(running_reward)
+            ##xaxis.append(i_episode)
             self.finish_episode()
 
             # if not in an IRL setting, solve environment according to specs
@@ -278,8 +282,12 @@ class ActorCritic:
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
                     break
-
-
+        '''
+        plt.figure(1)
+        plt.plot(xaxis, rvlist)
+        plt.draw()
+        plt.pause(0.001)
+        '''
         return self.policy
 
     def train_episode(self, reward_acc, rewardNetwork=None, featureExtractor=None):
