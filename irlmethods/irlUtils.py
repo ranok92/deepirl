@@ -100,7 +100,7 @@ def toNumpy(torchTensor):
     return torchTensor.to("cpu").detach().numpy()
 
 def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
-                            goal_state = np.asarray([3,3])):
+                            goal_state = np.asarray([3,3]), episode_length = 30):
     '''
     The state visitation frequency for a given policy is the probability of being
     at a particular state at a particular time for the agent given:
@@ -116,7 +116,7 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
             total_states x 1
     '''
 
-    TIMESTEPS = 30
+    TIMESTEPS = episode_length
     TOTALSTATES = rows*cols
     GOALSTATE = (goal_state[0]*cols)+goal_state[1]
 
@@ -235,7 +235,10 @@ if __name__ == '__main__':
     policy.load_state_dict(torch.load('../experiments/saved-models/5.pt', map_location=DEVICE))
     policy.eval()
     policy.to(DEVICE)
-    statevisit = getStateVisitationFreq(policy , rows = r, cols = c, num_actions = 5 , goal_state = np.asarray([3,3]))
+    statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
+                                         num_actions = 5 , 
+                                         goal_state = np.asarray([3,3]),
+                                         episode_length = 20)
     print(type(statevisit))
     print(statevisit)
     statevisitMat = np.resize(statevisit,(r,c))

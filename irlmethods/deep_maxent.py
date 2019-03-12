@@ -82,7 +82,8 @@ class RewardNet(nn.Module):
 
 class DeepMaxEnt():
     def __init__(self, traj_path, rlmethod=None, env=None, iterations=10,
-                log_intervals=1 , on_server = True, plot_save_folder=None):
+                log_intervals=1 , on_server = True, plot_save_folder=None,
+                rl_max_episodes = 30):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
@@ -90,6 +91,7 @@ class DeepMaxEnt():
 
         self.max_episodes = iterations
         self.traj_path = traj_path
+        self.rl_max_episodes = rl_max_episodes
 
         self.plot_save_folder = plot_save_folder
 
@@ -116,8 +118,11 @@ class DeepMaxEnt():
         return irlUtils.expert_svf(self.traj_path).type(self.dtype)
 
 
-    def policy_svf(self, policy, rows, cols, actions_space=5 , goalState= np.asarray([0,0])):
-        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=actions_space , goal_state=goalState)
+    def policy_svf(self, policy, rows = 10, cols = 10, 
+                    actions_space=5 , 
+                    goalState= np.asarray([0,0]),
+                    episode_length = 30):
+        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=actions_space , goal_state=goalState ,episode_length=episode_length)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
@@ -186,9 +191,11 @@ class DeepMaxEnt():
         expert_policy = Policy(2,5)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/1.pt')
-        expertdemo_svf = self.policy_svf( expert_policy, rows=self.env.rows,
+        expertdemo_svf = self.policy_svf( expert_policy, 
+                                         rows=self.env.rows,
                                          cols=self.env.cols,
-                                         goalState = np.array([3,3]))
+                                         goalState = np.array([3,3]),
+                                         episode_length = self.rl_max_episodes)
 
         lossList = []
         x_axis = []
@@ -207,8 +214,10 @@ class DeepMaxEnt():
             )
 
             current_agent_svf = self.policy_svf( current_agent_policy,
-                                                self.env.rows, self.env.cols,
-                                                np.array([3,3]))
+                                                rows = self.env.rows, 
+                                                cols = self.env.cols,
+                                                goalState = np.array([3,3]),
+                                                episode_length = self.rl_max_episodes)
 
             diff_freq = torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
