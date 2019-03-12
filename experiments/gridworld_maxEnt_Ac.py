@@ -6,7 +6,7 @@ import matplotlib
 import numpy as np
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
-
+from envs.gridworld import GridWorld
 from envs.gridworld_clockless import GridWorld
 import utils
 

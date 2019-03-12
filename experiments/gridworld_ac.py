@@ -6,7 +6,7 @@ import utils
 import numpy as np
 import argparse
 
-from envs.gridworld import GridWorld
+from envs.gridworld_clockless import GridWorldClockless as GridWorld
 from rlmethods.b_actor_critic import ActorCritic
 
 parser = argparse.ArgumentParser()
@@ -27,6 +27,7 @@ def main():
         obstacles=[np.asarray([1, 2])],
         step_wrapper=utils.step_wrapper,
         reset_wrapper=utils.reset_wrapper,
+        stepReward = .01
     )
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=10**4,
