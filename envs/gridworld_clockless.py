@@ -1,4 +1,3 @@
-import pygame
 import numpy as np
 import torch
 import time
@@ -7,6 +6,9 @@ import pdb
 import sys
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
+
+with utils.HiddenPrints():
+    import pygame
 
 class MockActionspace:
     def __init__(self, n):

@@ -1,4 +1,3 @@
-import pygame
 import numpy as np
 import torch
 import time
@@ -8,6 +7,9 @@ from envs.gridworld_clockless import GridWorldClockless
 import sys
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
+
+with utils.HiddenPrints():
+    import pygame
 
 class GridWorld(GridWorldClockless):
 
