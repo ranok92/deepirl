@@ -70,17 +70,17 @@ def createStateTransitionMatix(rows=10, cols=10, action_space=5):
         else:
             transitionMatrix[i,3,i] = 1
         #check right
-        if (int(i/cols)==int((i+1)/cols)):
+        if (math.floor(i/cols)==math.floor((i+1)/cols)):
             transitionMatrix[i+1,1,i] = 1
         else:
             transitionMatrix[i,1,i] = 1
         #check top
-        if (math.floor((i-cols)/cols) >= 0):
+        if (i-cols)/cols >= 0:
             transitionMatrix[i-cols,0,i] = 1
         else:
             transitionMatrix[i,0,i] = 1
         #check down
-        if (math.floor((i+cols)/cols)) < cols:
+        if (i+cols)/cols < rows:
             transitionMatrix[i+cols,2,i] = 1
         else:
             transitionMatrix[i,2,i] = 1
@@ -160,7 +160,7 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
                             stateTransitionMatrix[s, a, s_prev] * \
                             stateActionTable[a, s_prev]
 
-    return np.sum(stateVisitationMatrix,axis=1)
+    return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
 
 def expert_svf(traj_path, ncols=10, nrows=10):
