@@ -44,7 +44,7 @@ def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
     for i in range(rows):
         for j in range(cols):
-            state = np.asarray([j, i]) #***
+            state = np.asarray([i, j]) 
             action, _ = policy(toTorch(state))
             stateActionTable[:, i*cols+j] = toNumpy(action)
 
@@ -229,6 +229,8 @@ if __name__ == '__main__':
     r = 10
     c = 10
     env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+    print(env.reset())
+    print(len(env.reset()))
     policy = Policy(env.reset().shape[0], env.action_space.n)
     policy.load_state_dict(torch.load('../experiments/saved-models/1.pt', map_location=DEVICE))
     policy.eval()

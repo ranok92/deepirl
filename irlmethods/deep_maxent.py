@@ -117,7 +117,7 @@ class DeepMaxEnt():
 
 
     def policy_svf(self, policy, rows, cols, actions_space=5 , goalState= np.asarray([0,0])):
-        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=action_space , goal_state=goalState)
+        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=actions_space , goal_state=goalState)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()

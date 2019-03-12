@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 import torch
 import time
+import pdb
 
 import sys
 sys.path.insert(0, '..')
@@ -41,9 +42,9 @@ class GridWorld:
         self.rows = rows
         self.cols = cols
         self.cellWidth = width
-        self.upperLimit = np.asarray([self.cols-1, self.rows-1])
+        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
         self.lowerLimit = np.asarray([0,0])
-        self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
+        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.state = self.onehotrep()
 
         # these wrappers ensure correct output format
@@ -51,7 +52,7 @@ class GridWorld:
         self.reset_wrapper = reset_wrapper
 
         if goal_state==None:
-            self.goal_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
+            self.goal_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         else:
             self.goal_state = goal_state
 
@@ -95,18 +96,17 @@ class GridWorld:
 
     def reset(self):
 
-        self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
+        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
-
         self.state = self.onehotrep()
         if self.display:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
 
-
+        print("before",self.state)
         self.state = self.reset_wrapper(self.state)
-
+        print("after",self.state)
         return self.state
 
     #action is a number which points to the index of the action to be taken
