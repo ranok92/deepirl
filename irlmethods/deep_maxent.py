@@ -1,6 +1,7 @@
 '''
 Deep maxent as defined by Wulfmeier et. al.
 '''
+
 import pdb
 import itertools
 
@@ -37,7 +38,7 @@ class RewardNet(nn.Module):
 
     def forward(self, x):
         x = F.elu(self.affine1(x))
-   
+
         x = self.reward_head(x)
 
         return x
@@ -175,13 +176,10 @@ class DeepMaxEnt():
         newNN.to(self.device)
         self.rl.policy = newNN
 
-
-
     def train(self):
         '''
-        Contains the code for the main training loop of the irl method. Includes calling the RL and
-        environment from within
-
+        Contains the code for the main training loop of the irl method.
+        Includes calling the RL and environment from within
         '''
 
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
@@ -191,6 +189,7 @@ class DeepMaxEnt():
         expertdemo_svf = self.policy_svf( expert_policy, rows=self.env.rows,
                                          cols=self.env.cols,
                                          goalState = np.array([3,3]))
+
         lossList = []
         x_axis = []
 
@@ -201,8 +200,11 @@ class DeepMaxEnt():
 
             self.resetPolicy()
 
-            current_agent_policy = self.rl.train(rewardNetwork=self.reward,
-                                                irl=True)
+            current_agent_policy = self.rl.train_mp(
+                n_jobs=4,
+                reward_net=self.reward,
+                irl=True
+            )
 
             current_agent_svf = self.policy_svf( current_agent_policy,
                                                 self.env.rows, self.env.cols,
@@ -214,11 +216,6 @@ class DeepMaxEnt():
             # returns a tensor of size (no_of_states x 1)
             reward_per_state = self.per_state_reward(
                 self.reward, self.env.rows, self.env.cols)
-
-            diffabs = diff_freq.abs().sum().item()
-            print ('Loss :',diffabs)
-            lossList.append(diffabs)
-            x_axis.append(i)
 
             # PLOT
             to_plot = []
@@ -237,7 +234,7 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
 
             # GRAD AND BACKPROP
-            self.calculate_grads(self.optimizer, reward_per_state, -diff_freq)
+            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
             self.optimizer.step()
 

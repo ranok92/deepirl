@@ -3,6 +3,10 @@ import numpy as np
 import torch
 import time
 
+import sys
+sys.path.insert(0, '..')
+import utils  # NOQA: E402
+
 class MockActionspace:
     def __init__(self, n):
         self.n = n
@@ -16,7 +20,19 @@ class GridWorld:
     #the numbering starts from 0,0 from topleft corner and goes down and right
     #the obstacles should be a list of 2 dim numpy array stating the position of the 
     #obstacle
-    def __init__(self ,seed = 7,rows = 10 , cols = 10 , width = 10, goal_state = None, obstacles = None , display = True ,stepReward=0.001):
+    def __init__(
+        self,
+        seed = 7,
+        rows = 10,
+        cols = 10,
+        width = 10,
+        goal_state = None,
+        obstacles = None,
+        display = True,
+        stepReward=0.001,
+        step_wrapper=utils.identity_wrapper,
+        reset_wrapper=utils.identity_wrapper,
+    ):
 
         #environment information
         np.random.seed(seed)
@@ -28,7 +44,11 @@ class GridWorld:
         self.upperLimit = np.asarray([self.cols-1, self.rows-1])
         self.lowerLimit = np.asarray([0,0])
         self.agent_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
-        self.state = self.onehotrep() 
+        self.state = self.onehotrep()
+
+        # these wrappers ensure correct output format
+        self.step_wrapper = step_wrapper
+        self.reset_wrapper = reset_wrapper
 
         if goal_state==None:
             self.goal_state = np.asarray([np.random.randint(0,self.cols-1),np.random.randint(0,self.rows-1)])
@@ -83,6 +103,10 @@ class GridWorld:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
+
+
+        self.state = self.reset_wrapper(self.state)
+
         return self.state
 
     #action is a number which points to the index of the action to be taken
@@ -95,6 +119,14 @@ class GridWorld:
 
         # step should return fourth element 'info'
         self.state = self.onehotrep()
+
+
+        self.state, reward, done, _ = self.step_wrapper(
+            self.state,
+            reward,
+            done,
+            None
+        )
 
         return self.state, reward, done, None
 

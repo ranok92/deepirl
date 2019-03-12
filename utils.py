@@ -2,6 +2,8 @@
 
 import numpy as np
 import torch
+import sys
+import os
 
 
 class HistoryBuffer:
@@ -55,6 +57,7 @@ def to_oh(idx, size):
 
     return out
 
+
 def reset_torch_state(dtype=torch.float32):
     """decorator to return a torch tensor from gym's env.reset() function.
 
@@ -105,3 +108,41 @@ def step_torch_state(dtype=torch.float32):
 
         return inner
     return real_decorator
+
+
+def identity_dec(f):
+    def same_func(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return same_func
+
+
+def identity_wrapper(*output):
+    return output
+
+
+def step_wrapper(s, r, d, p, dtype=torch.float):
+    if torch.cuda.is_available():
+        s = torch.from_numpy(s).cuda().type(dtype)
+
+    else:
+        s = torch.from_numpy(s).type(dtype)
+
+    return s, r, d, p
+
+
+def reset_wrapper(s, dtype=torch.float):
+
+    if torch.cuda.is_available():
+        return torch.from_numpy(s).cuda().type(dtype)
+
+    return torch.from_numpy(s).type(dtype)
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout

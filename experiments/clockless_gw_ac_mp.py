@@ -1,13 +1,13 @@
 import pdb
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
-import utils
 
 import numpy as np
 import argparse
-
-from envs.gridworld import GridWorld
+import torch.multiprocessing as mp
+from envs.gridworld_clockless import GridWorld
 from rlmethods.b_actor_critic import ActorCritic
+from utils import reset_wrapper, step_wrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -21,12 +21,11 @@ parser.add_argument('--num-trajs', type=int, default=10)
 def main():
     args = parser.parse_args()
 
-
     env = GridWorld(
         display=args.render,
         obstacles=[np.asarray([1, 2])],
-        step_wrapper=utils.step_wrapper,
-        reset_wrapper=utils.reset_wrapper,
+        step_wrapper=step_wrapper,
+        reset_wrapper=reset_wrapper
     )
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=10**4,
@@ -36,7 +35,7 @@ def main():
         model.policy.load(args.policy_path)
 
     if not args.play:
-        model.train()
+        model.train_mp(n_jobs=4)
 
         if not args.dont_save:
             model.policy.save('./saved-models/')

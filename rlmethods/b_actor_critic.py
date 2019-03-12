@@ -113,9 +113,7 @@ class ActorCritic:
 
         self.env = env
 
-        # decorate environment's functions to return torch tensors
-        self.env.step = utils.step_torch_state()(self.env.step)
-        self.env.reset = utils.reset_torch_state()(self.env.reset)
+        mp.set_start_method('spawn')
 
         # initialize a policy if none is passed.
         if policy is None:
@@ -322,32 +320,66 @@ class ActorCritic:
 
         self.finish_episode()
 
-    def train_mp(self, n_jobs=1, max_episodes=20000, reward_net=None,
-            feature_extractor=None, irl=False, log_interval=100):
+
+    def train_mp(
+        self,
+        n_jobs=1,
+        reward_net=None,
+        feature_extractor=None,
+        irl=False,
+        log_interval=100
+    ):
 
         self.policy.share_memory()
 
         ep_idx = 0
         running_reward = mp.Value('d', 0.0)
 
-        while ep_idx < max_episodes:
-            processes = []
-            for i in range(n_jobs):
-                p = mp.Process(target=self.train_episode,
-                        args=(running_reward, reward_net, feature_extractor))
-                p.start()
-                processes.append(p)
+        # while ep_idx < max_episodes:
+            # processes = []
+            # for i in range(n_jobs):
+                # p = mp.Process(target=self.train_episode,
+                        # args=(running_reward, reward_net, feature_extractor))
+                # p.start()
+                # processes.append(p)
 
-            for p in processes:
-                p.join()
+            # for p in processes:
+                # p.join()
 
-            ep_idx += n_jobs
+            # ep_idx += n_jobs
 
-            if ep_idx % log_interval == 0:
-                print("ep: {} \t running reward: {}".format(ep_idx,
-                    running_reward.value))
+            # if ep_idx % log_interval == 0:
+                # print("ep: {} \t running reward: {}".format(ep_idx,
+                    # running_reward.value))
+
+        # processes = []
+        # for _ in range(n_jobs):
+            # p = mp.Process(target=self.train,
+                    # args=(reward_net, feature_extractor, irl))
+            # p.start()
+            # processes.append(p)
+
+        # for p in processes:
+            # p.join()
+
+        # share the reward network memory if it exists
+        if reward_net:
+            reward_net.share_memory()
+
+        # TODO: The target method here is weirdly setup, where part of the
+        # functionality MUST lie outside of any class. How to fix this?
+        mp.spawn(
+            train_spawnable,
+            args=(self, reward_net, feature_extractor, irl),
+            nprocs=n_jobs
+        )
 
         return self.policy
+
+
+def train_spawnable(process_index, rl, *args):
+    print("%d process spawned." % process_index)
+    rl.train(*args)
 
 if __name__ == '__main__':
     args = parser.parse_args()
