@@ -113,8 +113,6 @@ class ActorCritic:
 
         self.env = env
 
-        mp.set_start_method('spawn')
-
         # initialize a policy if none is passed.
         if policy is None:
             self.policy = Policy(env.reset().shape[0], env.action_space.n)

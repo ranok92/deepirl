@@ -232,7 +232,7 @@ if __name__ == '__main__':
     print(env.reset())
     print(len(env.reset()))
     policy = Policy(env.reset().shape[0], env.action_space.n)
-    policy.load_state_dict(torch.load('../experiments/saved-models/1.pt', map_location=DEVICE))
+    policy.load_state_dict(torch.load('../experiments/saved-models/5.pt', map_location=DEVICE))
     policy.eval()
     policy.to(DEVICE)
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c, num_actions = 5 , goal_state = np.asarray([3,3]))
