@@ -160,11 +160,11 @@ class GridWorldClockless:
 
     def onehotrep(self):
 
-        # onehot = np.zeros(self.rows*self.cols)
-        # onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
-        # return onehot
+        onehot = np.zeros(self.rows*self.cols)
+        onehot[self.agent_state[0]*self.cols+self.agent_state[1]] = 1
+        return onehot
 
-        return self.agent_state
+        #return self.agent_state
 
 
 if __name__=="__main__":

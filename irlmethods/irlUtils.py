@@ -14,7 +14,7 @@ import math
 from envs.gridworld import GridWorld
 import torch
 import pdb
-
+from utils import to_oh
 
 
 #for visual
@@ -45,6 +45,7 @@ def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     for i in range(rows):
         for j in range(cols):
             state = np.asarray([i, j]) 
+            state = to_oh( i*cols+j , rows*cols)
             action, _ = policy(toTorch(state))
             stateActionTable[:, i*cols+j] = toNumpy(action)
 

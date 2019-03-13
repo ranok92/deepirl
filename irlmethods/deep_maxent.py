@@ -99,9 +99,10 @@ class DeepMaxEnt():
         # needs to be made independant somehow
         # self.env.step = utils.step_torch_state()(self.env.step)
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
-
+        self.state_size = self.env.reset().shape[0]
+        self.action_size = self.env.action_space.n
         self.reward = RewardNet(env.reset().shape[0])
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-1)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
@@ -132,8 +133,13 @@ class DeepMaxEnt():
 
     def per_state_reward(self, reward_function, rows, cols):
         all_states = itertools.product(range(rows), range(cols))
+        pdb.set_trace()
 
-        all_states = torch.tensor(list(all_states),
+        oh_states = []
+        for state in all_states:
+            oh_states.append(utils.to_oh(state[0]*cols+state[1], rows*cols))
+
+        all_states = torch.tensor(oh_states,
                                   dtype=torch.float).to(self.device)
 
         return reward_function(all_states)
@@ -175,9 +181,9 @@ class DeepMaxEnt():
         plt.draw()
         plt.pause(.0001)
 
-    def resetPolicy(self):
+    def resetPolicy(self,inp_size,out_size):
 
-        newNN = Policy(2,5)
+        newNN = Policy(inp_size,out_size)
         newNN.to(self.device)
         self.rl.policy = newNN
 
@@ -188,9 +194,9 @@ class DeepMaxEnt():
         '''
 
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
-        expert_policy = Policy(2,5)
+        expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
-        expert_policy.load('./saved-models/1.pt')
+        expert_policy.load('./saved-models/6.pt')
         expertdemo_svf = self.policy_svf( expert_policy, 
                                          rows=self.env.rows,
                                          cols=self.env.cols,
@@ -205,7 +211,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetPolicy()
+            self.resetPolicy(self.state_size,self.action_size)
 
             current_agent_policy = self.rl.train_mp(
                 n_jobs=4,
