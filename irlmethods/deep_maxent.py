@@ -133,7 +133,6 @@ class DeepMaxEnt():
 
     def per_state_reward(self, reward_function, rows, cols):
         all_states = itertools.product(range(rows), range(cols))
-        pdb.set_trace()
 
         oh_states = []
         for state in all_states:
