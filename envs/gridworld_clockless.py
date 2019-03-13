@@ -53,7 +53,7 @@ class GridWorldClockless:
         self.step_wrapper = step_wrapper
         self.reset_wrapper = reset_wrapper
 
-        if goal_state==None:
+        if goal_state is None:
             self.goal_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         else:
             self.goal_state = goal_state
@@ -90,7 +90,7 @@ class GridWorldClockless:
         # creates an environment spec containing useful info, notably reward
         # threshold at which the env is considered to be solved
 
-
+        print("environment initialized with goal state :",self.goal_state)
         self.spec = MockSpec(1.0)
 
 
@@ -98,7 +98,10 @@ class GridWorldClockless:
 
         self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
+
         self.state = self.onehotrep()
+        
+
         if self.display:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
             pygame.display.set_caption('Your friendly grid environment')
