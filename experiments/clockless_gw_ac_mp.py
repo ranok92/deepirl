@@ -5,9 +5,10 @@ sys.path.insert(0, '..')  # NOQA: E402
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
-from envs.gridworld_clockless import GridWorld
+from envs.gridworld_clockless import GridWorldClockless as GridWorld
 from rlmethods.b_actor_critic import ActorCritic
 from utils import reset_wrapper, step_wrapper
+from irlmethods.deep_maxent import RewardNet
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -34,8 +35,11 @@ def main():
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
 
+    reward_net = RewardNet(env.reset().shape[0])
+    reward_net.load('./saved-models-rewards/38.pt')
+
     if not args.play:
-        model.train_mp(n_jobs=4)
+        model.train_mp(n_jobs=4, reward_net=reward_net)
 
         if not args.dont_save:
             model.policy.save('./saved-models/')
