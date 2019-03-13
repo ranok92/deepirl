@@ -149,10 +149,9 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
 
         for s in range(TOTALSTATES):
             # start state
-            stateVisitationMatrix[GOALSTATE,i] = 0
+            #stateVisitationMatrix[GOALSTATE,i] = 0
             if i == 0:
                 stateVisitationMatrix[s, i] = startStateDist[s]
-
             else:
                 for s_prev in range(TOTALSTATES):
                     for a in range(env.action_space.n):
@@ -218,6 +217,7 @@ def getperStateReward(rewardNetwork, rows=10 , cols =10):
     for i in range(rows):
         for j in range(cols):
             state = np.asarray([i, j])
+            
             stateRewardTable[i*cols+j,1] = rewardNetwork(toTorch(state))
 
 
@@ -233,20 +233,28 @@ if __name__ == '__main__':
     print(env.reset())
     print(len(env.reset()))
     policy = Policy(env.reset().shape[0], env.action_space.n)
-    policy.load_state_dict(torch.load('../experiments/saved-models/5.pt', map_location=DEVICE))
+    #policy = Policy(2, env.action_space.n)
+    #6.pt is a model trained to completion
+    #8.pt is a model trained for 200 RL iterations
+    policy.load_state_dict(torch.load('../experiments/saved-models/17.pt', map_location=DEVICE))
     policy.eval()
     policy.to(DEVICE)
-    statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
+    for i in range(50):
+        statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                          num_actions = 5 , 
                                          goal_state = np.asarray([3,3]),
-                                         episode_length = 20)
-    print(type(statevisit))
-    print(statevisit)
-    statevisitMat = np.resize(statevisit,(r,c))
-    statevisitMat/=5
-    plt.imshow(statevisitMat)
-    plt.colorbar()
-    plt.show()
+                                         episode_length = i)
+        print(type(statevisit))
+        print(statevisit)
+        statevisitMat = np.resize(statevisit,(r,c))
+ 
+        plt.imshow(statevisitMat)
+        
+        plt.colorbar()
+        fname = './plots/'+str(i)+'.png'
+        plt.savefig(fname)
+        plt.clf()
+
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
