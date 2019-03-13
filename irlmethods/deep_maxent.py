@@ -196,7 +196,7 @@ class DeepMaxEnt():
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
-        expert_policy.load('./saved-models/6.pt')
+        expert_policy.load('./saved-models/2.pt')
         expertdemo_svf = self.policy_svf( expert_policy, 
                                          rows=self.env.rows,
                                          cols=self.env.cols,
