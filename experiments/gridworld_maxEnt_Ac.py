@@ -49,7 +49,7 @@ def main():
                     reset_wrapper=utils.reset_wrapper)
 
     # intialize RL method
-    rlMethod = ActorCritic(env, gamma=0.99, log_interval=100,
+    rlMethod = ActorCritic(env, gamma=0.99,
                             log_interval = args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length)

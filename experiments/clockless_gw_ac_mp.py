@@ -5,7 +5,6 @@ sys.path.insert(0, '..')  # NOQA: E402
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
-from envs.gridworld_clockless import GridWorldClockless as GridWorld
 from rlmethods.b_actor_critic import ActorCritic
 from utils import reset_wrapper, step_wrapper
 from irlmethods.deep_maxent import RewardNet
@@ -24,12 +23,17 @@ parser.add_argument('--irl', action='store_true')
 def main():
     args = parser.parse_args()
 
+    if args.render:
+        from envs.gridworld import GridWorld
+    else:
+        from envs.gridworld_clockless import GridWorldClockless as GridWorld
+
     env = GridWorld(
         display=args.render,
         obstacles=[np.asarray([1, 2])],
         step_wrapper=step_wrapper,
         reset_wrapper=reset_wrapper,
-        seed = 2
+        seed = 3
     )
 
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=5000,
@@ -45,7 +49,7 @@ def main():
         reward_net.eval()
     else:
         reward_net = None
-        
+
     if not args.play:
         model.train_mp(n_jobs=4, reward_net=reward_net,
                         irl=args.irl)
