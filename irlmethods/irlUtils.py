@@ -8,6 +8,7 @@ import numpy as np
 import sys
 sys.path.insert(0, '..')
 
+
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
 import math
@@ -207,23 +208,6 @@ def expert_svf(traj_path, ncols=10, nrows=10):
 
     return svf.reshape(-1)
 
-def getperStateReward(rewardNetwork, rows=10 , cols =10):
-
-    stateRewardTable = np.zeros([(rows*cols),1])
-    '''
-    the states are linearized in the following way row*cols+cols = col 
-    of the state visitation freq table 
-    '''
-    for i in range(rows):
-        for j in range(cols):
-            state = np.asarray([i, j])
-            
-            stateRewardTable[i*cols+j,1] = rewardNetwork(toTorch(state))
-
-
-    return stateRewardTable
-
-
 
 if __name__ == '__main__':
 
@@ -236,25 +220,27 @@ if __name__ == '__main__':
     #policy = Policy(2, env.action_space.n)
     #6.pt is a model trained to completion
     #8.pt is a model trained for 200 RL iterations
-    policy.load_state_dict(torch.load('../experiments/saved-models/17.pt', map_location=DEVICE))
+    policy.load_state_dict(torch.load('../experiments/saved-models/1.pt', map_location=DEVICE))
     policy.eval()
     policy.to(DEVICE)
-    for i in range(50):
-        statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
-                                         num_actions = 5 , 
-                                         goal_state = np.asarray([3,3]),
-                                         episode_length = i)
-        print(type(statevisit))
-        print(statevisit)
-        statevisitMat = np.resize(statevisit,(r,c))
- 
-        plt.imshow(statevisitMat)
-        
-        plt.colorbar()
-        fname = './plots/'+str(i)+'.png'
-        plt.savefig(fname)
-        plt.clf()
+  
+    
+    #for i in range(50):
+    statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
+                                     num_actions = 5 , 
+                                     goal_state = np.asarray([3,3]),
+                                     episode_length = 3)
+    print(type(statevisit))
+    print(statevisit)
+    statevisitMat = np.resize(statevisit,(r,c))
 
+    plt.imshow(statevisitMat)
+    
+    plt.colorbar()
+    fname = './plots/'+str(1)+'.png'
+    plt.savefig(fname)
+    plt.clf()
+    
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
