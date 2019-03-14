@@ -212,19 +212,21 @@ class DeepMaxEnt():
 
             self.resetPolicy(self.state_size,self.action_size)
 
+
+            self.reward.save('./saved-models-rewards/')
+
             current_agent_policy = self.rl.train_mp(
                 n_jobs=4,
                 reward_net=self.reward,
                 irl=True
             )
-
             current_agent_svf = self.policy_svf( current_agent_policy,
                                                 rows = self.env.rows, 
                                                 cols = self.env.cols,
                                                 goalState = np.array([3,3]),
                                                 episode_length = self.rl_max_episodes)
-
-            diff_freq = torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
+            current_agent_policy.save('./saved-models/')
+            diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
 
             # returns a tensor of size (no_of_states x 1)
