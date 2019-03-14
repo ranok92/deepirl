@@ -26,6 +26,7 @@ parser.add_argument('--store-interval', action='store_true',
 parser.add_argument('--rl-episodes', type=int, default=1000)
 parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
+parser.add_argument('--rl-log-intervals', type=int, default=100)
 
 
 def main():
@@ -49,8 +50,9 @@ def main():
 
     # intialize RL method
     rlMethod = ActorCritic(env, gamma=0.99, log_interval=100,
-                           max_episodes=args.rl_episodes,
-                           max_ep_length=args.rl_ep_length)
+                            log_interval = args.rl_log_intervals,
+                            max_episodes=args.rl_episodes,
+                            max_ep_length=args.rl_ep_length)
 
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
@@ -65,7 +67,7 @@ def main():
     rewardNetwork = irlMethod.train()
 
     if not args.dont_save:
-        rewardNetwork.save('./saved-models-rewards/')
+        pass
 
 
 if __name__ == '__main__':
