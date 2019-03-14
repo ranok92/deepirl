@@ -180,11 +180,13 @@ class DeepMaxEnt():
         plt.draw()
         plt.pause(.0001)
 
-    def resetPolicy(self,inp_size,out_size):
+    def resetTraining(self,inp_size,out_size):
 
         newNN = Policy(inp_size,out_size)
         newNN.to(self.device)
         self.rl.policy = newNN
+        self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
+
 
     def train(self):
         '''
@@ -210,7 +212,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetPolicy(self.state_size,self.action_size)
+            self.resetTraining(self.state_size,self.action_size)
 
 
             self.reward.save('./saved-models-rewards/')
@@ -220,7 +222,7 @@ class DeepMaxEnt():
                 reward_net=self.reward,
                 irl=True
             )
-            current_agent_svf = self.policy_svf( current_agent_policy,
+            current_agent_svf = self.policy_svf(self.rl.policy,
                                                 rows = self.env.rows, 
                                                 cols = self.env.cols,
                                                 goalState = np.array([3,3]),
