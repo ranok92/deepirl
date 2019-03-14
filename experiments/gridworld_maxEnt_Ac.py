@@ -46,6 +46,7 @@ def main():
     # initialize the environment
     env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])], 
                    step_wrapper=utils.step_wrapper,
+                   seed = 3,
                     reset_wrapper=utils.reset_wrapper)
 
     # intialize RL method
@@ -53,7 +54,7 @@ def main():
                             log_interval = args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length)
-
+    print("RL method initialized.")
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
@@ -63,7 +64,7 @@ def main():
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            plot_save_folder='./plots/')
-
+    print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
 
     if not args.dont_save:

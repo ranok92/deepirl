@@ -88,7 +88,6 @@ class DeepMaxEnt():
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
         self.env = env
-
         self.max_episodes = iterations
         self.traj_path = traj_path
         self.rl_max_episodes = rl_max_episodes
@@ -123,7 +122,10 @@ class DeepMaxEnt():
                     actions_space=5 , 
                     goalState= np.asarray([0,0]),
                     episode_length = 30):
-        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, num_actions=actions_space , goal_state=goalState ,episode_length=episode_length)
+        return irlUtils.getStateVisitationFreq(policy, rows=rows, cols=cols, 
+                                                num_actions=actions_space ,
+                                                goal_state=goalState ,
+                                                episode_length=episode_length)
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
@@ -197,11 +199,11 @@ class DeepMaxEnt():
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
-        expert_policy.load('./saved-models/2.pt')
+        expert_policy.load('./saved-models/1.pt')
         expertdemo_svf = self.policy_svf( expert_policy, 
                                          rows=self.env.rows,
                                          cols=self.env.cols,
-                                         goalState = np.array([3,3]),
+                                         goalState = self.env.goal_state,
                                          episode_length = self.rl_max_episodes)
 
         lossList = []
@@ -225,7 +227,7 @@ class DeepMaxEnt():
             current_agent_svf = self.policy_svf(self.rl.policy,
                                                 rows = self.env.rows, 
                                                 cols = self.env.cols,
-                                                goalState = np.array([3,3]),
+                                                goalState = self.env.goal_state,
                                                 episode_length = self.rl_max_episodes)
             current_agent_policy.save('./saved-models/')
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
