@@ -218,6 +218,8 @@ class ActorCritic:
         running_reward = 0
         #rvlist = []
         #xaxis = []
+
+
         for i_episode in count(1):
             state = self.env.reset()
 
@@ -274,6 +276,10 @@ class ActorCritic:
                     break
             else:
                 assert self.max_episodes>0
+
+                if i_episode % self.log_interval == 0:
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                    i_episode, t, running_reward))
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
