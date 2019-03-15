@@ -25,7 +25,7 @@ class GridWorld(GridWorldClockless):
         goal_state = None,
         obstacles = None,
         display = True,
-        is_onehot = False,
+        is_onehot = True,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
