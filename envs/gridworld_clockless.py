@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import time
 import pdb
-
 import sys
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
@@ -32,6 +31,7 @@ class GridWorldClockless:
         goal_state = None,
         obstacles = None,
         display = True,
+        is_onehot = True,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
@@ -47,7 +47,7 @@ class GridWorldClockless:
         self.upperLimit = np.asarray([self.rows-1, self.cols-1])
         self.lowerLimit = np.asarray([0,0])
         self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
-        self.state = self.onehotrep()
+        self.is_onehot = is_onehot
 
         # these wrappers ensure correct output format
         self.step_wrapper = step_wrapper
@@ -75,6 +75,39 @@ class GridWorldClockless:
         self.agent_action_keyboard = [False for i in range(4)]
         #does not matter if none or not.
         self.obstacles = obstacles
+
+        '''
+        this decides the state information based on whether 
+        onehot information is needed or not.
+        if onehot : the state becomes a onehot representation of
+                    agent_state
+            else  : This is the general representation of a particular
+                    state for this  environment :
+
+                        A list of numpy arrays, where 
+                            index[0] : agent_state
+                            index[1] : goal_state
+                            index[2] : obs1
+                            index[3] : obs2
+                             and so on.
+
+        If you need a different representation for your experiment,
+        create new feature extractor methods in the feature extractor
+        folder and use any of the above state representation from the 
+        environment to create your desired feature. DO NOT create any
+        specific feature extractor functions in the environment itself.
+
+        '''         
+        if self.is_onehot:
+            self.state = self.onehotrep()
+        else:
+            self.state = []
+            self.state.append(self.agent_state)
+            self.state.append(self.goal_state)
+            if self.obstacles is not None:
+                for obs in self.obstacles:
+                    self.state.append(obs)
+
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
                             np.asarray([0,-1]),np.asarray([0,0])]
@@ -99,8 +132,15 @@ class GridWorldClockless:
         self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
 
-        self.state = self.onehotrep()
-        
+        if self.is_onehot:
+            self.state = self.onehotrep()
+        else:
+            self.state = []
+            self.state.append(self.agent_state)
+            self.state.append(self.goal_state)
+            if self.obstacles is not None:
+                for obs in self.obstacles:
+                    self.state.append(obs)
 
         if self.display:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
@@ -109,6 +149,7 @@ class GridWorldClockless:
 
         self.state = self.reset_wrapper(self.state)
         return self.state
+
 
     #action is a number which points to the index of the action to be taken
     def step(self,action):
@@ -119,8 +160,12 @@ class GridWorldClockless:
             self.render()
 
         # step should return fourth element 'info'
-        self.state = self.onehotrep()
-
+        if self.is_onehot:
+            self.state = self.onehotrep()
+        else:
+            #just update the position of the agent
+            #the rest of the information remains the same
+            self.state[0] = self.agent_state 
 
         self.state, reward, done, _ = self.step_wrapper(
             self.state,

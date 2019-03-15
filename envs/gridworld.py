@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import time
 import pdb
-from envs.gridworld_clockless import GridWorldClockless
+from gridworld_clockless import GridWorldClockless
 
 import sys
 sys.path.insert(0, '..')
@@ -25,6 +25,7 @@ class GridWorld(GridWorldClockless):
         goal_state = None,
         obstacles = None,
         display = True,
+        is_onehot = False,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
@@ -36,6 +37,7 @@ class GridWorld(GridWorldClockless):
                        goal_state = goal_state,
                        obstacles = obstacles,
                        display = display,
+                       is_onehot = is_onehot,
                        stepReward= stepReward,
                        step_wrapper=step_wrapper,
                        reset_wrapper=reset_wrapper)
@@ -84,7 +86,7 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
     
-    world = GridWorld(display=True, seed = 0 , obstacles=[np.asarray([1,2])])
+    world = GridWorld(display=True, is_onehot = True ,seed = 0 , obstacles=[np.asarray([1,2])])
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -96,7 +98,7 @@ if __name__=="__main__":
             action = world.takeUserAction()
             next_state, reward,done,_ = world.step(action)
             #print(world.agent_state)
-            #print(next_state)
+            print(next_state)
             totalReward+=reward
             if done:
                 break
