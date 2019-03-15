@@ -220,7 +220,8 @@ if __name__ == '__main__':
     #policy = Policy(2, env.action_space.n)
     #6.pt is a model trained to completion
     #8.pt is a model trained for 200 RL iterations
-    policy.load_state_dict(torch.load('../experiments/saved-models/1.pt', map_location=DEVICE))
+    #policy.load_state_dict(torch.load('../experiments/saved-models/4.pt', map_location=DEVICE))
+    policy.load('../experiments/saved-models/3.pt')
     policy.eval()
     policy.to(DEVICE)
   
@@ -229,7 +230,7 @@ if __name__ == '__main__':
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
-                                     episode_length = 3)
+                                     episode_length = 20)
     print(type(statevisit))
     print(statevisit)
     statevisitMat = np.resize(statevisit,(r,c))
@@ -237,7 +238,7 @@ if __name__ == '__main__':
     plt.imshow(statevisitMat)
     
     plt.colorbar()
-    fname = './plots/'+str(1)+'.png'
+    fname = './plots/'+str(3)+'.png'
     plt.savefig(fname)
     plt.clf()
     
