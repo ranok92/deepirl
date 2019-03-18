@@ -1,3 +1,4 @@
+from neural_nets.base_network import BaseNN
 '''An environment independant actor critic method.'''
 import argparse
 import pdb
@@ -21,7 +22,6 @@ import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
-from neural_nets.base_network import BaseNN
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -39,6 +39,7 @@ SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
+
 
 class Policy(BaseNN):
     """Policy network"""
@@ -186,15 +187,10 @@ class ActorCritic:
         del self.policy.rewards[:]
         del saved_actions[:]
 
-    def train(self, rewardNetwork=None, featureExtractor = None, irl=False):
+    def train(self, rewardNetwork=None, featureExtractor=None, irl=False):
         """Train actor critic method on given gym environment."""
-        #train() now takes in a 3rd party rewardNetwork as an option
-        #train() now returns the optimal policy
-        # keeps running avg of rewards through episodes
-        running_reward = 0
-        #rvlist = []
-        #xaxis = []
 
+        running_reward = 0
 
         for i_episode in count(1):
             state = self.env.reset()
@@ -214,7 +210,6 @@ class ActorCritic:
 
                     reward = reward
                 else:
-                    # reward = rewardNetwork(torch.from_numpy(state).type(dtype))
                     reward = rewardNetwork(state)
                     reward = reward.item()
 
@@ -231,8 +226,6 @@ class ActorCritic:
             running_reward = running_reward * self.reward_threshold_ratio +\
                 ep_reward * (1-self.reward_threshold_ratio)
 
-            ##rvlist.append(running_reward)
-            ##xaxis.append(i_episode)
             self.finish_episode()
 
             # if not in an IRL setting, solve environment according to specs
@@ -251,21 +244,16 @@ class ActorCritic:
                 if i_episode > self.max_episodes and self.max_episodes > 0:
                     break
             else:
-                assert self.max_episodes>0
+                assert self.max_episodes > 0
 
                 if i_episode % self.log_interval == 0:
                     print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                    i_episode, t, running_reward))
+                        i_episode, t, running_reward))
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
                     break
-        '''
-        plt.figure(1)
-        plt.plot(xaxis, rvlist)
-        plt.draw()
-        plt.pause(0.001)
-        '''
+
         return self.policy
 
     def train_episode(self, reward_acc, rewardNetwork=None, featureExtractor=None):
@@ -291,7 +279,7 @@ class ActorCritic:
             ep_reward += reward
 
             g = self.gamma
-            reward_acc.value = g * reward_acc.value + (1-g)* ep_reward
+            reward_acc.value = g * reward_acc.value + (1-g) * ep_reward
 
             self.policy.rewards.append(reward)
 
@@ -299,7 +287,6 @@ class ActorCritic:
                 break
 
         self.finish_episode()
-
 
     def train_mp(
         self,
@@ -311,36 +298,6 @@ class ActorCritic:
     ):
 
         self.policy.share_memory()
-
-        ep_idx = 0
-        running_reward = mp.Value('d', 0.0)
-
-        # while ep_idx < max_episodes:
-            # processes = []
-            # for i in range(n_jobs):
-                # p = mp.Process(target=self.train_episode,
-                        # args=(running_reward, reward_net, feature_extractor))
-                # p.start()
-                # processes.append(p)
-
-            # for p in processes:
-                # p.join()
-
-            # ep_idx += n_jobs
-
-            # if ep_idx % log_interval == 0:
-                # print("ep: {} \t running reward: {}".format(ep_idx,
-                    # running_reward.value))
-
-        # processes = []
-        # for _ in range(n_jobs):
-            # p = mp.Process(target=self.train,
-                    # args=(reward_net, feature_extractor, irl))
-            # p.start()
-            # processes.append(p)
-
-        # for p in processes:
-            # p.join()
 
         # share the reward network memory if it exists
         if reward_net:
@@ -360,6 +317,7 @@ class ActorCritic:
 def train_spawnable(process_index, rl, *args):
     print("%d process spawned." % process_index)
     rl.train(*args)
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
