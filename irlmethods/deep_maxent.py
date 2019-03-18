@@ -22,11 +22,12 @@ sys.path.insert(0, '..')
 import utils  # NOQA: E402
 from irlmethods import irlUtils
 # from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
+from neural_nets.base_network import BaseNN
 
 from rlmethods.b_actor_critic import Policy
 
 
-class RewardNet(nn.Module):
+class RewardNet(BaseNN):
     """Reward network"""
 
     def __init__(self, state_dims):
@@ -42,32 +43,6 @@ class RewardNet(nn.Module):
         x = self.reward_head(x)
 
         return x
-
-    def save(self, path):
-        """Save the model.
-
-        :param path: path in which to save the model.
-        """
-        model_i = 0
-
-        # os.makedirs(path, parents=True, exist_ok=True)
-
-        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
-
-        while os.path.exists(os.path.join(path, '%s.pt' % model_i)):
-            model_i += 1
-
-        filename = os.path.join(path, '%s.pt' % model_i)
-
-        torch.save(self.state_dict(), filename)
-
-    def load(self, path):
-        '''load the model.
-
-        :param path: path from which to load the model.
-        '''
-        self.load_state_dict(torch.load(path))
-        self.eval()
 
 
 '''

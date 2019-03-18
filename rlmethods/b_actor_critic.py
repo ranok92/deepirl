@@ -21,6 +21,7 @@ import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
+from neural_nets.base_network import BaseNN
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -38,7 +39,8 @@ SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
-class Policy(nn.Module):
+
+class Policy(BaseNN):
     """Policy network"""
 
     def __init__(self, state_dims, action_dims):
@@ -64,32 +66,6 @@ class Policy(nn.Module):
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
-
-    def save(self, path):
-        """Save the model.
-
-        :param path: path in which to save the model.
-        """
-        model_i = 0
-
-        # os.makedirs(path, parents=True, exist_ok=True)
-
-        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
-
-        while os.path.exists(os.path.join(path, '%s.pt' % model_i)):
-            model_i += 1
-
-        filename = os.path.join(path, '%s.pt' % model_i)
-
-        torch.save(self.state_dict(), filename)
-
-    def load(self, path):
-        """load the model.
-
-        :param path: path from which to load the model.
-        """
-        self.load_state_dict(torch.load(path, map_location=DEVICE))
-        self.eval()
 
 
 class ActorCritic:
