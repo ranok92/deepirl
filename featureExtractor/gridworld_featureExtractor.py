@@ -10,11 +10,6 @@ from utils import reset_wrapper, step_wrapper
 #*************array of helper methods***************#
 
 #helper methods
-def block_to_arrpos(self,r,c):
-	a = (self.window_size**2-1)/2
-	b = self.window_size
-	pos = a+(b*r)+c
-	return int(pos)
 
 
 class LocalGlobal():
@@ -27,6 +22,13 @@ class LocalGlobal():
 		self.agent_radius = agent_rad
 		self.obs_rad = obs_rad
 
+
+
+	def block_to_arrpos(self,r,c):
+		a = (self.window_size**2-1)/2
+		b = self.window_size
+		pos = a+(b*r)+c
+		return int(pos)
 
 	#state is the goal state
 	#the state is a list with the following information in the given
@@ -74,7 +76,7 @@ class LocalGlobal():
 		            temp_pos = np.asarray([agent_pos[0] + r*block_width, 
 		            			agent_pos[1] + c*block_width])
 		            if np.array_equal(temp_pos,obs_pos):
-		                pos = block_to_arrpos(r,c)
+		                pos = self.block_to_arrpos(r,c)
 
 		                mod_state[pos+4]=1
 
@@ -87,7 +89,7 @@ class FrontBackSide():
 	def __init__(self,window_size=5,grid_size=1):
 
 		#heading direction 0 default top, 1 right ,2 down and 3 left
-		#self.heading_direction=0 #no need for previous heading as the
+		self.heading_direction=0 #no need for previous heading as the
 		#coordinates provided as the state are always assumed as top facing
 		self.window_size = window_size
 		self.sensor_rad = (int)(window_size/2)
@@ -98,33 +100,36 @@ class FrontBackSide():
 		format of matrix for coordinate conversion from a direction
 		to the other
 			to 
-		from		top | left | right |down
+		from		top | right |down | left
 			top
-			left
 			right
 			down
+			left
 
 
 		'''
 
 
 		self.rel_pos_transform_table = np.asarray([
-												[[1,1],[-1,1],[1,-1],[-1,-1]],
-												[[-1,1],[1,1],[-1,-1],[1,-1]],
-												[[1,-1],[-1,-1],[1,1],[-1,1]],
-												[[-1,-1],[1,-1],[-1,1],[1,1]]
+												[[1,1],[-1,1],[-1,-1],[1,-1]],
+												[[-1,1],[1,1],[1,-1],[-1,-1]],
+												[[-1,-1],[1,-1],[1,1],[-1,1]],
+												[[1,-1],[-1,-1],[-1,1],[1,1]]
 												])
 
-
+		self.swap_coord_table = np.asarray([[0,1,0,1],
+										   [1,0,1,0],
+										   [0,1,0,1],
+										   [1,0,1,0]])
 
 	#given the current state returns the relative position of 
 	#the goal and all of the obstacles
 	def get_relative_coords(self,state):
 
-		rel_positions = np.zeros(state.shape[0],state.shape[1])
+		rel_positions = np.zeros((state.shape[0],state.shape[1]))
 		agent_pos = state[0]
 		for i in range(state.shape[0]):
-			rel_position[i,:] = state[i,:]-agent_pos
+			rel_positions[i,:] = state[i,:]-agent_pos
 
 		return rel_positions
 
@@ -134,15 +139,47 @@ class FrontBackSide():
 
 		#using the action and the current heading, decide the final heading
 		#quick reminder 0 - move front 1 - move right 2 - move down 3 - move left
-		multiplying_factor = self.rel_pos_transform_table[0,action]
+		if action==4:
+			multiplying_factor = self.rel_pos_transform_table[0,self.heading_direction]
+			swap = self.swap_coord_table[0,self.heading_direction]
+		else:
+			multiplying_factor = self.rel_pos_transform_table[0,action]
+			self.heading_direction = action
+			swap = self.swap_coord_table[0,action]
 
 		for i in range(rel_positions.shape[0]):
 
+			if swap==1: 
+				#swap the rows and columns
+				rel_positions[i,0],rel_positions[i,1] = rel_positions[i,1],rel_positions[i,0]
+
 			rel_positions[i,0] = rel_positions[i,0]*multiplying_factor[0]
 			rel_positions[i,1] = rel_positions[i,1]*multiplying_factor[1]
-
+		
 		return rel_positions
 
+	def get_goal_pos(self,rel_pos):
+
+		goal_pos = np.zeros(4)
+		r = rel_pos[1,0]
+		c = rel_pos[1,1]
+		if abs(r)>abs(c):
+			#front or back
+			if r>0:
+				#back
+				goal_pos[2]=1
+			else:
+				#front
+				goal_pos[0]=1
+		if abs(r)<=abs(c):
+			#left or right
+			if c<0:
+				#left
+				goal_pos[3]=1
+			if c>0:
+				#right
+				goal_pos[1]=1
+		return goal_pos
 
 	#given the correct local_representation returns the state representation
 	def rel_coord_to_local_rep(self,rel_pos):
@@ -158,11 +195,15 @@ class FrontBackSide():
 		row_start =  int((window_rows-1)/2)
 		col_start = int((window_cols-1)/2)
 		#check if they are within the window range and if so do your magic
-		for i in range(1,rel_pos.shape[0]):
+		#account for the goal
+		goal_pos = self.get_goal_pos(rel_pos)
+
+		#account for the obstacles
+		for i in range(2,rel_pos.shape[0]):
 			#if i==1, this means we are dealing with the goal rather than
 			#the obstacles so, that gets added in the goal_pos array
 			#rather than the local_rep array, which is just for the obstacles
-			if np.all(rel_pos[i,:]>=-2) and np.all(rel_pos[i,:]<=2):
+			if np.all(rel_pos[i,:]>=-self.sensor_rad) and np.all(rel_pos[i,:]<=self.sensor_rad):
 
 				#this value is within range, place it in the right position
 				r = rel_pos[i,0]
@@ -171,40 +212,31 @@ class FrontBackSide():
 					#front or back
 					if r>0:
 						#back
-						if i==1:
-							goal_pos[2]=1
-						else:
-							local_rep[2]=1
+						local_rep[2]=1
 
 					else:
 						#front
-						if i==1:
-							goal_pos[0]=1
-						else:
-							local_rep[0]=1
+						local_rep[0]=1
 				if abs(r)<=abs(c):
 					#left or right
 					if c<0:
 						#left
-						if i==1:
-							goal_pos[3]=1
-						else:
-							local_rep[3]=1
+						local_rep[3]=1
 					if c>0:
 						#right
-						if i==1:
-							goal_pos[1]=1
-						else:
-							local_rep[1]=1
+						local_rep[1]=1
 
-		return np.concat(goal_pos,local_rep,axis=0)
+		return np.concatenate((goal_pos,local_rep),axis=0)
 
 
 	def extract_features(self,state,action):
 
-		rel_coords = get_relative_coords(state)
-		updated_coords = update_relative_coords(rel_coords,action)
-		features = rel_coord_to_local_rep(updated_coords)
+		if action!=4:
+			pass
+			#pdb.set_trace()
+		rel_coords = self.get_relative_coords(state)
+		updated_coords = self.update_relative_coords(rel_coords,action)
+		features = self.rel_coord_to_local_rep(updated_coords)
 
 		return reset_wrapper(features)
 
