@@ -107,6 +107,7 @@ class GridWorldClockless:
             if self.obstacles is not None:
                 for obs in self.obstacles:
                     self.state.append(obs)
+            self.state = np.asarray(self.state)
 
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
@@ -141,6 +142,7 @@ class GridWorldClockless:
             if self.obstacles is not None:
                 for obs in self.obstacles:
                     self.state.append(obs)
+            self.state = np.asarray(self.state)
 
         if self.display:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
@@ -165,7 +167,7 @@ class GridWorldClockless:
         else:
             #just update the position of the agent
             #the rest of the information remains the same
-            self.state[0] = self.agent_state 
+            self.state[0,:] = self.agent_state 
 
         self.state, reward, done, _ = self.step_wrapper(
             self.state,

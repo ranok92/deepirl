@@ -95,7 +95,7 @@ class Policy(nn.Module):
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
-    def __init__(self, env, policy=None, gamma=0.99, render=False,
+    def __init__(self, env, feat_extractor= None, policy=None, gamma=0.99, render=False,
                  log_interval=100, max_episodes=0, max_ep_length=200,
                  reward_threshold_ratio=0.99):
         """__init__
@@ -112,10 +112,21 @@ class ActorCritic:
         self.reward_threshold_ratio = reward_threshold_ratio
 
         self.env = env
+        
+        self.feature_extractor = feat_extractor
 
+        if self.feature_extractor is None:
+
+            state_size = env.reset().shape[0]
+
+        else:
+
+            state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
+
+        print("Actor Critic initialized with state size ",state_size)
         # initialize a policy if none is passed.
         if policy is None:
-            self.policy = Policy(env.reset().shape[0], env.action_space.n)
+            self.policy = Policy(state_size, env.action_space.n)
         else:
             self.policy = policy
 
@@ -221,7 +232,13 @@ class ActorCritic:
 
 
         for i_episode in count(1):
-            state = self.env.reset()
+
+            if self.feature_extractor is not None:
+
+                state = self.feature_extractor.extract_features(
+                            self.env.reset())
+            else:
+                state = self.env.reset()
 
             # number of timesteps taken
             t = 0
@@ -231,8 +248,14 @@ class ActorCritic:
             ep_reward = 0
 
             for t in range(self.max_ep_length):  # Don't infinite loop while learning
+
                 action = self.select_action(state)
                 state, reward, done, _ = self.env.step(action)
+
+                if self.feature_extractor is not None:
+                
+                    state = self.feature_extractor.extract_features(
+                            state)
 
                 if rewardNetwork is None:
 
