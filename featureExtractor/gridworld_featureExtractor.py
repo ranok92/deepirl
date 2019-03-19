@@ -7,6 +7,17 @@ import numpy as np
 from utils import reset_wrapper, step_wrapper
 
 
+'''
+
+	THE STATE PUBLISHED BY THE ENVIRONMENT IS A DICTIONARY
+	WITH THE FOLLOWING FIELDS so far:
+	'agent_state' - numpy array
+	'agent_head_dir' - int
+	'goal_state' - numpy array
+	'obstacles'	- list of numpy arrays
+
+'''
+
 #*************array of helper methods***************#
 
 #helper methods
@@ -15,12 +26,27 @@ from utils import reset_wrapper, step_wrapper
 class LocalGlobal():
 
 	def __init__(self,window_size=5, grid_size = 1,  
-				agent_rad = 1, obs_rad = 1):
+				agent_rad = 1, obs_rad = 1 , fieldList = []):
 
 		self.window_size = window_size
 		self.grid_size = grid_size
 		self.agent_radius = agent_rad
 		self.obs_rad = obs_rad
+		self.field_list = fieldList
+
+
+	#reads the list of fields from the state to create its features
+	def get_info_from_state(self,state):
+
+		state_list = []
+		for field in self.field_list:
+			if type(state[field]) is list:
+				for val in state[field]:
+					state_list.append(val)
+			else:
+				state_list.append(state[field])
+
+		return np.array(state_list)
 
 
 
@@ -30,11 +56,10 @@ class LocalGlobal():
 		pos = a+(b*r)+c
 		return int(pos)
 
-	#state is the goal state
-	#the state is a list with the following information in the given
-	#order : agent_location ,goal_location ,obs_info1 ,obs_info2 .... 
 	def extract_features(self,state):
 
+		pdb.set_trace()
+		state = self.get_info_from_state(state)
 		window_size = self.window_size
 		block_width = self.grid_size
 		window_rows = window_cols = window_size
@@ -86,7 +111,7 @@ class LocalGlobal():
 
 class FrontBackSide():
 
-	def __init__(self,window_size=5,grid_size=1):
+	def __init__(self,window_size=5,grid_size=1,fieldList = []):
 
 		#heading direction 0 default top, 1 right ,2 down and 3 left
 		self.heading_direction=0 #no need for previous heading as the
@@ -94,6 +119,7 @@ class FrontBackSide():
 		self.window_size = window_size
 		self.sensor_rad = (int)(window_size/2)
 		self.grid_size = grid_size
+		self.field_list = fieldList
 		#the entire table is not needed, only the first row
 		#but I am still keeping this if necessary in future
 		'''
@@ -121,6 +147,23 @@ class FrontBackSide():
 										   [1,0,1,0],
 										   [0,1,0,1],
 										   [1,0,1,0]])
+
+
+
+
+	#reads the list of fields from the state to create its features
+	def get_info_from_state(self,state):
+
+		state_list = []
+		for field in self.field_list:
+			if type(state[field]) is list:
+				for val in state[field]:
+					state_list.append(val)
+			else:
+				state_list.append(state[field])
+
+		return np.array(state_list)
+
 
 	#given the current state returns the relative position of 
 	#the goal and all of the obstacles
@@ -229,8 +272,10 @@ class FrontBackSide():
 		return np.concatenate((goal_pos,local_rep),axis=0)
 
 
-	def extract_features(self,state,action):
-
+	def extract_features(self,state):
+		action = state['agent_head_dir']
+		state = self.get_info_from_state(state)
+		
 		if action!=4:
 			pass
 			#pdb.set_trace()
