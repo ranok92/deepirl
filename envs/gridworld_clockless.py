@@ -101,13 +101,12 @@ class GridWorldClockless:
         if self.is_onehot:
             self.state = self.onehotrep()
         else:
-            self.state = []
-            self.state.append(self.agent_state)
-            self.state.append(self.goal_state)
+            self.state = {}
+            self.state['agent_state'] = self.agent_state
+            self.state['agent_head_dir'] = 0 #starts heading towards top
+            self.state['goal_state'] = self.goal_state
             if self.obstacles is not None:
-                for obs in self.obstacles:
-                    self.state.append(obs)
-            self.state = np.asarray(self.state)
+                self.state['obstacles'] = self.obstacles
 
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
@@ -136,13 +135,14 @@ class GridWorldClockless:
         if self.is_onehot:
             self.state = self.onehotrep()
         else:
-            self.state = []
-            self.state.append(self.agent_state)
-            self.state.append(self.goal_state)
+
+            self.state = {}
+            self.state['agent_state'] = self.agent_state
+            self.state['agent_head_dir'] = 0 #starts heading towards top
+            self.state['goal_state'] = self.goal_state
             if self.obstacles is not None:
-                for obs in self.obstacles:
-                    self.state.append(obs)
-            self.state = np.asarray(self.state)
+                self.state['obstacles'] = self.obstacles
+
 
         if self.display:
             self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
@@ -167,7 +167,9 @@ class GridWorldClockless:
         else:
             #just update the position of the agent
             #the rest of the information remains the same
-            self.state[0,:] = self.agent_state 
+            self.state['agent_state'] = self.agent_state
+            if action!=4:
+                self.state['agent_head_dir'] = action 
 
         self.state, reward, done, _ = self.step_wrapper(
             self.state,
