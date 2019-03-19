@@ -2,13 +2,13 @@ import numpy as np
 import torch
 import time
 import pdb
-from gridworld_clockless import GridWorldClockless
 
 from featureExtractor.gridworld_featureExtractor import LocalGlobal
 
 import sys
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
+from envs.gridworld_clockless import GridWorldClockless
 
 with utils.HiddenPrints():
     import pygame
