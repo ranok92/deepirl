@@ -4,6 +4,8 @@ import time
 import pdb
 from gridworld_clockless import GridWorldClockless
 
+from featureExtractor.gridworld_featureExtractor import LocalGlobal
+
 import sys
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
@@ -85,8 +87,9 @@ class GridWorld(GridWorldClockless):
 
 
 if __name__=="__main__":
-    
-    world = GridWorld(display=True, is_onehot = True ,seed = 0 , obstacles=[np.asarray([1,2])])
+
+    featExt = LocalGlobal() 
+    world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles=[np.asarray([1,2])])
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -98,7 +101,9 @@ if __name__=="__main__":
             action = world.takeUserAction()
             next_state, reward,done,_ = world.step(action)
             #print(world.agent_state)
-            print(next_state)
+            print("next state :", next_state)
+            print("Features extracted from next state :",
+                featExt.extract_features(next_state))
             totalReward+=reward
             if done:
                 break
