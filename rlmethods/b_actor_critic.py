@@ -72,7 +72,7 @@ class Policy(BaseNN):
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
-    def __init__(self, env, feat_extractor= None, policy=None, gamma=0.99, render=False,
+    def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
                  log_interval=100, max_episodes=0, max_ep_length=200,
                  reward_threshold_ratio=0.99):
         """__init__
@@ -91,6 +91,11 @@ class ActorCritic:
         self.env = env
         
         self.feature_extractor = feat_extractor
+
+        self.termination = None
+        if termination is not None:
+
+            self.termination=termination
 
         if self.feature_extractor is None:
 
@@ -192,6 +197,9 @@ class ActorCritic:
         loss = torch.stack(policy_losses).sum() + \
             torch.stack(value_losses).sum()
 
+        #additional lines for loss based termination
+        self.termination.update_loss_list(loss.item())
+        self.termination.plot_avg_loss()
         loss.backward()
         self.optimizer.step()
 
@@ -275,6 +283,10 @@ class ActorCritic:
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
+                    break
+
+                #terminate based on loss
+                if self.termination.check_termination():
                     break
 
         return self.policy
