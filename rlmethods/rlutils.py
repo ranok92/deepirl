@@ -31,7 +31,7 @@ class LossBasedTermination():
 
 		elif len(self.loss_list) == self.list_size:
 
-			new_diff = self.last_loss-new_loss
+			new_diff = abs(self.last_loss-new_loss)
 			del(self.loss_list[0])#remove the oldest loss entry
 			self.loss_list.append(new_diff)
 			self.last_loss = new_loss
@@ -39,7 +39,7 @@ class LossBasedTermination():
 
 		else:
 
-			new_diff = self.last_loss-new_loss
+			new_diff = abs(self.last_loss-new_loss)
 			self.loss_list.append(new_diff)
 			self.last_loss = new_loss
 
