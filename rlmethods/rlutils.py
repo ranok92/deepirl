@@ -12,7 +12,7 @@ class LossBasedTermination():
 
 	def __init__(self,list_size = 100 , stop_threshold = .5 ,info=True , log_interval = 50):
 
-		self.loss_list = []
+		self.loss_diff_list = []
 		self.list_size = list_size
 		self.stop_threshold = stop_threshold
 		self.last_loss = None
@@ -21,38 +21,37 @@ class LossBasedTermination():
 
 		self.log_interval = log_interval
 		if self.info:
-			self.current_avg_loss_list = []
+			self.current_avg_loss_diff_list = []
 
-	def update_loss_list(self, new_loss):
+	def update_loss_diff_list(self, new_loss):
 
-		print(len(self.loss_list))
 		if self.last_loss is None:
 			self.last_loss = new_loss
 
-		elif len(self.loss_list) == self.list_size:
+		elif len(self.loss_diff_list) == self.list_size:
 
 			new_diff = abs(self.last_loss-new_loss)
-			del(self.loss_list[0])#remove the oldest loss entry
-			self.loss_list.append(new_diff)
+			del(self.loss_diff_list[0])#remove the oldest loss entry
+			self.loss_diff_list.append(new_diff)
 			self.last_loss = new_loss
-			self.current_avg_loss = sum(self.loss_list)/self.list_size
+			self.current_avg_loss = sum(self.loss_diff_list)/self.list_size
 
 		else:
 
 			new_diff = abs(self.last_loss-new_loss)
-			self.loss_list.append(new_diff)
+			self.loss_diff_list.append(new_diff)
 			self.last_loss = new_loss
 
-			if len(self.loss_list)==self.list_size:
-				self.current_avg_loss = sum(self.loss_list)/self.list_size
+			if len(self.loss_diff_list)==self.list_size:
+				self.current_avg_loss = sum(self.loss_diff_list)/self.list_size
 
 		if self.current_avg_loss is not None:
-			self.current_avg_loss_list.append(self.current_avg_loss)
+			self.current_avg_loss_diff_list.append(self.current_avg_loss)
 
 
 	def check_termination(self):
 
-		if len(self.loss_list)==self.list_size:
+		if len(self.loss_diff_list)==self.list_size:
 
 			if self.current_avg_loss < self.stop_threshold:
 
@@ -64,9 +63,8 @@ class LossBasedTermination():
 
 	def plot_avg_loss(self):
 
-		if len(self.current_avg_loss_list)%self.log_interval==0:
-			print('len',len(self.current_avg_loss_list))
-			plt.plot(self.current_avg_loss_list)
+		if len(self.current_avg_loss_diff_list) >0 and len(self.current_avg_loss_diff_list)%self.log_interval==0:
+			plt.plot(self.current_avg_loss_diff_list)
 			plt.draw()
 			plt.pause(.0001)
 
@@ -78,7 +76,7 @@ if __name__ == '__main__':
 	for val in losslist:
 		l.update_list(val)
 		print('avg loss :',l.current_avg_loss)
-		print(l.loss_list)
+		print(l.loss_diff_list)
 		print(l.check_termination())
 		l.plot_avg_loss()
 	plt.plot(losslist)
