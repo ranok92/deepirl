@@ -163,7 +163,7 @@ class DeepMaxEnt():
 
     def resetTraining(self,inp_size,out_size):
 
-        newNN = Policy(inp_size,out_size)
+        newNN = Policy(inp_size,out_size, body_net = self.reward.body)
         newNN.to(self.device)
         self.rl.policy = newNN
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)

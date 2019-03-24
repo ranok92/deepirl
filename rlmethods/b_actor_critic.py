@@ -53,7 +53,7 @@ class Policy(BaseNN):
         super(Policy, self).__init__()
 
         if body_net:
-            self.body = body_net
+            self.graft(body_net)
         else:
             self.body = nn.Sequential(
                 nn.Linear(state_dims, 128),
@@ -72,6 +72,17 @@ class Policy(BaseNN):
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
+
+    def graft(self, body):
+        """Grafts a deep copy of another neural network's body into this
+        network. Requires optimizer to be reset after this operation is
+        performed.
+
+        :param body: body of the neural network you want grafted.
+        """
+        assert body is not None, 'NN body being grafted is None!'
+
+        self.body = copy.deepcopy(body)
 
 
 class ActorCritic:
