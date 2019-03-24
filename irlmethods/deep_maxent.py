@@ -208,7 +208,7 @@ class DeepMaxEnt():
                                                 cols = self.env.cols,
                                                 goalState = self.env.goal_state,
                                                 episode_length = self.rl_max_episodes)
-            current_agent_policy.save('./saved-models/')
+
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
 
