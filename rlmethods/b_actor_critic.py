@@ -1,10 +1,11 @@
-from neural_nets.base_network import BaseNN
 '''An environment independant actor critic method.'''
 import argparse
 import pdb
 import os
 import pathlib
 import datetime
+import copy
+
 from itertools import count
 from collections import namedtuple
 import gym
@@ -22,6 +23,10 @@ import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
+from neural_nets.base_network import BaseNN
+
+from rlmethods.rlutils import LossBasedTermination
+
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -44,13 +49,16 @@ dtype = torch.float32
 class Policy(BaseNN):
     """Policy network"""
 
-    def __init__(self, state_dims, action_dims):
+    def __init__(self, state_dims, action_dims, body_net = None):
         super(Policy, self).__init__()
 
-        self.affine1 = nn.Linear(state_dims, 128)
-        self.affine2 = nn.Linear(128, 128)
-        self.affine3 = nn.Linear(128, 128)
-        self.affine4 = nn.Linear(128, 128)
+        if body_net:
+            self.body = body_net
+        else:
+            self.body = nn.Sequential(
+                nn.Linear(state_dims, 128),
+                nn.ReLU()
+            )
 
         self.action_head = nn.Linear(128, action_dims)
         self.value_head = nn.Linear(128, 1)
@@ -59,10 +67,7 @@ class Policy(BaseNN):
         self.rewards = []
 
     def forward(self, x):
-        x = F.relu(self.affine1(x))
-        x = F.relu(self.affine2(x))
-        x = F.relu(self.affine3(x))
-        x = F.relu(self.affine4(x))
+        x = self.body(x)
 
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
@@ -89,13 +94,13 @@ class ActorCritic:
         self.reward_threshold_ratio = reward_threshold_ratio
 
         self.env = env
-        
         self.feature_extractor = feat_extractor
 
-        self.termination = None
         if termination is not None:
-
             self.termination=termination
+        else:
+            self.termination = LossBasedTermination()
+
 
         if self.feature_extractor is None:
 

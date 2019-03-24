@@ -33,14 +33,18 @@ class RewardNet(BaseNN):
     def __init__(self, state_dims):
         super(RewardNet, self).__init__()
 
-        self.affine1 = nn.Linear(state_dims, 128)
+        self.body = nn.Sequential(
+            nn.Linear(state_dims, 128),
+            nn.ReLU(),
+        )
 
-        self.reward_head = nn.Linear(128, 1)
+        self.head = nn.Sequential(
+            nn.Linear(128, 1),
+        )
 
     def forward(self, x):
-        x = F.elu(self.affine1(x))
-
-        x = self.reward_head(x)
+        x = self.body(x)
+        x = self.head(x)
 
         return x
 
