@@ -7,13 +7,16 @@ import glob
 import numpy as np
 import sys
 sys.path.insert(0, '..')
+from neural_nets.base_network import BaseNN
 
-
+from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
 import math
 from envs.gridworld import GridWorld
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import pdb
 from utils import to_oh
 
@@ -29,6 +32,23 @@ dtype = torch.float32
 All the methods here are created with environments with relatively small statespace.
 It is also assumed that we know all the possible states.
 '''
+
+class RewardNet(BaseNN):
+    """Reward network"""
+
+    def __init__(self, state_dims):
+        super(RewardNet, self).__init__()
+
+        self.affine1 = nn.Linear(state_dims, 128)
+
+        self.reward_head = nn.Linear(128, 1)
+
+    def forward(self, x):
+        x = F.elu(self.affine1(x))
+
+        x = self.reward_head(x)
+
+        return x
 
 def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
@@ -209,11 +229,114 @@ def expert_svf(traj_path, ncols=10, nrows=10):
     return svf.reshape(-1)
 
 
+'''
+The select_action is a duplicate the the select action in the b_actor_critic.py
+file. But unlike that method, this does not store any of the actions or 
+rewards.
+***Open to suggestions for better way of implementing this***
+
+'''
+
+def select_action(policy,state):
+    """based on current policy, given the current state, select an action
+    from the action space.
+
+    :param state: Current state in environment.
+    """
+    probs, state_value = policy(state)
+    m = Categorical(probs)
+    action = m.sample()
+    return action.item()
+
+#should calculate the SVF of a policy network by running the agent a number of times
+#on the given environment. Once the trajectories are obtained, each of the trajectories 
+#multiplied by a certain weight, w, where w = e^(r)/ sum(e^(r) for r of all the 
+#trajectories played)
+
+def get_svf_from_sampling(no_of_samples = 1000, env = None ,
+						 policy_nn = None , reward_nn = None,
+						 episode_length = 20, feature_extractor = None):
+	
+	if feature_extractor is None:
+		svf_policy = np.zeros((100, no_of_samples)) #as the possible states are 100
+	else:
+		#kept for later
+		pass 
+
+	rewards = np.zeros(no_of_samples)
+	approx_Z = 0 #this should be the sum of all the rewards obtained
+	eps = 0.00001 # so that the reward is never 0.
+
+	'''
+	need a non decreasing function that is always positive.
+	get the range of rewards obtained and normalize it?
+	
+	The state space changes with the feature_extractor being used. 
+
+	**Feature_extractor should have a member dictionary containing
+	all possible states.
+
+	The default feature for the environment for now is onehot.
+
+	'''
+	for i in range(no_of_samples):
+		run_reward = 0
+		state = env.reset()
+
+		if feature_extractor is not None:
+			state = feature_extractor.extract_features(state)
+
+		svf_policy[np.where(state==1)[0][0],i] = 1 #marks the visitation for 
+												   #the state for the run
+		for t in range(episode_length):
+			action = select_action(policy_nn,state)
+			state, reward, done,_ = env.step(action)
+
+			svf_policy[np.where(state==1)[0][0],i] += 1 #marks the visitation for 
+												   #the state for the run
+			
+			if feature_extractor is not None:
+				state = feature_extractor.extract_features(state)
+
+			reward  = reward_nn(state)
+			run_reward+=reward
+
+			if done:
+				rewards[i]=run_reward
+				break
+
+			if t >= episode_length:
+				rewards[i]=run_reward
+				break
+
+	#normalize the rewards to get the weights
+	#dont want to go exp, thus so much hassle
+	rewards = rewards - np.min(rewards)
+	total_reward = sum(rewards)
+	weights = rewards/total_rewards
+
+	#normalize the visitation histograms so that for each run the 
+	#sum of all the visited states becomes 1
+
+	norm_factor = np.sum(svf_policy,axis=0)
+
+	svf_policy = np.divide(svf_policy, norm_factor)
+
+	svf_policy = np.matmul(svf_policy,weights)
+
+	return svf_policy
+
+
+			
+
+
 if __name__ == '__main__':
 
     r = 10
     c = 10
-    env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+    env = GridWorld(display=False, reset_wrapper=reset_wrapper,
+    				step_wrapper= step_wrapper,
+    				obstacles=[np.asarray([1, 2])])
     print(env.reset())
     print(len(env.reset()))
     policy = Policy(env.reset().shape[0], env.action_space.n)
@@ -224,23 +347,36 @@ if __name__ == '__main__':
     policy.load('../experiments/saved-models/3.pt')
     policy.eval()
     policy.to(DEVICE)
-  
-    
+  	
+  	#initialize the reward network
+    reward = RewardNet(env.reset().shape[0])
+    reward.load('../experiments/saved-models-rewards/5.pt')
+    reward.eval()
+    reward.to(DEVICE)
+
+
+
+
     #for i in range(50):
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
                                      episode_length = 20)
+
+
+    statevisit2 = get_svf_from_sampling(no_of_samples = 1000, env = env ,
+						 policy_nn = policy , reward_nn = reward,
+						 episode_length = 20, feature_extractor = None)
     print(type(statevisit))
-    print(statevisit)
+    print('sum :', np.sum(statevisit))
     statevisitMat = np.resize(statevisit,(r,c))
 
     plt.imshow(statevisitMat)
     
     plt.colorbar()
     fname = './plots/'+str(3)+'.png'
-    plt.savefig(fname)
-    plt.clf()
+    #plt.savefig(fname)
+    #plt.clf()
     
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
