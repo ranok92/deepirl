@@ -32,12 +32,13 @@ def main():
     env = GridWorld(
         display=args.render,
         obstacles=[np.asarray([1, 2])],
+        goal_state = np.asarray([5,5]),
         step_wrapper=step_wrapper,
         reset_wrapper=reset_wrapper,
         seed = 3
     )
-    loss_t = LBT(list_size=100,stop_threshold=.2,log_interval=50)
-    model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=5000,
+    loss_t = LBT(list_size=100,stop_threshold=1.5,log_interval=100)
+    model = ActorCritic(env, gamma=0.99, log_interval=200, max_episodes=5000,
                         max_ep_length=20, termination = loss_t)
 
     if args.policy_path is not None:
