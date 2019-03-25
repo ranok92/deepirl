@@ -319,7 +319,9 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 			if feature_extractor is not None:
 				state = feature_extractor.extract_features(state)
 
-			reward  = reward_nn(state)
+			if reward_nn is not None:
+				reward  = reward_nn(state)
+
 			run_reward+=reward
 
 			if done:
@@ -378,16 +380,17 @@ if __name__ == '__main__':
     #6.pt is a model trained to completion
     #8.pt is a model trained for 200 RL iterations
     #policy.load_state_dict(torch.load('../experiments/saved-models/4.pt', map_location=DEVICE))
-    policy.load('../experiments/saved-models/3.pt')
+    policy.load('../experiments/saved-models/8.pt')
     policy.eval()
     policy.to(DEVICE)
   	
   	#initialize the reward network
+  	
     reward = RewardNet(env.reset().shape[0])
     reward.load('../experiments/saved-models-rewards/319.pt')
     reward.eval()
     reward.to(DEVICE)
-
+	
 
 
 
@@ -402,8 +405,8 @@ if __name__ == '__main__':
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
     '''
-    statevisit3 = get_svf_from_sampling(no_of_samples = 30, env = env ,
-						 policy_nn = policy , reward_nn = reward,
+    statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
+						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = None)
     
     print(np.sum(statevisit))
