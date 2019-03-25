@@ -258,8 +258,9 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 						 policy_nn = None , reward_nn = None,
 						 episode_length = 20, feature_extractor = None):
 	
+	num_states = 100
 	if feature_extractor is None:
-		svf_policy = np.zeros((100, no_of_samples)) #as the possible states are 100
+		svf_policy = np.zeros((num_states, no_of_samples)) #as the possible states are 100
 	else:
 		#kept for later
 		pass 
@@ -268,6 +269,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 	approx_Z = 0 #this should be the sum of all the rewards obtained
 	eps = 0.00001 # so that the reward is never 0.
 
+	start_state = np.zeros(num_states)
 	'''
 	need a non decreasing function that is always positive.
 	get the range of rewards obtained and normalize it?
@@ -280,16 +282,33 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 	The default feature for the environment for now is onehot.
 
 	'''
+
+	index = np.arange(num_states)
 	for i in range(no_of_samples):
 		run_reward = 0
-		state = env.reset()
+		if i%500==0:
+			plt.bar(index,start_state)
+			plt.draw()
+			plt.pause(.001)
+		#to make sure the start state is uniform among all possible states
+		while True:
 
-		if feature_extractor is not None:
-			state = feature_extractor.extract_features(state)
+			state = env.reset()
+			if feature_extractor is not None:
+				state = feature_extractor.extract_features(state)
 
-		state_np = state.cpu().numpy()
+			state_np = state.cpu().numpy()
+
+			if start_state[np.where(state_np==1)[0][0]] > (no_of_samples/num_states)+2:
+				pass
+			else:
+				start_state[np.where(state_np==1)[0][0]]+=1
+				break
+
+
 		svf_policy[np.where(state_np==1)[0][0],i] = 1 #marks the visitation for 
 												   #the state for the run
+		
 		for t in range(episode_length):
 			action = select_action(policy_nn,state)
 			state, reward, done,_ = env.step(action)
@@ -313,16 +332,29 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	#normalize the rewards to get the weights
 	#dont want to go exp, thus so much hassle
-	rewards = rewards - np.min(rewards)
+	print('Rewards untouched :',rewards)
+	rewards = rewards - np.min(rewards)+eps
+	print('Rewards :',rewards)
 	total_reward = sum(rewards)
 	weights = rewards/total_reward
-
+	print('The weights :',weights)
 	#normalize the visitation histograms so that for each run the 
 	#sum of all the visited states becomes 1
+
+
+
 
 	norm_factor = np.sum(svf_policy,axis=0)
 
 	svf_policy = np.divide(svf_policy, norm_factor)
+
+	for j in range(no_of_samples):
+
+		#plt.imshow(np.resize(svf_policy[:,j],(10,10)))
+		#plt.show()
+		print("the corresponding weight :", weights[j])
+
+	print ("sum over timesteps :", np.resize(np.sum(svf_policy,axis=1),(10,10)))
 
 	svf_policy = np.matmul(svf_policy,weights)
 
@@ -352,7 +384,7 @@ if __name__ == '__main__':
   	
   	#initialize the reward network
     reward = RewardNet(env.reset().shape[0])
-    reward.load('../experiments/saved-models-rewards/5.pt')
+    reward.load('../experiments/saved-models-rewards/319.pt')
     reward.eval()
     reward.to(DEVICE)
 
@@ -365,17 +397,33 @@ if __name__ == '__main__':
                                      goal_state = np.asarray([3,3]),
                                      episode_length = 20)
 
-
-    statevisit2 = get_svf_from_sampling(no_of_samples = 1000, env = env ,
+    '''
+    statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
+    '''
+    statevisit3 = get_svf_from_sampling(no_of_samples = 30, env = env ,
+						 policy_nn = policy , reward_nn = reward,
+						 episode_length = 20, feature_extractor = None)
+    
+    print(np.sum(statevisit))
+    #print(np.sum(statevisit2))
+    #print("The difference :",np.sum(np.abs(statevisit3-statevisit2)))
     print(type(statevisit))
     print('sum :', np.sum(statevisit))
     statevisitMat = np.resize(statevisit,(r,c))
+    #statevisitMat2 = np.resize(statevisit2,(r,c))
+    statevisitMat3 = np.resize(statevisit3,(r,c))
 
+    #print ('svf :',statevisitMat2)
+    plt.clf()
+    plt.figure(0)
     plt.imshow(statevisitMat)
-    
     plt.colorbar()
+    plt.figure(2)
+    plt.imshow(statevisitMat3)
+    plt.colorbar()
+    plt.show()
     fname = './plots/'+str(3)+'.png'
     #plt.savefig(fname)
     #plt.clf()
