@@ -8,6 +8,7 @@ import numpy as np
 import sys
 sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
+from torch.distributions import Categorical
 
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
@@ -286,13 +287,14 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 		if feature_extractor is not None:
 			state = feature_extractor.extract_features(state)
 
-		svf_policy[np.where(state==1)[0][0],i] = 1 #marks the visitation for 
+		state_np = state.cpu().numpy()
+		svf_policy[np.where(state_np==1)[0][0],i] = 1 #marks the visitation for 
 												   #the state for the run
 		for t in range(episode_length):
 			action = select_action(policy_nn,state)
 			state, reward, done,_ = env.step(action)
-
-			svf_policy[np.where(state==1)[0][0],i] += 1 #marks the visitation for 
+			state_np = state.cpu().numpy()
+			svf_policy[np.where(state_np==1)[0][0],i] += 1 #marks the visitation for 
 												   #the state for the run
 			
 			if feature_extractor is not None:
@@ -313,7 +315,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 	#dont want to go exp, thus so much hassle
 	rewards = rewards - np.min(rewards)
 	total_reward = sum(rewards)
-	weights = rewards/total_rewards
+	weights = rewards/total_reward
 
 	#normalize the visitation histograms so that for each run the 
 	#sum of all the visited states becomes 1
