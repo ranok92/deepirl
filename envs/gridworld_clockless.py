@@ -129,7 +129,7 @@ class GridWorldClockless:
 
     def reset(self):
 
-        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
+        self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
 
         if self.is_onehot:
