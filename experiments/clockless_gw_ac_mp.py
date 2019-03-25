@@ -2,6 +2,7 @@ import pdb
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 
+from rlmethods.rlutils import LossBasedTermination as LBT
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
@@ -35,9 +36,9 @@ def main():
         reset_wrapper=reset_wrapper,
         seed = 3
     )
-
+    loss_t = LBT(list_size=100,stop_threshold=.2,log_interval=50)
     model = ActorCritic(env, gamma=0.99, log_interval=100, max_episodes=5000,
-                        max_ep_length=20)
+                        max_ep_length=20, termination = loss_t)
 
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
