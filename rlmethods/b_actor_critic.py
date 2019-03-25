@@ -261,9 +261,17 @@ class ActorCritic:
 
             # if not in an IRL setting, solve environment according to specs
             if not irl:
-                if i_episode % self.log_interval == 0:
-                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                        i_episode, t, running_reward))
+
+                if i_episode > 10 and i_episode % self.log_interval == 0:
+                    
+                    if self.termination is None:
+                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                            i_episode, t, running_reward))
+                    else:
+                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f} \
+                            \tLoss diff :{:.4f}'.format(
+                            i_episode, t, running_reward, 
+                            self.termination.current_avg_loss))
 
                 if running_reward > self.env.spec.reward_threshold:
                     print("Solved! Running reward is now {} and "
@@ -273,13 +281,27 @@ class ActorCritic:
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes and self.max_episodes > 0:
+
                     break
+
+                if self.termination is not None and self.termination.check_termination():
+                    break
+
             else:
                 assert self.max_episodes > 0
 
-                if i_episode % self.log_interval == 0:
-                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                        i_episode, t, running_reward))
+                if i_episode > 10 and  i_episode % self.log_interval == 0:
+
+                    if self.termination is None:
+                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                            i_episode, t, running_reward))
+                    else:
+                        print('Ep {}\tLast length: {:5d}\
+                            \tAvg. reward: {:.2f} \
+                            \tLoss diff :{:.4f}'.format(
+                            i_episode, t, running_reward, 
+                            self.termination.current_avg_loss))
+
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
