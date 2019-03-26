@@ -25,7 +25,7 @@ from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
 from neural_nets.base_network import BaseNN
 
-from rlmethods.rlutils import LossBasedTermination
+from rlmethods.termination import LossBasedTermination
 
 
 
