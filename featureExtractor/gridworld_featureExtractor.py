@@ -2,7 +2,11 @@
 this file contains different types of feature extractors 
 specifically for the 10x10 super simplified gridworld environment
 '''
+import sys
+sys.path.insert(0, '..')
+
 import pdb
+import itertools
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
 
@@ -33,6 +37,38 @@ class LocalGlobal():
 		self.agent_radius = agent_rad
 		self.obs_rad = obs_rad
 		self.field_list = fieldList
+
+		#added new (26-3-19)
+		#based on the state representation, this should contain a 
+		#dictionary containing all possible states
+		self.state_dictionary = {}
+
+
+	#generates the state dictionary based on the structure of the 
+	#hand crafted state space
+	
+	#the keys in the dictionary are strings converted from 
+	#numpy arrays
+	'''
+	def generate_state_dictionary(self):
+
+		state = np.zeros(4+self.window_size*self.window_size)
+
+		#the base state
+		state[4+floor((self.window_size*self.window_size)/2)] = 1
+		for i in range(3):
+			for r in range(self.window_size):
+				for c in range(self.window_size):
+	
+
+	
+	this will be a nightmare of a state space of size 4*2^24
+
+	'''
+
+
+
+
 
 
 	#reads the list of fields from the state to create its features
@@ -147,6 +183,36 @@ class FrontBackSide():
 										   [1,0,1,0],
 										   [0,1,0,1],
 										   [1,0,1,0]])
+
+
+
+		#adding the state dictionary
+
+		self.state_dictionary = {}
+
+		self.generate_state_dictionary()
+
+
+	#the state space for this should be 2^4*4
+	def generate_state_dictionary(self):
+
+		
+
+		for i in range(4):
+			
+			for j in range(0,5):
+
+				combos = itertools.combinations(range(4),j)
+
+				for combination in combos:
+
+					state = np.zeros(8)
+					state[i] = 1
+					for val in combination:
+
+						state[4+val] = 1
+
+					self.state_dictionary[np.array2string(state)] = 0
 
 
 
@@ -287,7 +353,11 @@ class FrontBackSide():
 
 
 
+if __name__=='__main__':
 
+	f = FrontBackSide()
+	print(f.state_dictionary)
+	print(len(f.state_dictionary.keys()))
 
 
 
