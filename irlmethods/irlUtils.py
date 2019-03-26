@@ -185,51 +185,8 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
     return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
 
+
 def expert_svf(traj_path, ncols=10, nrows=10):
-
-    actions = glob.glob(os.path.join(traj_path, '*.acts'))
-    states = glob.glob(os.path.join(traj_path, '*.states'))
-
-    # histogram to accumulate state visitations
-    state_hist = torch.zeros((1,ncols,nrows))
-
-    svf = torch.zeros((ncols, nrows))
-
-    for idx, state_file in enumerate(states):
-        # load states from trajectory file
-        torch_state = torch.load(state_file, map_location=DEVICE)
-
-        # states can only be indecies if they are of type long
-        state = torch_state.type(torch.long)
-        pdb.set_trace()
-        # list of all time-slices of the histogram
-        hist_slices = []
-
-        for row_i, row in enumerate(state):
-            # if this timestep has already been encountered, then increment in
-            # existing histogram timeslice
-            if row_i < len(hist_slices):
-                hist_slices[row_i][row[0], row[1]] += 1
-
-            # else initialize new histogram timeslice and append to hist_slices
-            else:
-                hist_slice = torch.zeros(ncols, nrows)
-                hist_slice[row[0], row[1]] += 1
-                hist_slices.append(hist_slice)
-
-        # normalize each timestep
-        for hist in hist_slices:
-            hist /= hist.sum()
-
-        # accumulate frequencies through time
-
-        svf += torch.stack(hist_slices).sum(0)
-
-    svf /= len(states)
-
-    return svf.reshape(-1)
-
-def expert_svf_onehot(traj_path, ncols=10, nrows=10):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
@@ -238,31 +195,40 @@ def expert_svf_onehot(traj_path, ncols=10, nrows=10):
     svf = np.zeros((1,ncols*nrows))
 
     for idx, state_file in enumerate(states):
-        # load states from trajectory file
-        traj_svf = np.zeros((1,ncols*nrows))
 
-        torch_state = torch.load(state_file, map_location=DEVICE)
-        state_np = torch_state.numpy()
-        # states can only be indecies if they are of type long
-        state = torch_state.type(torch.long)
-        # list of all time-slices of the histogram
-        hist_slices = []
+        # traj_svf stores the state hist
+        traj_hist = np.zeros((1,ncols*nrows))
 
-        for i in range(state_np.shape[0]):
-        	traj_svf+=state_np[i]
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+        	#this is for onehot
+
+        	#convert state to state index
+        	state_index = np.where(traj_np[i]==1)[0][0]
+
+        	# +1 for that index in the trajectory histogram
+        	traj_hist[0,state_index]+=1
 
 
         # normalize each trajectory
-        #pdb.set_trace()
-        traj_svf/=np.sum(traj_svf)
+        traj_hist/=np.sum(traj_hist)
 
         # accumulate frequencies through time
 
-        svf += traj_svf
+        svf += traj_hist
 
     svf /= len(states)
 
     return svf
+
+
+
 
 
 '''
@@ -333,13 +299,16 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 				state = feature_extractor.extract_features(state)
 
 			state_np = state.cpu().numpy()
-
+			#from the one_hot state representation get the state
 			if start_state[np.where(state_np==1)[0][0]] > (no_of_samples/num_states)+2:
 				pass
 			else:
 				start_state[np.where(state_np==1)[0][0]]+=1
 				break
 
+
+		#np.where(state_np==1)[0][0] returns the state index
+		#from the state representation
 
 		svf_policy[np.where(state_np==1)[0][0],i] = 1 #marks the visitation for 
 												   #the state for the run
@@ -428,7 +397,7 @@ if __name__ == '__main__':
 	
 
 
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_3_3/')
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld/')
 
     expert_np = np.resize(exp_svf,(10,10))
 
