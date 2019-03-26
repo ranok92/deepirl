@@ -60,9 +60,18 @@ class RewardNet(BaseNN):
 
 
 class DeepMaxEnt():
-    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10,
-                log_intervals=1 , on_server = True, plot_save_folder=None,
-                rl_max_episodes = 30):
+    def __init__(
+            self,
+            traj_path,
+            rlmethod=None,
+            env=None,
+            iterations=10,
+            log_intervals=1,
+            on_server = True,
+            plot_save_folder=None,
+            rl_max_episodes = 30,
+            graft = True,
+    ):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
@@ -70,6 +79,7 @@ class DeepMaxEnt():
         self.max_episodes = iterations
         self.traj_path = traj_path
         self.rl_max_episodes = rl_max_episodes
+        self.graft = graft
 
         self.plot_save_folder = plot_save_folder
 
@@ -161,9 +171,13 @@ class DeepMaxEnt():
         plt.draw()
         plt.pause(.0001)
 
-    def resetTraining(self,inp_size,out_size):
+    def resetTraining(self,inp_size,out_size, graft=True):
 
-        newNN = Policy(inp_size,out_size, body_net = self.reward.body)
+        if graft:
+            newNN = Policy(inp_size,out_size, body_net = self.reward.body)
+        else:
+            newNN = Policy(inp_size,out_size)
+
         newNN.to(self.device)
         self.rl.policy = newNN
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
@@ -193,7 +207,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size,self.action_size)
+            self.resetTraining(self.state_size,self.action_size, self.graft)
 
 
             self.reward.save('./saved-models-rewards/')
