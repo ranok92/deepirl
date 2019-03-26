@@ -216,6 +216,7 @@ class ActorCritic:
         #additional lines for loss based termination
         self.termination.update_loss_diff_list(loss.item())
         self.termination.plot_avg_loss()
+
         loss.backward()
         self.optimizer.step()
 
