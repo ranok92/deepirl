@@ -201,7 +201,7 @@ def expert_svf(traj_path, ncols=10, nrows=10):
 
         # states can only be indecies if they are of type long
         state = torch_state.type(torch.long)
-
+        pdb.set_trace()
         # list of all time-slices of the histogram
         hist_slices = []
 
@@ -228,6 +228,41 @@ def expert_svf(traj_path, ncols=10, nrows=10):
     svf /= len(states)
 
     return svf.reshape(-1)
+
+def expert_svf_onehot(traj_path, ncols=10, nrows=10):
+
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+
+    # histogram to accumulate state visitations
+    svf = np.zeros((1,ncols*nrows))
+
+    for idx, state_file in enumerate(states):
+        # load states from trajectory file
+        traj_svf = np.zeros((1,ncols*nrows))
+
+        torch_state = torch.load(state_file, map_location=DEVICE)
+        state_np = torch_state.numpy()
+        # states can only be indecies if they are of type long
+        state = torch_state.type(torch.long)
+        # list of all time-slices of the histogram
+        hist_slices = []
+
+        for i in range(state_np.shape[0]):
+        	traj_svf+=state_np[i]
+
+
+        # normalize each trajectory
+        #pdb.set_trace()
+        traj_svf/=np.sum(traj_svf)
+
+        # accumulate frequencies through time
+
+        svf += traj_svf
+
+    svf /= len(states)
+
+    return svf
 
 
 '''
@@ -393,18 +428,29 @@ if __name__ == '__main__':
 	
 
 
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_3_3/')
 
-    #for i in range(50):
+    expert_np = np.resize(exp_svf,(10,10))
+
+    plt.figure(0)
+    plt.imshow(expert_np)
+    plt.colorbar()
+    plt.show()
+
+
+    print ("The expert svf :", exp_svf)
+
+    '''
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
                                      episode_length = 20)
 
-    '''
+    
     statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
-    '''
+    
     statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = None)
@@ -434,3 +480,4 @@ if __name__ == '__main__':
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
+	'''
