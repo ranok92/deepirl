@@ -214,7 +214,7 @@ class ActorCritic:
             torch.stack(value_losses).sum()
 
         #additional lines for loss based termination
-        self.termination.update_loss_diff_list(loss.item())
+        self.termination.add_loss(loss.item())
         self.termination.plot_avg_loss()
 
         loss.backward()
@@ -303,7 +303,7 @@ class ActorCritic:
                     break
 
                 #terminate based on loss
-                if self.termination.check_termination():
+                if self.termination.is_terminated():
                     break
 
         return self.policy

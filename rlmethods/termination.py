@@ -10,7 +10,16 @@ import sys
 sys.path.insert(0, '..')
 
 
-class LossBasedTermination():
+class BaseTermination():
+
+    def add_loss(self, loss):
+        raise NotImplementedError
+
+    def is_terminated(self):
+        raise NotImplementedError
+
+
+class LossBasedTermination(BaseTermination):
 
     def __init__(
             self,
@@ -31,7 +40,7 @@ class LossBasedTermination():
         if self.info:
             self.current_avg_loss_diff_list = []
 
-    def update_loss_diff_list(self, new_loss):
+    def add_loss(self, new_loss):
 
         if self.last_loss is None:
             self.last_loss = new_loss
@@ -45,7 +54,7 @@ class LossBasedTermination():
         if self.current_avg_loss is not None:
             self.current_avg_loss_diff_list.append(self.current_avg_loss)
 
-    def check_termination(self):
+    def is_terminated(self):
         """Returns true if RL has converged."""
 
         if len(self.loss_diff_list) == self.list_size:
