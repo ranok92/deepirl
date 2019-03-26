@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
-
+from featureExtractor.gridworld_featureExtractor import OneHot
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
@@ -185,8 +185,9 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
     return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
 
-
-def expert_svf(traj_path, ncols=10, nrows=10):
+#will remove this once onehot becomes a feature extractor class
+#but till then this stays 
+def expert_svf_onehot(traj_path, ncols=10, nrows=10):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
@@ -227,6 +228,52 @@ def expert_svf(traj_path, ncols=10, nrows=10):
 
     return svf
 
+
+
+def expert_svf(traj_path, state_dict = None):
+
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+    print("From here.")
+
+
+    # histogram to accumulate state visitations
+    svf = np.zeros((1,len(state_dict.keys())))
+
+    for idx, state_file in enumerate(states):
+
+        # traj_svf stores the state hist
+        traj_hist = np.zeros((1,len(state_dict.keys())))
+
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+        	#this is for onehot
+
+        	#convert state to state index
+        	state_str = np.array2string(traj_np[i])
+        	state_index = state_dict[state_str]
+
+        	# +1 for that index in the trajectory histogram
+        	traj_hist[0,state_index]+=1
+
+
+        # normalize each trajectory over timesteps
+        traj_hist/=np.sum(traj_hist)
+
+        # accumulate frequencies through trajetories
+
+        svf += traj_hist
+
+    #normalize the svf over trajectories
+    svf /= len(states)
+
+    return svf
 
 
 
@@ -374,16 +421,15 @@ if __name__ == '__main__':
 
     r = 10
     c = 10
+
+    feat = OneHot(grid_rows=10,grid_cols=10)
+
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper= step_wrapper,
     				obstacles=[np.asarray([1, 2])])
     print(env.reset())
     print(len(env.reset()))
     policy = Policy(env.reset().shape[0], env.action_space.n)
-    #policy = Policy(2, env.action_space.n)
-    #6.pt is a model trained to completion
-    #8.pt is a model trained for 200 RL iterations
-    #policy.load_state_dict(torch.load('../experiments/saved-models/4.pt', map_location=DEVICE))
     policy.load('../experiments/saved-models/8.pt')
     policy.eval()
     policy.to(DEVICE)
@@ -397,7 +443,10 @@ if __name__ == '__main__':
 	
 
 
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld/')
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld/',
+    			state_dict = feat.state_dictionary)
+
+    #exp_svf = expert_svf_onehot('../experiments/trajs/ac_gridworld/')
 
     expert_np = np.resize(exp_svf,(10,10))
 
