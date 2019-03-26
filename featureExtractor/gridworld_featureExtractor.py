@@ -12,6 +12,30 @@ from utils import reset_wrapper, step_wrapper
 
 
 '''
+	Creating a new class?? Keeps these POINTS in mind.
+	
+	***will change to parent and sub class later***
+	Each class MUST have the following methods:
+
+		get_info_from_state(self, state)
+		
+		generate_state_dictionary(self)
+
+		extract_features(self, state)
+
+	Each class MUST have the following members:
+	
+
+		self.state_dictionary : A dictionary that contains 
+								all states possible based on the
+								state representation created by
+								the feature extractor with 
+								an index for each of the state.
+
+'''
+
+
+'''
 
 	THE STATE PUBLISHED BY THE ENVIRONMENT IS A DICTIONARY
 	WITH THE FOLLOWING FIELDS so far:
@@ -25,6 +49,9 @@ from utils import reset_wrapper, step_wrapper
 #*************array of helper methods***************#
 
 #helper methods
+
+
+
 
 
 class LocalGlobal():
@@ -63,6 +90,7 @@ class LocalGlobal():
 
 	
 	this will be a nightmare of a state space of size 4*2^24
+	ABORTING . . .
 
 	'''
 
@@ -196,7 +224,7 @@ class FrontBackSide():
 	#the state space for this should be 2^4*4
 	def generate_state_dictionary(self):
 
-		
+		indexval = 0
 
 		for i in range(4):
 			
@@ -212,7 +240,8 @@ class FrontBackSide():
 
 						state[4+val] = 1
 
-					self.state_dictionary[np.array2string(state)] = 0
+					self.state_dictionary[np.array2string(state)] = indexval
+					indexval+=1
 
 
 
@@ -352,13 +381,60 @@ class FrontBackSide():
 		return reset_wrapper(features)
 
 
+class OneHot():
+
+	def __init__(self,grid_rows = 10 , grid_cols = 10):
+
+		self.rows = grid_rows
+		self.cols = grid_cols
+		self.state_size = self.rows*self.cols
+
+		self.state_dictionary = {}
+
+		self.generate_state_dictionary()
+
+
+	def generate_state_dictionary(self):
+
+		indexval = 0
+		
+		for i in range(self.state_size):
+			state = np.zeros(self.state_size)
+			state[i] = 1
+			self.state_dictionary[np.array2string(state)] = indexval
+			indexval+=1
+
+	def get_info_from_state(self,state):
+
+		agent_state = state['agent_state']
+		return agent_state
+
+
+
+	def extract_features(self,state):
+
+		feature = np.zeros(self.state_size)
+		agent_pos = get_info_from_state(state)
+
+		index = agent_pos[0]*self.cols+agent_pos[1]
+		feature[index] = 1
+
+		feature = reset_wrapper(feature)
+
+		return feature
+
+
 
 if __name__=='__main__':
 
-	f = FrontBackSide()
+	f = OneHot(grid_rows=10,grid_cols=10)
 	print(f.state_dictionary)
 	print(len(f.state_dictionary.keys()))
 
+	a = np.zeros(100)
+	a[99] = 1
+
+	print(f.state_dictionary[np.array2string(a)])
 
 
 
