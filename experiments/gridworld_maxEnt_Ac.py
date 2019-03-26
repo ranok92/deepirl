@@ -27,6 +27,8 @@ parser.add_argument('--rl-episodes', type=int, default=1000)
 parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
 parser.add_argument('--rl-log-intervals', type=int, default=100)
+parser.add_argument('--graft', action='store_true',
+                    help='graft the reward network body into policy.')
 
 
 def main():
@@ -63,7 +65,8 @@ def main():
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
-                           plot_save_folder='./plots/')
+                           plot_save_folder='./plots/',
+                           graft=args.graft)
     print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
 

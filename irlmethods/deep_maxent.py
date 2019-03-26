@@ -33,14 +33,18 @@ class RewardNet(BaseNN):
     def __init__(self, state_dims):
         super(RewardNet, self).__init__()
 
-        self.affine1 = nn.Linear(state_dims, 128)
+        self.body = nn.Sequential(
+            nn.Linear(state_dims, 128),
+            nn.ReLU(),
+        )
 
-        self.reward_head = nn.Linear(128, 1)
+        self.head = nn.Sequential(
+            nn.Linear(128, 1),
+        )
 
     def forward(self, x):
-        x = F.elu(self.affine1(x))
-
-        x = self.reward_head(x)
+        x = self.body(x)
+        x = self.head(x)
 
         return x
 
@@ -56,9 +60,18 @@ class RewardNet(BaseNN):
 
 
 class DeepMaxEnt():
-    def __init__(self, traj_path, rlmethod=None, env=None, iterations=10,
-                log_intervals=1 , on_server = True, plot_save_folder=None,
-                rl_max_episodes = 30):
+    def __init__(
+            self,
+            traj_path,
+            rlmethod=None,
+            env=None,
+            iterations=10,
+            log_intervals=1,
+            on_server = True,
+            plot_save_folder=None,
+            rl_max_episodes = 30,
+            graft = True,
+    ):
 
         # pass the actual object of the class of RL method of your choice
         self.rl = rlmethod
@@ -66,6 +79,7 @@ class DeepMaxEnt():
         self.max_episodes = iterations
         self.traj_path = traj_path
         self.rl_max_episodes = rl_max_episodes
+        self.graft = graft
 
         self.plot_save_folder = plot_save_folder
 
@@ -157,9 +171,13 @@ class DeepMaxEnt():
         plt.draw()
         plt.pause(.0001)
 
-    def resetTraining(self,inp_size,out_size):
+    def resetTraining(self,inp_size,out_size, graft=True):
 
-        newNN = Policy(inp_size,out_size)
+        if graft:
+            newNN = Policy(inp_size,out_size, body_net = self.reward.body)
+        else:
+            newNN = Policy(inp_size,out_size)
+
         newNN.to(self.device)
         self.rl.policy = newNN
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
@@ -189,7 +207,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size,self.action_size)
+            self.resetTraining(self.state_size,self.action_size, self.graft)
 
 
             self.reward.save('./saved-models-rewards/')
@@ -204,7 +222,7 @@ class DeepMaxEnt():
                                                 cols = self.env.cols,
                                                 goalState = self.env.goal_state,
                                                 episode_length = self.rl_max_episodes)
-            current_agent_policy.save('./saved-models/')
+
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
 
