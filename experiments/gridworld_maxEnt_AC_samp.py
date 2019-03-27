@@ -48,9 +48,13 @@ def main():
     # initialize the environment
 
     #**set is_onehot to false
-    env = GridWorld(display=args.render, obstacles=[np.asarray([1, 2])], 
-                   step_wrapper=utils.step_wrapper,
-                   seed = 3,
+    goal_state = np.asarray([5,5])
+
+    env = GridWorld(display=args.render, 
+                    obstacles=[np.asarray([1, 2])],
+                    goal_state=goal_state, 
+                    step_wrapper=utils.step_wrapper,
+                    seed = 3,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
 
@@ -74,7 +78,7 @@ def main():
         rlMethod.policy.load(args.policy_path)
 
     # initialize IRL method
-    trajectory_path = './trajs/ac_gridworld/'
+    trajectory_path = './trajs/ac_gridworld_5_5/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,

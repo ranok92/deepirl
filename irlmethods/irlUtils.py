@@ -144,7 +144,9 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
     GOALSTATE = (goal_state[0]*cols)+goal_state[1]
 
     stateVisitationMatrix = np.zeros([TOTALSTATES, TIMESTEPS])
-    env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
+    env = GridWorld(display=False, 
+    				obstacles=[np.asarray([1, 2])],
+    				goal_state = goal_state)
 
     '''
     The lines below were necessary if a policy dictionary file was passed as an argument to the 
@@ -237,8 +239,6 @@ def expert_svf(traj_path, state_dict = None):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
-    print("From here.")
-
 
     # histogram to accumulate state visitations
     svf = np.zeros((1,len(state_dict.keys())))
@@ -444,8 +444,6 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	svf_policy = np.divide(svf_policy, norm_factor)
 
-	print ("sum over timesteps :", np.resize(np.sum(svf_policy,axis=1),(10,10)))
-
 	svf_policy = np.matmul(svf_policy,weights)
 
 	return svf_policy
@@ -467,10 +465,10 @@ if __name__ == '__main__':
     				is_onehot = False)
     print(env.reset())
     print(len(env.reset()))
-
+    
     state_space = len(feat.state_dictionary.keys())
     policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/8.pt')
+    policy.load('../experiments/saved-models/g5_5_o1_2.pt')
     policy.eval()
     policy.to(DEVICE)
   	
@@ -482,9 +480,9 @@ if __name__ == '__main__':
     reward.to(DEVICE)
 	
 
-    '''
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld/',
-    			state_dict = feat.state_dictionary)
+    
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_5_5/',
+     			state_dict = feat.state_dictionary)
 
     #exp_svf = expert_svf_onehot('../experiments/trajs/ac_gridworld/')
 
@@ -494,11 +492,10 @@ if __name__ == '__main__':
     plt.imshow(expert_np)
     plt.colorbar()
     plt.show()
-	'''
+	
 
     #print ("The expert svf :", exp_svf)
-
-  
+    
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
@@ -508,7 +505,7 @@ if __name__ == '__main__':
     statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
-    '''
+    
     statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = feat)
@@ -518,15 +515,18 @@ if __name__ == '__main__':
     #print("The difference :",np.sum(np.abs(statevisit3-statevisit2)))
     print(type(statevisit))
     print('sum :', np.sum(statevisit))
+    '''
     statevisitMat = np.resize(statevisit,(r,c))
     #statevisitMat2 = np.resize(statevisit2,(r,c))
-    statevisitMat3 = np.resize(statevisit3,(r,c))
+    #statevisitMat3 = np.resize(statevisit3,(r,c))
 
     #print ('svf :',statevisitMat2)
     plt.clf()
     plt.figure(0)
     plt.imshow(statevisitMat)
     plt.colorbar()
+    plt.show()
+    '''
     plt.figure(2)
     plt.imshow(statevisitMat3)
     plt.colorbar()
@@ -538,4 +538,4 @@ if __name__ == '__main__':
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
-	
+	'''
