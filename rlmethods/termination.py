@@ -22,7 +22,7 @@ class BaseTermination():
 
 class VarianceTermination():
 
-    def __init__(self, window_size=100, stop_threshold=0.2):
+    def __init__(self, window_size=100, stop_threshold=0.2, log_interval=100):
         """Initialize a VarianceTermination instance.
 
         :param window_size: size of window for which samples are kept.
@@ -42,6 +42,7 @@ class VarianceTermination():
         self.means = collections.deque(maxlen=window_size)
         self.variances = collections.deque(maxlen=window_size)
         self.log_counter = 0
+        self.log_interval = log_interval
 
         # plt.ion()
 
@@ -86,17 +87,19 @@ class VarianceTermination():
         return False
 
     def print_debug(self):
+        plt.cla()
+
         plt.plot(self.means, 'b')
         plt.plot(self.variances, 'r')
+
         plt.draw()
         plt.pause(0.0001)
 
     def plot_avg_loss(self):
-        if self.log_counter % 300 == 0:
+        if self.log_counter % self.log_interval  == 0:
             self.print_debug()
-            self.log_counter = 0
-        else:
-            self.log_counter += 1
+
+        self.log_counter += 1
 
 
 class LossBasedTermination(BaseTermination):
