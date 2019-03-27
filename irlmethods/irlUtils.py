@@ -346,10 +346,12 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 		run_reward = 0
 
 		#for debugging purpose, shows the histogram of the start states 
+		'''
 		if i%500==0:
 			plt.bar(index,start_state)
 			plt.draw()
 			plt.pause(.001)
+		'''
 		#to make sure the start state is uniform among all possible states
 
 		#the continues to restart unless the starting points are somewhat uniformly
