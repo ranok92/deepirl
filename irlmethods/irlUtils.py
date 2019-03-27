@@ -428,12 +428,12 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	#normalize the rewards to get the weights
 	#dont want to go exp, thus so much hassle
-	print('Rewards untouched :',rewards)
+	#print('Rewards untouched :',rewards)
 	rewards = rewards - np.min(rewards)+eps
-	print('Rewards :',rewards)
+	#print('Rewards :',rewards)
 	total_reward = sum(rewards)
 	weights = rewards/total_reward
-	print('The weights :',weights)
+	#print('The weights :',weights)
 	#normalize the visitation histograms so that for each run the 
 	#sum of all the visited states becomes 1
 
