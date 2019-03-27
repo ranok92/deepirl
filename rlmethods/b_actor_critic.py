@@ -107,12 +107,7 @@ class ActorCritic:
         self.env = env
         self.feature_extractor = feat_extractor
 
-        if termination is not None:
-            self.termination=termination
-        else:
-            self.termination = LossBasedTermination()
-
-
+        self.termination = termination
 
         if env.is_onehot:
             state_size = env.reset().shape[0]
@@ -312,6 +307,7 @@ class ActorCritic:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward))
                     else:
+                        print(self.termination)
                         print('Ep {}\tLast length: {:5d}\
                             \tAvg. reward: {:.2f} \
                             \tLoss diff :{:.4f}'.format(
