@@ -50,7 +50,7 @@ if __name__ == '__main__':
     c = 10
     env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
     reward_network = RewardNet(env.reset().shape[0])
-    reward_network.load('./experiments/saved-models-rewards/0.pt')
+    reward_network.load('./experiments/saved-models-rewards/251.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
