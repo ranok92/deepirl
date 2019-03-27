@@ -10,7 +10,7 @@ import random
 
 class LossBasedTermination():
 
-	def __init__(self,list_size = 100 , stop_threshold = .5 ,info=True , log_interval = 50):
+	def __init__(self,list_size = 100 , stop_threshold = .5 ,info=True , log_interval = 100):
 
 		self.loss_diff_list = []
 		self.list_size = list_size
@@ -46,7 +46,8 @@ class LossBasedTermination():
 				self.current_avg_loss = sum(self.loss_diff_list)/self.list_size
 
 		if self.current_avg_loss is not None:
-			self.current_avg_loss_diff_list.append(self.current_avg_loss)
+			if self.info:
+				self.current_avg_loss_diff_list.append(self.current_avg_loss)
 
 
 	def check_termination(self):
@@ -63,10 +64,13 @@ class LossBasedTermination():
 
 	def plot_avg_loss(self):
 
-		if len(self.current_avg_loss_diff_list) >0 and len(self.current_avg_loss_diff_list)%self.log_interval==0:
-			plt.plot(self.current_avg_loss_diff_list)
-			plt.draw()
-			plt.pause(.0001)
+		if self.info:
+			if len(self.current_avg_loss_diff_list) >0 and len(self.current_avg_loss_diff_list)%self.log_interval==0:
+				plt.plot(self.current_avg_loss_diff_list)
+				plt.draw()
+				plt.pause(.0001)
+		else:
+			pass
 
 
 if __name__ == '__main__':
