@@ -25,7 +25,7 @@ from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
 from neural_nets.base_network import BaseNN
 
-from rlmethods.termination import LossBasedTermination
+from rlmethods.termination import VarianceTermination
 
 
 
@@ -110,7 +110,7 @@ class ActorCritic:
         if termination is not None:
             self.termination=termination
         else:
-            self.termination = LossBasedTermination()
+            self.termination = VarianceTermination()
 
 
         if self.feature_extractor is None:
@@ -250,7 +250,6 @@ class ActorCritic:
                 state, reward, done, _ = self.env.step(action)
 
                 if self.feature_extractor is not None:
-                
                     state = self.feature_extractor.extract_features(
                             state)
 
@@ -282,10 +281,7 @@ class ActorCritic:
                     print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                         i_episode, t, running_reward))
 
-                if running_reward > self.env.spec.reward_threshold:
-                    print("Solved! Running reward is now {} and "
-                          "the last episode runs to {} time \
-                          steps!".format(running_reward, t))
+                if self.termination.is_terminated():
                     break
 
                 # terminate if max episodes exceeded
