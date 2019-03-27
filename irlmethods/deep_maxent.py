@@ -73,9 +73,12 @@ class DeepMaxEnt():
         # needs to be made independant somehow
         # self.env.step = utils.step_torch_state()(self.env.step)
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
-        self.state_size = self.env.reset().shape[0]
+        if self.env.is_onehot:
+            self.state_size = self.env.reset().shape[0]
+        else:
+            self.state_size = len(self.rl.feature_extractor.state_dictionary.keys())
         self.action_size = self.env.action_space.n
-        self.reward = RewardNet(env.reset().shape[0])
+        self.reward = RewardNet(self.state_size)
         self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
@@ -89,11 +92,14 @@ class DeepMaxEnt():
         #making it run on server
         self.on_server = on_server
 
+
+
+    #******parts being operated on
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path).type(self.dtype)
 
 
-    def policy_svf(self, policy, rows = 10, cols = 10, 
+    def calc_svf_absolute(self, policy, rows = 10, cols = 10, 
                     actions_space=5 , 
                     goalState= np.asarray([0,0]),
                     episode_length = 30):
@@ -101,6 +107,20 @@ class DeepMaxEnt():
                                                 num_actions=actions_space ,
                                                 goal_state=goalState ,
                                                 episode_length=episode_length)
+
+
+    def agent_svf_sampling(no_of_samples = 1000 , env =None,
+                            policy_nn = None , reward_nn = None,
+                            episode_length = 20, feature_extractor = None):
+
+        return irlUtils.get_svf_from_sampling(no_of_samples=no_of_samples,
+                                            env=  env, policy_nn = policy_nn,
+                                            reward_nn = reward_nn ,
+                                            episode_length = episode_length,
+                                            feature_extractor = feature_extractor)
+
+    #***********
+
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
@@ -175,7 +195,7 @@ class DeepMaxEnt():
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/1.pt')
-        expertdemo_svf = self.policy_svf( expert_policy, 
+        expertdemo_svf = self.calc_svf_absolute( expert_policy, 
                                          rows=self.env.rows,
                                          cols=self.env.cols,
                                          goalState = self.env.goal_state,
@@ -199,11 +219,12 @@ class DeepMaxEnt():
                 reward_net=self.reward,
                 irl=True
             )
-            current_agent_svf = self.policy_svf(self.rl.policy,
-                                                rows = self.env.rows, 
-                                                cols = self.env.cols,
-                                                goalState = self.env.goal_state,
+            current_agent_svf = self.agent_svf_sampling(no_of_samples = 3000,
+                                                policy_nn= self.rl.policy,
+                                                reward_nn = self.reward,
+                                                feature_extractor = self.rl.feature_extractor,
                                                 episode_length = self.rl_max_episodes)
+
             current_agent_policy.save('./saved-models/')
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
