@@ -444,12 +444,6 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	svf_policy = np.divide(svf_policy, norm_factor)
 
-	for j in range(no_of_samples):
-
-		#plt.imshow(np.resize(svf_policy[:,j],(10,10)))
-		#plt.show()
-		print("the corresponding weight :", weights[j])
-
 	print ("sum over timesteps :", np.resize(np.sum(svf_policy,axis=1),(10,10)))
 
 	svf_policy = np.matmul(svf_policy,weights)
