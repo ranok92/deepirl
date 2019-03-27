@@ -149,7 +149,8 @@ class GridWorldClockless:
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
 
-        self.state = self.reset_wrapper(self.state)
+        if self.is_onehot:
+            self.state = self.reset_wrapper(self.state)
         return self.state
 
 
@@ -171,12 +172,14 @@ class GridWorldClockless:
             if action!=4:
                 self.state['agent_head_dir'] = action 
 
-        self.state, reward, done, _ = self.step_wrapper(
-            self.state,
-            reward,
-            done,
-            None
-        )
+        if self.is_onehot:
+
+            self.state, reward, done, _ = self.step_wrapper(
+                self.state,
+                reward,
+                done,
+                None
+            )
 
         return self.state, reward, done, None
 
