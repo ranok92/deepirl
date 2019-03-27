@@ -10,7 +10,14 @@ import random
 
 class LossBasedTermination():
 
-	def __init__(self,list_size = 100 , stop_threshold = .5 ,info=True , log_interval = 100):
+
+	def __init__(
+            self,
+            list_size = 100,
+            stop_threshold = .5,
+            info=True,
+            log_interval = 50
+            ):
 
 		self.loss_diff_list = []
 		self.list_size = list_size
