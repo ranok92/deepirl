@@ -383,7 +383,7 @@ class FrontBackSide():
 
 class OneHot():
 
-	def __init__(self,grid_rows = 10 , grid_cols = 10):
+	def __init__(self,grid_rows = 10 , grid_cols = 10 ,wrapper =reset_wrapper):
 
 		self.rows = grid_rows
 		self.cols = grid_cols
@@ -414,7 +414,7 @@ class OneHot():
 	def extract_features(self,state):
 
 		feature = np.zeros(self.state_size)
-		agent_pos = get_info_from_state(state)
+		agent_pos = self.get_info_from_state(state)
 
 		index = agent_pos[0]*self.cols+agent_pos[1]
 		feature[index] = 1
