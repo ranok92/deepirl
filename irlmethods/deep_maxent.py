@@ -109,11 +109,11 @@ class DeepMaxEnt():
                                                 episode_length=episode_length)
 
 
-    def agent_svf_sampling(no_of_samples = 1000 , env =None,
+    def agent_svf_sampling(self,num_of_samples = 1000 , env = None,
                             policy_nn = None , reward_nn = None,
                             episode_length = 20, feature_extractor = None):
 
-        return irlUtils.get_svf_from_sampling(no_of_samples=no_of_samples,
+        return irlUtils.get_svf_from_sampling(no_of_samples=num_of_samples,
                                             env=  env, policy_nn = policy_nn,
                                             reward_nn = reward_nn ,
                                             episode_length = episode_length,
@@ -219,7 +219,8 @@ class DeepMaxEnt():
                 reward_net=self.reward,
                 irl=True
             )
-            current_agent_svf = self.agent_svf_sampling(no_of_samples = 3000,
+            current_agent_svf = self.agent_svf_sampling(num_of_samples = 3000,
+                                                env = self.env,
                                                 policy_nn= self.rl.policy,
                                                 reward_nn = self.reward,
                                                 feature_extractor = self.rl.feature_extractor,

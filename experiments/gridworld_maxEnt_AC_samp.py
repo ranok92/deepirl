@@ -23,7 +23,7 @@ parser.add_argument('--store-train-results', action='store_true',
                     help='True if you want to store intermediate results')
 parser.add_argument('--store-interval', action='store_true',
                     help='Interval of storing the results.')
-parser.add_argument('--rl-episodes', type=int, default=1000)
+parser.add_argument('--rl-episodes', type=int, default=50)
 parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
 parser.add_argument('--rl-log-intervals', type=int, default=100)
@@ -67,7 +67,7 @@ def main():
                             log_interval = args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
-                            termination = lbt,
+                            termination = None,
                             feat_extractor = feat_ext)
     print("RL method initialized.")
     if args.policy_path is not None:
