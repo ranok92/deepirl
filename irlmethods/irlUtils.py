@@ -229,6 +229,9 @@ def expert_svf_onehot(traj_path, ncols=10, nrows=10):
     return svf
 
 
+#This is a more general function and should work with any
+#state representation provided the state dictionary
+#corresponding to that state representation is provided
 
 def expert_svf(traj_path, state_dict = None):
 
@@ -306,16 +309,23 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 						 policy_nn = None , reward_nn = None,
 						 episode_length = 20, feature_extractor = None):
 	
+
 	num_states = 100
+	#initialize the variable to store the svfs
 	if feature_extractor is None:
 		svf_policy = np.zeros((num_states, no_of_samples)) #as the possible states are 100
 	else:
 		#kept for later
-		pass 
+		num_states = len(feature_extractor.state_dictionary.keys())
+		svf_policy = np.zeros((num_states, no_of_samples))
+
 
 	rewards = np.zeros(no_of_samples)
 	approx_Z = 0 #this should be the sum of all the rewards obtained
 	eps = 0.00001 # so that the reward is never 0.
+
+	#start_state contains the distribution of the start state
+	#as of now the code focuses on starting from all possible states uniformly
 
 	start_state = np.zeros(num_states)
 	'''
@@ -334,23 +344,41 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 	index = np.arange(num_states)
 	for i in range(no_of_samples):
 		run_reward = 0
+
+		#for debugging purpose, shows the histogram of the start states 
 		if i%500==0:
 			plt.bar(index,start_state)
 			plt.draw()
 			plt.pause(.001)
 		#to make sure the start state is uniform among all possible states
+
+		#the continues to restart unless the starting points are somewhat uniformly
+		#distributed
 		while True:
 
 			state = env.reset()
 			if feature_extractor is not None:
 				state = feature_extractor.extract_features(state)
 
-			state_np = state.cpu().numpy()
+			if 'torch' in state.type():
+				state_np = state.cpu().numpy()
+			else:
+				state_np = state
 			#from the one_hot state representation get the state
-			if start_state[np.where(state_np==1)[0][0]] > (no_of_samples/num_states)+2:
+			#to get the index of the state
+
+			#keeping this to make it work with the default case of onehot
+			#**will be removed in the future
+			if feature_extractor is None:
+				state_index = np.where(state_np==1)[0][0]
+			else:
+				#feature_extractor wraps the state in torch tensor so convert that back
+
+				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+			if start_state[state_index] > (no_of_samples/num_states)+2:
 				pass
 			else:
-				start_state[np.where(state_np==1)[0][0]]+=1
+				start_state[state_index]+=1
 				break
 
 
@@ -363,13 +391,26 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 		for t in range(episode_length):
 			action = select_action(policy_nn,state)
 			state, reward, done,_ = env.step(action)
-			state_np = state.cpu().numpy()
-			svf_policy[np.where(state_np==1)[0][0],i] += 1 #marks the visitation for 
+			#feature_extractor wraps the state in torch tensor so convert that back
+
+			
+			#get the state index
+			if feature_extractor is None:
+				state_index = np.where(state_np==1)[0][0]
+			else:
+				state = feature_extractor.extract_features(state)
+				if 'torch' in state.type():
+					state_np= state.cpu().numpy()
+				else:
+					state_np = state
+
+				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+
+
+			svf_policy[state_index,i] += 1 #marks the visitation for 
 												   #the state for the run
 			
-			if feature_extractor is not None:
-				state = feature_extractor.extract_features(state)
-
+	
 			if reward_nn is not None:
 				reward  = reward_nn(state)
 
@@ -426,23 +467,26 @@ if __name__ == '__main__':
 
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper= step_wrapper,
-    				obstacles=[np.asarray([1, 2])])
+    				obstacles=[np.asarray([1, 2])],
+    				is_onehot = False)
     print(env.reset())
     print(len(env.reset()))
-    policy = Policy(env.reset().shape[0], env.action_space.n)
+
+    state_space = len(feat.state_dictionary.keys())
+    policy = Policy(state_space, env.action_space.n)
     policy.load('../experiments/saved-models/8.pt')
     policy.eval()
     policy.to(DEVICE)
   	
   	#initialize the reward network
   	
-    reward = RewardNet(env.reset().shape[0])
+    reward = RewardNet(state_space)
     reward.load('../experiments/saved-models-rewards/319.pt')
     reward.eval()
     reward.to(DEVICE)
 	
 
-
+    '''
     exp_svf = expert_svf('../experiments/trajs/ac_gridworld/',
     			state_dict = feat.state_dictionary)
 
@@ -454,24 +498,24 @@ if __name__ == '__main__':
     plt.imshow(expert_np)
     plt.colorbar()
     plt.show()
+	'''
 
+    #print ("The expert svf :", exp_svf)
 
-    print ("The expert svf :", exp_svf)
-
-    '''
+  
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
                                      episode_length = 20)
 
-    
+    '''
     statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
-    
+    '''
     statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = None,
-						 episode_length = 20, feature_extractor = None)
+						 episode_length = 20, feature_extractor = feat)
     
     print(np.sum(statevisit))
     #print(np.sum(statevisit2))
@@ -498,4 +542,4 @@ if __name__ == '__main__':
     #print(stateactiontable)
     #print(np.sum(stateactiontable,axis=0))
     #mat = createStateTransitionMatix(rows=5,cols=5)
-	'''
+	
