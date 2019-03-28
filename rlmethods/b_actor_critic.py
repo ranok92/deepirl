@@ -152,7 +152,10 @@ class ActorCritic:
 
             # action and states lists for current trajectory
             actions = []
-            states = [self.env.reset()]
+            if self.feature_extractor is None:
+                states = [self.env.reset()]
+            else:
+                states = [self.feature_extractor.extract_features(self.env.reset())]
 
             done = False
             while not done:
@@ -160,6 +163,8 @@ class ActorCritic:
                 actions.append(action)
 
                 state, rewards, done, _ = self.env.step(action)
+                if self.feature_extractor is not None:
+                    state = self.feature_extractor.extract_features(state)
                 states.append(state)
 
             actions_tensor = torch.tensor(actions)
