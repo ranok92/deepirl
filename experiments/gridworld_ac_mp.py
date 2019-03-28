@@ -17,6 +17,7 @@ parser.add_argument('--play', action='store_true',
 parser.add_argument('--dont-save', action='store_true',
                    help="don't save the policy network weights.")
 parser.add_argument('--num-trajs', type=int, default=10)
+parser.add_argument('--njobs', type=int, default=4)
 
 def main():
     args = parser.parse_args()
@@ -32,7 +33,7 @@ def main():
         model.policy.load(args.policy_path)
 
     if not args.play:
-        model.train_mp(n_jobs=4)
+        model.train_mp(n_jobs=args.njobs)
 
         if not args.dont_save:
             model.policy.save('./saved-models/')
