@@ -158,14 +158,20 @@ class ActorCritic:
                 states = [self.feature_extractor.extract_features(self.env.reset())]
 
             done = False
-            while not done:
+            t= 0
+            run_reward = 0
+            while not done and t < self.max_ep_length:
+                t+=1
                 action = self.select_action(states[-1])
                 actions.append(action)
 
                 state, rewards, done, _ = self.env.step(action)
+                run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
                 states.append(state)
+                
+            print('Reward for the run :',run_reward)
 
             actions_tensor = torch.tensor(actions)
             states_tensor = torch.stack(states)
