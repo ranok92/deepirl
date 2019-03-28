@@ -213,12 +213,17 @@ class ActorCritic:
         loss = torch.stack(policy_losses).sum() + \
             torch.stack(value_losses).sum()
 
-        #additional lines for loss based termination
-        self.termination.add_loss(loss.item())
-        self.termination.plot_avg_loss()
 
         loss.backward()
         self.optimizer.step()
+
+        #additional lines for loss based termination
+        gradient_magnitude = [torch.norm(param.grad) for param in \
+                self.policy.parameters()]
+        gradient_magnitude = sum(gradient_magnitude)/len(gradient_magnitude)
+
+        self.termination.add_loss(gradient_magnitude)
+        self.termination.plot_avg_loss()
 
         del self.policy.rewards[:]
         del saved_actions[:]
