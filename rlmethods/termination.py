@@ -39,8 +39,10 @@ class VarianceTermination():
         self.stop_threshold = stop_threshold
 
         # debug data stores
-        self.means = collections.deque(maxlen=window_size)
-        self.variances = collections.deque(maxlen=window_size)
+        # self.means = collections.deque(maxlen=window_size)
+        # self.variances = collections.deque(maxlen=window_size)
+        self.variances = []
+        self.means = []
         self.log_counter = 0
         self.log_interval = log_interval
 
