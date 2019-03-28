@@ -90,7 +90,7 @@ class DeepMaxEnt():
         if self.env.is_onehot:
             self.state_size = self.env.reset().shape[0]
         else:
-            self.state_size = len(self.rl.feature_extractor.state_dictionary.keys())
+            self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size)
         self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
