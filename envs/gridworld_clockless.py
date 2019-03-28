@@ -29,7 +29,7 @@ class GridWorldClockless:
         cols = 10,
         width = 10,
         goal_state = None,
-        obstacles = None,
+        obstacles = [],
         display = True,
         is_onehot = True,
         stepReward=0.001,
@@ -107,6 +107,8 @@ class GridWorldClockless:
             self.state['goal_state'] = self.goal_state
             if self.obstacles is not None:
                 self.state['obstacles'] = self.obstacles
+            else:
+                self.state['obstacles'] = self.obstacles
 
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
@@ -140,8 +142,8 @@ class GridWorldClockless:
             self.state['agent_state'] = self.agent_state
             self.state['agent_head_dir'] = 0 #starts heading towards top
             self.state['goal_state'] = self.goal_state
-            if self.obstacles is not None:
-                self.state['obstacles'] = self.obstacles
+            #if self.obstacles is not None:
+            self.state['obstacles'] = self.obstacles
 
 
         if self.display:
