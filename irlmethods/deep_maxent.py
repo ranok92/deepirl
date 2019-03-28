@@ -110,7 +110,7 @@ class DeepMaxEnt():
 
     #******parts being operated on
     def expert_svf(self):
-        return irlUtils.expert_svf(self.traj_path).type(self.dtype)
+        return irlUtils.expert_svf(self.traj_path,state_dict= self.rl.feature_extractor.state_dictionary)
 
 
     def calc_svf_absolute(self, policy, rows = 10, cols = 10, 
@@ -141,7 +141,7 @@ class DeepMaxEnt():
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
         dotProd.backward()
 
-
+    '''
     def per_state_reward(self, reward_function, rows, cols):
         all_states = itertools.product(range(rows), range(cols))
 
@@ -151,6 +151,24 @@ class DeepMaxEnt():
 
         all_states = torch.tensor(oh_states,
                                   dtype=torch.float).to(self.device)
+
+        return reward_function(all_states)
+
+    '''
+
+    def per_state_reward(self, reward_function):
+
+        all_state_list = []
+        state_dict = self.rl.feature_extractor.state_str_arr_dict
+
+
+        for state in state_dict:
+
+            state_tensor = state_dict[state]
+       
+            all_state_list.append(state_tensor)
+
+        all_states = torch.tensor(all_state_list, dtype=torch.float).to(self.device)
 
         return reward_function(all_states)
 
@@ -212,6 +230,8 @@ class DeepMaxEnt():
         #expertdemo_svf = self.expert_svf()  # get the expert state visitation frequency
         #*****EXPERT SVF COMING FROM POLICY INSTEAD OF 
         #TRAJECTORIES. Will change in future. So handcoded.
+
+        '''
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/g5_5_o1_2.pt')
@@ -221,6 +241,10 @@ class DeepMaxEnt():
                                          goalState = self.env.goal_state,
                                          episode_length = self.rl_max_episodes)
 
+        '''
+        #not the best way to call the method but I am too tired to make anything fancy
+        #generating svf from samples
+        expertdemo_svf = self.expert_svf()
         lossList = []
         x_axis = []
 
@@ -239,7 +263,7 @@ class DeepMaxEnt():
                 reward_net=self.reward,
                 irl=True
             )
-            current_agent_svf = self.agent_svf_sampling(num_of_samples = 3000,
+            current_agent_svf = self.agent_svf_sampling(num_of_samples = 300,
                                                 env = self.env,
                                                 policy_nn= self.rl.policy,
                                                 reward_nn = self.reward,
@@ -254,9 +278,10 @@ class DeepMaxEnt():
 
             # returns a tensor of size (no_of_states x 1)
             reward_per_state = self.per_state_reward(
-                self.reward, self.env.rows, self.env.cols)
+                self.reward)
 
             # PLOT
+            '''
             to_plot = []
             to_plot.append(diff_freq.cpu().numpy().reshape((10,10)))
             to_plot.append(expertdemo_svf.reshape((10,10)))
@@ -271,7 +296,7 @@ class DeepMaxEnt():
 
             self.plot(to_plot, to_plot_descriptions,
                       save_path=self.plot_save_folder)
-
+            '''
             # GRAD AND BACKPROP
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
