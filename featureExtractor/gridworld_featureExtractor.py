@@ -4,7 +4,7 @@ specifically for the 10x10 super simplified gridworld environment
 '''
 import sys
 sys.path.insert(0, '..')
-
+import math
 import pdb
 import itertools
 import numpy as np 
@@ -69,34 +69,32 @@ class LocalGlobal():
 		#based on the state representation, this should contain a 
 		#dictionary containing all possible states
 		self.state_dictionary = {}
-
+		self.generate_state_dictionary()
 
 	#generates the state dictionary based on the structure of the 
 	#hand crafted state space
 	
 	#the keys in the dictionary are strings converted from 
 	#numpy arrays
-	'''
+	
 	def generate_state_dictionary(self):
+		
+		indexval = 0
+		for i in range(4):
+			for j in range(0,self.window_size*self.window_size):
+				combos = itertools.combinations(range(self.window_size*self.window_size),j)
+				for combination in combos:
+					state = np.zeros(4+self.window_size*self.window_size)
+					state[i] = 1
+					for val in combination:
+						state[4+val]=1
 
-		state = np.zeros(4+self.window_size*self.window_size)
+					#the base state
 
-		#the base state
-		state[4+floor((self.window_size*self.window_size)/2)] = 1
-		for i in range(3):
-			for r in range(self.window_size):
-				for c in range(self.window_size):
-	
+					state[4+math.floor((self.window_size*self.window_size)/2)] = 1
 
-	
-	this will be a nightmare of a state space of size 4*2^24
-	ABORTING . . .
-
-	'''
-
-
-
-
+					self.state_dictionary[np.array2string(state)] = indexval
+					indexval = len(self.state_dictionary.keys())
 
 
 	#reads the list of fields from the state to create its features
@@ -122,7 +120,7 @@ class LocalGlobal():
 
 	def extract_features(self,state):
 
-		pdb.set_trace()
+		#pdb.set_trace()
 		state = self.get_info_from_state(state)
 		window_size = self.window_size
 		block_width = self.grid_size
@@ -248,7 +246,7 @@ class FrontBackSide():
 
 	#reads the list of fields from the state to create its features
 	def get_info_from_state(self,state):
-
+		
 		state_list = []
 		for field in self.field_list:
 			if type(state[field]) is list:
@@ -257,13 +255,15 @@ class FrontBackSide():
 			else:
 				state_list.append(state[field])
 
+		
+
 		return np.array(state_list)
 
 
 	#given the current state returns the relative position of 
 	#the goal and all of the obstacles
 	def get_relative_coords(self,state):
-
+		
 		rel_positions = np.zeros((state.shape[0],state.shape[1]))
 		agent_pos = state[0]
 		for i in range(state.shape[0]):
@@ -427,15 +427,8 @@ class OneHot():
 
 if __name__=='__main__':
 
-	f = OneHot(grid_rows=10,grid_cols=10)
-	print(f.state_dictionary)
+	f = LocalGlobal(window_size=3)
+	#print(f.state_dictionary)
 	print(len(f.state_dictionary.keys()))
-
-	a = np.zeros(100)
-	a[99] = 1
-
-	print(f.state_dictionary[np.array2string(a)])
-
-
 
 
