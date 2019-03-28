@@ -113,7 +113,7 @@ class ActorCritic:
             state_size = env.reset().shape[0]
         else:
 
-            state_size = len(self.feature_extractor.state_dictionary.keys())
+            state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
 
         print("Actor Critic initialized with state size ",state_size)
         # initialize a policy if none is passed.

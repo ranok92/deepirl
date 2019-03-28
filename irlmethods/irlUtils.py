@@ -466,7 +466,7 @@ if __name__ == '__main__':
     print(env.reset())
     print(len(env.reset()))
     
-    state_space = len(feat.state_dictionary.keys())
+    state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
     policy.load('../experiments/saved-models/g5_5_o1_2.pt')
     policy.eval()
