@@ -69,6 +69,7 @@ class LocalGlobal():
 		#based on the state representation, this should contain a 
 		#dictionary containing all possible states
 		self.state_dictionary = {}
+		self.state_str_arr_dict = {}
 		self.generate_state_dictionary()
 
 	#generates the state dictionary based on the structure of the 
@@ -94,6 +95,7 @@ class LocalGlobal():
 					state[4+math.floor((self.window_size*self.window_size)/2)] = 1
 
 					self.state_dictionary[np.array2string(state)] = indexval
+					self.state_str_arr_dict[np.array2string(state)] = state
 					indexval = len(self.state_dictionary.keys())
 
 
