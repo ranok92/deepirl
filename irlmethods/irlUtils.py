@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
-from featureExtractor.gridworld_featureExtractor import OneHot
+from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
@@ -341,14 +341,14 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	'''
 
-	index = np.arange(num_states)
+	xaxis = np.arange(num_states)
 	for i in range(no_of_samples):
 		run_reward = 0
 
 		#for debugging purpose, shows the histogram of the start states 
 		'''
-		if i%500==0:
-			plt.bar(index,start_state)
+		if i%50==0:
+			plt.bar(xaxis,start_state)
 			plt.draw()
 			plt.pause(.001)
 		'''
@@ -356,6 +356,10 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 		#the continues to restart unless the starting points are somewhat uniformly
 		#distributed
+
+		#unfortunately this only works for onehot representations 
+		# for more generic features this needs to go
+		'''
 		while True:
 
 			state = env.reset()
@@ -382,12 +386,33 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 			else:
 				start_state[state_index]+=1
 				break
+		'''
+		#*******basically the same block as above without the 
+		#constrain of making the starting point uniform 
+		#because this will not be possible for all feature extractors
+		state = env.reset()
 
+		if feature_extractor is not None:
+			state = feature_extractor.extract_features(state)
+
+		if 'torch' in state.type():
+			state_np = state.cpu().numpy()
+		else:
+			state_np= state
+		if feature_extractor is None:
+			#onehot
+			state_index = np.where(state_np==1)[0][0]
+		else:
+			#feature_extractor wraps the state in torch tensor so convert that back
+			state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+
+		start_state[state_index]+=1
+		#********************** till here************
 
 		#np.where(state_np==1)[0][0] returns the state index
 		#from the state representation
 
-		svf_policy[np.where(state_np==1)[0][0],i] = 1 #marks the visitation for 
+		svf_policy[state_index,i] = 1 #marks the visitation for 
 												   #the state for the run
 		
 		for t in range(episode_length):
@@ -457,8 +482,8 @@ if __name__ == '__main__':
     r = 10
     c = 10
 
-    feat = OneHot(grid_rows=10,grid_cols=10)
-
+    #feat = OneHot(grid_rows=10,grid_cols=10)
+    feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper= step_wrapper,
     				obstacles=[np.asarray([1, 2])],
@@ -468,53 +493,56 @@ if __name__ == '__main__':
     
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/g5_5_o1_2.pt')
+    policy.load('../experiments/saved-models/loc_glob_3.pt')
     policy.eval()
     policy.to(DEVICE)
   	
-  	#initialize the reward network
   	
+    '''
     reward = RewardNet(state_space)
     reward.load('../experiments/saved-models-rewards/319.pt')
     reward.eval()
     reward.to(DEVICE)
-	
+	'''
 
     
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_5_5/',
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_locglob_3/',
      			state_dict = feat.state_dictionary)
-
+    exp_svf = np.squeeze(exp_svf)
+    print(exp_svf.shape)
+    xaxis = np.arange(len(feat.state_dictionary.keys()))
+    plt.figure(0)
+    plt.bar(xaxis,exp_svf)
+    #plt.imshow()
+	
+    
     #exp_svf = expert_svf_onehot('../experiments/trajs/ac_gridworld/')
 
-    expert_np = np.resize(exp_svf,(10,10))
-
-    plt.figure(0)
-    plt.imshow(expert_np)
-    plt.colorbar()
-    plt.show()
-	
-
     #print ("The expert svf :", exp_svf)
+    '''
     
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([3,3]),
                                      episode_length = 20)
-
-    '''
+	
     statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
-    
+    '''
     statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = feat)
-    
-    print(np.sum(statevisit))
+    statevisit3 = np.squeeze(statevisit3)
+    plt.figure(1)
+    plt.bar(xaxis,statevisit3)
+    #plt.imshow()
+    plt.show()
+    print(np.sum(statevisit3))
     #print(np.sum(statevisit2))
     #print("The difference :",np.sum(np.abs(statevisit3-statevisit2)))
-    print(type(statevisit))
-    print('sum :', np.sum(statevisit))
+    print(type(statevisit3))
+    print('sum :', np.sum(statevisit3))
     '''
     statevisitMat = np.resize(statevisit,(r,c))
     #statevisitMat2 = np.resize(statevisit2,(r,c))
@@ -526,7 +554,7 @@ if __name__ == '__main__':
     plt.imshow(statevisitMat)
     plt.colorbar()
     plt.show()
-    '''
+   
     plt.figure(2)
     plt.imshow(statevisitMat3)
     plt.colorbar()
