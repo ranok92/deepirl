@@ -45,7 +45,7 @@ def main():
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
-    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal
+    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav
     # initialize the environment
 
     #**set is_onehot to false
@@ -61,7 +61,8 @@ def main():
 
     #CHANGE HERE
     #initialize feature extractor
-    feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
     #feat_ext = LocalGlobal(window_size=3, 
                            #fieldList = ['agent_state','goal_state','obstacles'])
     
@@ -87,7 +88,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_onehot_g5_5_o3_7_new/'
+    trajectory_path = './trajs/ac_gridworld_socialNav_no_obs/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
