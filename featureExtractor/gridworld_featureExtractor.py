@@ -392,6 +392,7 @@ class OneHot():
 		self.state_size = self.rows*self.cols
 
 		self.state_dictionary = {}
+		self.state_str_arr_dict = {}
 
 		self.generate_state_dictionary()
 
@@ -404,6 +405,7 @@ class OneHot():
 			state = np.zeros(self.state_size)
 			state[i] = 1
 			self.state_dictionary[np.array2string(state)] = indexval
+			self.state_str_arr_dict[np.array2string(state)] = state
 			indexval+=1
 
 	def get_info_from_state(self,state):
