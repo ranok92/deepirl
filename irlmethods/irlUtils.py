@@ -145,7 +145,7 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
 
     stateVisitationMatrix = np.zeros([TOTALSTATES, TIMESTEPS])
     env = GridWorld(display=False, 
-    				obstacles=[np.asarray([1, 2])],
+    				obstacles=[np.asarray([3, 7])],
     				goal_state = goal_state)
 
     '''
@@ -444,8 +444,8 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 			run_reward+=reward
 
 			if done:
-				rewards[i]=run_reward
-				break
+				pass
+				
 
 			if t >= episode_length:
 				rewards[i]=run_reward
@@ -482,18 +482,19 @@ if __name__ == '__main__':
     r = 10
     c = 10
 
-    #feat = OneHot(grid_rows=10,grid_cols=10)
-    feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
+    feat = OneHot(grid_rows=10,grid_cols=10)
+    #feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper= step_wrapper,
-    				obstacles=[np.asarray([1, 2])],
+    				obstacles=[np.array([3,7])],
+    				goal_state= np.array([5,5]),
     				is_onehot = False)
     print(env.reset())
     print(len(env.reset()))
     
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/loc_glob_3.pt')
+    policy.load('../experiments/saved-models/onehot_g5_5_o3_7_newenv.pt')
     policy.eval()
     policy.to(DEVICE)
   	
@@ -506,47 +507,67 @@ if __name__ == '__main__':
 	'''
 
     
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_locglob_3/',
+    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_onehot_g5_5_o3_7_new/',
      			state_dict = feat.state_dictionary)
     exp_svf = np.squeeze(exp_svf)
-    print(exp_svf.shape)
+    print(exp_svf)
+	
+
+    '''
+    for other feature extractors
     xaxis = np.arange(len(feat.state_dictionary.keys()))
-    plt.figure(0)
+    plt.figure("the expert")
     plt.bar(xaxis,exp_svf)
     #plt.imshow()
-	
+	'''
+
+
     
     #exp_svf = expert_svf_onehot('../experiments/trajs/ac_gridworld/')
 
     #print ("The expert svf :", exp_svf)
-    '''
+    
     
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
-                                     goal_state = np.asarray([3,3]),
+                                     goal_state = np.asarray([5,5]),
                                      episode_length = 20)
-	
+    '''
     statevisit2 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
 						 policy_nn = policy , reward_nn = reward,
 						 episode_length = 20, feature_extractor = None)
     '''
-    statevisit3 = get_svf_from_sampling(no_of_samples = 3000, env = env ,
+    statevisit3 = get_svf_from_sampling(no_of_samples = 3000 , env = env ,
 						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = feat)
+    statevisit = np.squeeze(exp_svf)
     statevisit3 = np.squeeze(statevisit3)
-    plt.figure(1)
-    plt.bar(xaxis,statevisit3)
+    #plt.figure("expert from samples")
+    #plt.bar(xaxis,statevisit3)
     #plt.imshow()
-    plt.show()
+    #plt.show()
     print(np.sum(statevisit3))
     #print(np.sum(statevisit2))
     #print("The difference :",np.sum(np.abs(statevisit3-statevisit2)))
     print(type(statevisit3))
     print('sum :', np.sum(statevisit3))
+    statevisitMat3 = np.resize(statevisit3,(r,c))
+    statevisitMat = np.resize(statevisit,(r,c))
+    plt.figure(2)
+    plt.imshow(statevisitMat3)
+    plt.colorbar()
+
+    plt.figure(1)
+    plt.imshow(statevisitMat)
+    plt.colorbar()
+    plt.show()
+ 
+
+
     '''
     statevisitMat = np.resize(statevisit,(r,c))
     #statevisitMat2 = np.resize(statevisit2,(r,c))
-    #statevisitMat3 = np.resize(statevisit3,(r,c))
+    statevisitMat3 = np.resize(statevisit3,(r,c))
 
     #print ('svf :',statevisitMat2)
     plt.clf()

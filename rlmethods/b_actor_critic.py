@@ -160,12 +160,13 @@ class ActorCritic:
             done = False
             t= 0
             run_reward = 0
-            while not done and t < self.max_ep_length:
+            while t < self.max_ep_length:
                 t+=1
                 action = self.select_action(states[-1])
                 actions.append(action)
 
                 state, rewards, done, _ = self.env.step(action)
+                
                 run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
