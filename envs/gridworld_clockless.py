@@ -128,12 +128,18 @@ class GridWorldClockless:
         print("environment initialized with goal state :",self.goal_state)
         self.spec = MockSpec(1.0)
 
+        #this flag states if control has been released
+        #if true, the state will not change with any action
+
+        self.release_control = False
+
+
 
     def reset(self):
 
         self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
-
+        self.release_control = False
         if self.is_onehot:
             self.state = self.onehotrep()
         else:
@@ -142,6 +148,8 @@ class GridWorldClockless:
             self.state['agent_state'] = self.agent_state
             self.state['agent_head_dir'] = 0 #starts heading towards top
             self.state['goal_state'] = self.goal_state
+
+            self.state['release_control'] = self.release_control
             #if self.obstacles is not None:
             self.state['obstacles'] = self.obstacles
 
@@ -159,8 +167,17 @@ class GridWorldClockless:
     #action is a number which points to the index of the action to be taken
     def step(self,action):
         #print('printing the keypress status',self.agent_action_keyboard)
-        self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
+        if not self.release_control:
+            self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
         reward, done = self.calculateReward()
+
+        #if you are done ie hit an obstacle or the goal
+        #you leave control of the agent and you are forced to
+        #suffer/enjoy the consequences of your actions for the
+        #rest of your miserable/awesome life
+        if done:
+            self.release_control = True
+
         if self.display:
             self.render()
 
@@ -170,9 +187,12 @@ class GridWorldClockless:
         else:
             #just update the position of the agent
             #the rest of the information remains the same
-            self.state['agent_state'] = self.agent_state
-            if action!=4:
-                self.state['agent_head_dir'] = action 
+
+            #added new
+            if not self.release_control:
+                self.state['agent_state'] = self.agent_state
+                if action!=4:
+                    self.state['agent_head_dir'] = action 
 
         if self.is_onehot:
 
