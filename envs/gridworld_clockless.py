@@ -175,8 +175,6 @@ class GridWorldClockless:
         #you leave control of the agent and you are forced to
         #suffer/enjoy the consequences of your actions for the
         #rest of your miserable/awesome life
-        if done:
-            self.release_control = True
 
         if self.display:
             self.render()
@@ -202,6 +200,9 @@ class GridWorldClockless:
                 done,
                 None
             )
+            
+        if done:
+            self.release_control = True
 
         return self.state, reward, done, None
 
