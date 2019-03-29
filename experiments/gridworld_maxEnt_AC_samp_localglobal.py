@@ -28,7 +28,8 @@ parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
 parser.add_argument('--rl-log-intervals', type=int, default=10)
 
-
+#IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
+#before running on different settings
 def main():
     args = parser.parse_args()
 
@@ -51,21 +52,26 @@ def main():
     goal_state = np.asarray([5,5])
 
     env = GridWorld(display=args.render, 
-                    obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5])],
+                    obstacles = [np.array([3,7])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = 3,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
 
+    #CHANGE HERE
     #initialize feature extractor
-
-    #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-    feat_ext = LocalGlobal(window_size=3, 
-                           fieldList = ['agent_state','goal_state','obstacles'])
+    feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    #feat_ext = LocalGlobal(window_size=3, 
+                           #fieldList = ['agent_state','goal_state','obstacles'])
+    
+    #CHANGE HERE
     #initialize loss based termination
 
+
+
     # intialize RL method
+    #CHANGE HERE
     #pass the appropriate feature extractor
     rlMethod = ActorCritic(env, gamma=0.99,
                             log_interval = args.rl_log_intervals,
@@ -77,8 +83,11 @@ def main():
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
+    
+
     # initialize IRL method
-    trajectory_path = './trajs/ac_gridworld_locglob_3/'
+    #CHANGE HERE 
+    trajectory_path = './trajs/ac_gridworld_onehot_g5_5_o3_7_new/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,

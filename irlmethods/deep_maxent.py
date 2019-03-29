@@ -281,7 +281,7 @@ class DeepMaxEnt():
                 self.reward)
 
             # PLOT
-            '''
+            
             to_plot = []
             to_plot.append(diff_freq.cpu().numpy().reshape((10,10)))
             to_plot.append(expertdemo_svf.reshape((10,10)))
@@ -296,7 +296,7 @@ class DeepMaxEnt():
 
             self.plot(to_plot, to_plot_descriptions,
                       save_path=self.plot_save_folder)
-            '''
+            
             # GRAD AND BACKPROP
             self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
