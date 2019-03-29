@@ -273,8 +273,10 @@ class ActorCritic:
 
                 self.policy.rewards.append(reward)
 
+                #now does not break when done
                 if done:
-                    break
+                    #break
+                    pass
 
             running_reward = running_reward * self.reward_threshold_ratio +\
                 ep_reward * (1-self.reward_threshold_ratio)
@@ -294,13 +296,16 @@ class ActorCritic:
                             \tLoss diff :{:.4f}'.format(
                             i_episode, t, running_reward, 
                             self.termination.current_avg_loss))
+                
 
+                '''
+                commenting the break by 'solving' for now
                 if running_reward > self.env.spec.reward_threshold:
                     print("Solved! Running reward is now {} and "
                           "the last episode runs to {} time \
                           steps!".format(running_reward, t))
                     break
-
+                '''
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes and self.max_episodes > 0:
 
