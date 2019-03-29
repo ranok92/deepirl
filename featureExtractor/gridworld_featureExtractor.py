@@ -426,13 +426,115 @@ class OneHot():
 		feature = reset_wrapper(feature)
 
 		return feature
+'''
+custom features as of now 3x1, where:
+
+	feat[0] : 1 if agent is moving towards goal
+	feat[1] : 1 if agent is neutral
+	feat[2] : 1 if agent is moving away from goal
+
+'''
+class SocialNav():
+
+	def __init__(self, fieldList = []):
+
+		self.state_dictionary = {}
+		self.state_str_arr_dict = {}
+		self.field_list = fieldList
+		self.prev_dist = None
+		self.curr_dist = None
+
+		self.generate_state_dictionary()
+
+    #array of helper Features
+	def socialForecesFeatures(self):
+
+		return 0
+
+	def calcDistanceFromGoal(self):
+
+		return 0
+
+
+	def extract_features(self,state):
+
+		feature = np.zeros(7)
+		state_info = self.get_info_from_state(state)
+		current_dist = np.linalg.norm(state_info[0,:]-state_info[1,:])
+		
+		agent_pos = state_info[0]
+		goal_pos = state_info[1]
+		diff_x = goal_pos[0] - agent_pos[0]
+		diff_y = goal_pos[1] - agent_pos[1]
+
+		if diff_x >= 0 and diff_y >= 0:
+		    feature[1] = 1
+		elif diff_x < 0  and diff_y >= 0:
+		    feature[0] = 1
+		elif diff_x < 0 and diff_y < 0:
+		    feature[3] = 1
+		else:
+		    feature[2] = 1
+
+
+		if self.prev_dist is None or self.prev_dist == current_dist:
+
+			feature[4+1] = 1
+			self.prev_dist = current_dist
+			return reset_wrapper(feature)
+
+		if self.prev_dist > current_dist:
+
+			feature[4+0] = 1
+
+		if self.prev_dist < current_dist:
+
+			feature[4+2] = 1
+
+		self.prev_dist = current_dist
+
+		return reset_wrapper(feature)
+
+
+	def get_info_from_state(self,state):
+
+		state_list = []
+		for field in self.field_list:
+			if type(state[field]) is list:
+				for val in state[field]:
+					state_list.append(val)
+			else:
+				state_list.append(state[field])
+
+
+		return np.asarray(state_list)
+
+
+
+	def generate_state_dictionary(self):
+		counter = 0
+		for j in range(4):
+
+			for i in range(4,7):
+				state = np.zeros(7)
+				state[j] = 1
+				state[i] = 1
+				self.state_dictionary[np.array2string(state)] = counter
+				counter+=1
+				self.state_str_arr_dict[np.array2string(state)] = state 
+
+
+
+
+
 
 
 
 if __name__=='__main__':
 
-	f = LocalGlobal(window_size=3)
+	f = SocialNav(fieldList = ['agent_state','goal_state'])
 	#print(f.state_dictionary)
-	print(len(f.state_dictionary.keys()))
+	print(f.state_str_arr_dict)
+	print(f.state_dictionary)
 
 
