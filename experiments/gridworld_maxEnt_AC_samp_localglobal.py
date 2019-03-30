@@ -49,10 +49,11 @@ def main():
     # initialize the environment
 
     #**set is_onehot to false
-    goal_state = np.asarray([5,5])
+    goal_state = np.asarray([3,8])
 
     env = GridWorld(display=args.render, 
-                    obstacles = [np.array([3,7])],
+                    obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
+                                np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = 3,
@@ -62,9 +63,9 @@ def main():
     #CHANGE HERE
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-    feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat_ext = LocalGlobal(window_size=3, 
-                           #fieldList = ['agent_state','goal_state','obstacles'])
+    #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+    feat_ext = LocalGlobal(window_size=3, 
+                           fieldList = ['agent_state','goal_state','obstacles'])
     
     #CHANGE HERE
     #initialize loss based termination
@@ -88,7 +89,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_socialNav_no_obs/'
+    trajectory_path = './trajs/ac_gridworld_locglobv2_3/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
