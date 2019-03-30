@@ -55,7 +55,9 @@ from utils import reset_wrapper, step_wrapper
 
 
 class LocalGlobal():
-
+	#structure of the features first 4 : general direction of the goal
+	#							next 3 : indicates whether the agent moved towards or away from goal
+	#							next n^2 : indicates local obstacle information
 	def __init__(self,window_size=5, grid_size = 1,  
 				agent_rad = 1, obs_rad = 1 , fieldList = []):
 
@@ -64,7 +66,7 @@ class LocalGlobal():
 		self.agent_radius = agent_rad
 		self.obs_rad = obs_rad
 		self.field_list = fieldList
-
+		self.prev_dist = None
 		#added new (26-3-19)
 		#based on the state representation, this should contain a 
 		#dictionary containing all possible states
@@ -82,21 +84,24 @@ class LocalGlobal():
 		
 		indexval = 0
 		for i in range(4):
-			for j in range(0,self.window_size*self.window_size):
-				combos = itertools.combinations(range(self.window_size*self.window_size),j)
-				for combination in combos:
-					state = np.zeros(4+self.window_size*self.window_size)
-					state[i] = 1
-					for val in combination:
-						state[4+val]=1
+			for k in range(4,7):
+				for j in range(0,self.window_size*self.window_size+1):
+					combos = itertools.combinations(range((self.window_size*self.window_size)),j)
+					for combination in combos:
+						state = np.zeros(7+self.window_size*self.window_size)
+						state[i] = 1
+						state[k] = 1
+						for val in combination:
+							state[7+val]=1
 
-					#the base state
+						#the base state
+						#removing the base case, now for the local representation 
+						#only presence of an obstacle will make it 1
+						#state[4+math.floor((self.window_size*self.window_size)/2)] = 1
 
-					state[4+math.floor((self.window_size*self.window_size)/2)] = 1
-
-					self.state_dictionary[np.array2string(state)] = indexval
-					self.state_str_arr_dict[np.array2string(state)] = state
-					indexval = len(self.state_dictionary.keys())
+						self.state_dictionary[np.array2string(state)] = indexval
+						self.state_str_arr_dict[np.array2string(state)] = state
+						indexval = len(self.state_dictionary.keys())
 
 
 	#reads the list of fields from the state to create its features
@@ -112,6 +117,31 @@ class LocalGlobal():
 
 		return np.array(state_list)
 
+
+	def closeness_indicator(self,state_info):
+
+		agent_pos = state_info[0,:]
+		goal_pos = state_info[1,:]
+		feature = np.zeros(3)
+		current_dist = np.linalg.norm(agent_pos-goal_pos)
+
+		if self.prev_dist is None or self.prev_dist == current_dist:
+
+			feature[1] = 1
+			self.prev_dist = current_dist
+			return feature
+
+		if self.prev_dist > current_dist:
+
+			feature[0] = 1
+
+		if self.prev_dist < current_dist:
+
+			feature[2] = 1
+
+		self.prev_dist = current_dist
+
+		return feature
 
 
 	def block_to_arrpos(self,r,c):
@@ -130,10 +160,10 @@ class LocalGlobal():
 		row_start =  int((window_rows-1)/2)
 		col_start = int((window_cols-1)/2)
 
-		mod_state = np.zeros(4+window_size**2)
+		mod_state = np.zeros(7+window_size**2)
 
 		a = int((window_size**2-1)/2)
-		mod_state[a+4] = 1
+		
 		agent_pos = state[0]
 		goal_pos = state[1]
 		diff_x = goal_pos[0] - agent_pos[0]
@@ -148,6 +178,9 @@ class LocalGlobal():
 		else:
 		    mod_state[2] = 1
 
+		feat = self.closeness_indicator(state)
+
+		mod_state[4:7] = feat
 
 		for i in range(2,len(state)):
 
@@ -167,7 +200,7 @@ class LocalGlobal():
 		            if np.array_equal(temp_pos,obs_pos):
 		                pos = self.block_to_arrpos(r,c)
 
-		                mod_state[pos+4]=1
+		                mod_state[pos+7]=1
 
 		return reset_wrapper(mod_state)
 
@@ -532,7 +565,8 @@ class SocialNav():
 
 if __name__=='__main__':
 
-	f = SocialNav(fieldList = ['agent_state','goal_state'])
+	#f = SocialNav(fieldList = ['agent_state','goal_state'])
+	f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
 	#print(f.state_dictionary)
 	print(f.state_str_arr_dict)
 	print(f.state_dictionary)
