@@ -8,7 +8,7 @@ sys.path.insert(0, '..')
 
 
 from irlmethods.deep_maxent import RewardNet
-
+from featureExtractor.gridworld_featureExtractor import LocalGlobal,SocialNav
 import math
 from envs.gridworld import GridWorld
 import torch
@@ -42,19 +42,56 @@ def getperStateReward(rewardNetwork, rows=10 , cols =10):
     return stateRewardTable
 
 
+def visualize_rewards_in_environment(env , reward_network , feature_extractor):
+
+    rows = env.rows
+    cols = env.cols
+
+    board_reward = np.zeros((rows,cols))
+
+    for r in range(rows):
+        for c in range(cols):
+
+            #accessing inner variables of the environment, untill I can come up
+            #with something better 
+            env.state['agent_state'] = np.asarray([r,c])
+            
+            state_feat = feature_extractor.extract_features(env.state)
+
+            reward = reward_network(state_feat)
+
+            board_reward[r,c] = reward
+
+
+    return board_reward
+
+
+
 
 
 if __name__ == '__main__':
 
     r = 10
     c = 10
-    env = GridWorld(display=False, obstacles=[np.asarray([1, 2])])
-    reward_network = RewardNet(env.reset().shape[0])
-    reward_network.load('./experiments/saved-models-rewards/251.pt')
+    #initialize environment
+    env = GridWorld(display=True, is_onehot = False, 
+                    obstacles=[np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
+                                np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])] , 
+                    goal_state=np.asarray([5,5]))
+
+    #initialize feature extractor
+    feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
+    #feat = SocialNav(fieldList = ['agent_state','goal_state'])
+    
+    #initialize reward network
+    print(env.reset())
+    reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
+    reward_network.load('./experiments/saved-models-rewards/125.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
-    reward_values = getperStateReward(reward_network, rows = 10 , cols = 10)
+    #run function
+    reward_values = visualize_rewards_in_environment(env,reward_network, feat)
     plt.imshow(reward_values)
     plt.colorbar()
     plt.show()
