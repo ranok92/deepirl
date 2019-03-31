@@ -32,6 +32,7 @@ class GridWorldClockless:
         obstacles = [],
         display = True,
         is_onehot = True,
+        is_random = False,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
@@ -48,7 +49,7 @@ class GridWorldClockless:
         self.lowerLimit = np.asarray([0,0])
         self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.is_onehot = is_onehot
-
+        self.is_random = is_random
         # these wrappers ensure correct output format
         self.step_wrapper = step_wrapper
         self.reset_wrapper = reset_wrapper
@@ -136,6 +137,21 @@ class GridWorldClockless:
 
 
     def reset(self):
+
+        num_obs = len(self.obstacles)
+
+        #if this flag is true, the position of the obstacles and the goal 
+        #change with each reset
+
+        if self.is_random:
+            self.obstacles = []
+            for i in range(num_obs):
+
+                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.obstacles.append(obs_pos)
+
+            self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+
 
         self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))

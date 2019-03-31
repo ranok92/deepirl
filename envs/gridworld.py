@@ -2,11 +2,11 @@ import numpy as np
 import torch
 import time
 import pdb
-
-from featureExtractor.gridworld_featureExtractor import LocalGlobal
-
 import sys
 sys.path.insert(0, '..')
+from featureExtractor.gridworld_featureExtractor import SocialNav
+
+
 import utils  # NOQA: E402
 from envs.gridworld_clockless import GridWorldClockless
 
@@ -28,6 +28,7 @@ class GridWorld(GridWorldClockless):
         obstacles = None,
         display = True,
         is_onehot = True,
+        is_random = False,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
@@ -40,12 +41,13 @@ class GridWorld(GridWorldClockless):
                        obstacles = obstacles,
                        display = display,
                        is_onehot = is_onehot,
+                       is_random = is_random,
                        stepReward= stepReward,
                        step_wrapper=step_wrapper,
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
 
-        self.tickSpeed = 60
+        self.tickSpeed = 200
  
 
     def render(self):
@@ -88,7 +90,7 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = LocalGlobal() 
+    featExt = SocialNav(fieldList = ['agent_state','goal_state']) 
     world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles=[np.asarray([1,2])])
     for i in range(100):
         print ("here")
@@ -96,17 +98,16 @@ if __name__=="__main__":
         print (state)
         totalReward = 0
         done = False
-        while not done:
+        for i in range(300):
 
             action = world.takeUserAction()
             next_state, reward,done,_ = world.step(action)
             #print(world.agent_state)
-            print("next state :", next_state)
+            #print("next state :", next_state)
             print("Features extracted from next state :",
                 featExt.extract_features(next_state))
             totalReward+=reward
-            if done:
-                break
+
 
             print("reward for the run : ", totalReward)
 
