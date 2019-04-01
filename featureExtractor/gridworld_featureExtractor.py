@@ -83,13 +83,17 @@ class LocalGlobal():
 	def generate_state_dictionary(self):
 		
 		indexval = 0
-		for i in range(4):
+		for i in range(8):
 			for k in range(4,7):
 				for j in range(0,self.window_size*self.window_size+1):
 					combos = itertools.combinations(range((self.window_size*self.window_size)),j)
 					for combination in combos:
 						state = np.zeros(7+self.window_size*self.window_size)
-						state[i] = 1
+						if i < 4:
+							state[i] = 1
+						else:
+							state[i%4] = 1
+							state[(i+1)%4] = 1
 						state[k] = 1
 						for val in combination:
 							state[7+val]=1
@@ -168,7 +172,7 @@ class LocalGlobal():
 		goal_pos = state[1]
 		diff_x = goal_pos[0] - agent_pos[0]
 		diff_y = goal_pos[1] - agent_pos[1]
-
+		'''
 		if diff_x >= 0 and diff_y >= 0:
 		    mod_state[1] = 1
 		elif diff_x < 0  and diff_y >= 0:
@@ -176,6 +180,15 @@ class LocalGlobal():
 		elif diff_x < 0 and diff_y < 0:
 		    mod_state[3] = 1
 		else:
+		    mod_state[2] = 1
+		'''
+		if diff_x >= 0 and diff_y >= 0:
+		    mod_state[1] = 1
+		elif diff_x <= 0  and diff_y >= 0:
+		    mod_state[0] = 1
+		elif diff_x <= 0 and diff_y <= 0:
+		    mod_state[3] = 1
+		elif diff_x >=0 and diff_y <= 0:
 		    mod_state[2] = 1
 
 		feat = self.closeness_indicator(state)
@@ -502,11 +515,11 @@ class SocialNav():
 
 		if diff_x >= 0 and diff_y >= 0:
 		    feature[1] = 1
-		elif diff_x < 0  and diff_y >= 0:
+		elif diff_x <= 0  and diff_y >= 0:
 		    feature[0] = 1
-		elif diff_x < 0 and diff_y < 0:
+		elif diff_x <= 0 and diff_y <= 0:
 		    feature[3] = 1
-		else:
+		elif diff_x >=0 and diff_y <= 0:
 		    feature[2] = 1
 
 
@@ -566,7 +579,7 @@ class SocialNav():
 if __name__=='__main__':
 
 	#f = SocialNav(fieldList = ['agent_state','goal_state'])
-	f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
+	f = LocalGlobal(window_size = 1 ,fieldList = ['agent_state', 'goal_state','obstacles'])
 	#print(f.state_dictionary)
 	print(f.state_str_arr_dict)
 	print(f.state_dictionary)
