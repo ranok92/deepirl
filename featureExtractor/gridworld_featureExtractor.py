@@ -61,6 +61,8 @@ class LocalGlobal():
 	def __init__(self,window_size=5, grid_size = 1,  
 				agent_rad = 1, obs_rad = 1 , fieldList = []):
 
+		self.gl_size = 9
+		self.rl_size = 3
 		self.window_size = window_size
 		self.grid_size = grid_size
 		self.agent_radius = agent_rad
@@ -82,21 +84,26 @@ class LocalGlobal():
 	
 	def generate_state_dictionary(self):
 		
+		gl_size = self.gl_size
+		rl_size = self.rl_size
 		indexval = 0
-		for i in range(8):
-			for k in range(4,7):
+		for i in range(gl_size):
+			for k in range(gl_size,gl_size+rl_size):
 				for j in range(0,self.window_size*self.window_size+1):
 					combos = itertools.combinations(range((self.window_size*self.window_size)),j)
 					for combination in combos:
-						state = np.zeros(7+self.window_size*self.window_size)
+						state = np.zeros(gl_size+rl_size+self.window_size*self.window_size)
+						'''
 						if i < 4:
 							state[i] = 1
 						else:
 							state[i%4] = 1
 							state[(i+1)%4] = 1
+						'''
+						state[i] = 1
 						state[k] = 1
 						for val in combination:
-							state[7+val]=1
+							state[gl_size+rl_size+val]=1
 
 						#the base state
 						#removing the base case, now for the local representation 
@@ -122,11 +129,37 @@ class LocalGlobal():
 		return np.array(state_list)
 
 
+
+	def determine_index(self,diff_r, diff_c):
+
+
+		if diff_r==0 and diff_c >0: #right
+			index = 1
+		elif diff_r==0 and diff_c < 0: #left
+			index = 3
+		elif diff_r > 0 and diff_c == 0: #down
+			index = 2
+		elif diff_r < 0  and diff_c ==0: #up
+			index = 0
+		elif diff_r > 0 and diff_c > 0: #quad4
+		    index = 7
+		elif diff_r < 0  and diff_c > 0: #quad1
+		    index = 4
+		elif diff_r < 0 and diff_c < 0:	#quad2
+		    index = 5
+		elif diff_r >0 and diff_c < 0: #quad1
+		    index = 6
+		else:
+			index = 8
+
+		return index
+
+
 	def closeness_indicator(self,state_info):
 
 		agent_pos = state_info[0,:]
 		goal_pos = state_info[1,:]
-		feature = np.zeros(3)
+		feature = np.zeros(self.rl_size)
 		current_dist = np.linalg.norm(agent_pos-goal_pos)
 
 		if self.prev_dist is None or self.prev_dist == current_dist:
@@ -164,14 +197,14 @@ class LocalGlobal():
 		row_start =  int((window_rows-1)/2)
 		col_start = int((window_cols-1)/2)
 
-		mod_state = np.zeros(7+window_size**2)
+		mod_state = np.zeros(12+window_size**2)
 
-		a = int((window_size**2-1)/2)
+		#a = int((window_size**2-1)/2)
 		
 		agent_pos = state[0]
 		goal_pos = state[1]
-		diff_x = goal_pos[0] - agent_pos[0]
-		diff_y = goal_pos[1] - agent_pos[1]
+		diff_r = goal_pos[0] - agent_pos[0]
+		diff_c = goal_pos[1] - agent_pos[1]
 		'''
 		if diff_x >= 0 and diff_y >= 0:
 		    mod_state[1] = 1
@@ -182,18 +215,12 @@ class LocalGlobal():
 		else:
 		    mod_state[2] = 1
 		'''
-		if diff_x >= 0 and diff_y >= 0:
-		    mod_state[1] = 1
-		elif diff_x <= 0  and diff_y >= 0:
-		    mod_state[0] = 1
-		elif diff_x <= 0 and diff_y <= 0:
-		    mod_state[3] = 1
-		elif diff_x >=0 and diff_y <= 0:
-		    mod_state[2] = 1
+		index = self.determine_index(diff_r,diff_c)
+		mod_state[index] = 1
 
 		feat = self.closeness_indicator(state)
 
-		mod_state[4:7] = feat
+		mod_state[self.gl_size:self.gl_size+self.rl_size] = feat
 
 		for i in range(2,len(state)):
 
@@ -213,7 +240,7 @@ class LocalGlobal():
 		            if np.array_equal(temp_pos,obs_pos):
 		                pos = self.block_to_arrpos(r,c)
 
-		                mod_state[pos+7]=1
+		                mod_state[pos+self.gl_size+self.rl_size]=1
 
 		return reset_wrapper(mod_state)
 
@@ -502,9 +529,30 @@ class SocialNav():
 		return 0
 
 
+	def determine_index(self,diff_x, diff_y):
+
+
+		if diff_x==0 and diff_y >0: #up
+			index = 0
+		elif diff_x==0 and diff_y < 0: #down
+			index = 2
+		elif diff_x > 0 and diff_y == 0: #right
+			index = 1
+		elif diff_x < 0  and diff_y ==0: #left
+			index = 3
+		if diff_x > 0 and diff_y > 0: #quad1
+		    index = 4
+		elif diff_x < 0  and diff_y > 0: #quad2
+		    index = 5
+		elif diff_x < 0 and diff_y < 0:	#quad3
+		    index = 6
+		elif diff_x >0 and diff_y < 0: #quad4
+		    index = 7
+
+
 	def extract_features(self,state):
 
-		feature = np.zeros(7)
+		feature = np.zeros(11)
 		state_info = self.get_info_from_state(state)
 		current_dist = np.linalg.norm(state_info[0,:]-state_info[1,:])
 		
@@ -513,29 +561,21 @@ class SocialNav():
 		diff_x = goal_pos[0] - agent_pos[0]
 		diff_y = goal_pos[1] - agent_pos[1]
 
-		if diff_x >= 0 and diff_y >= 0:
-		    feature[1] = 1
-		elif diff_x <= 0  and diff_y >= 0:
-		    feature[0] = 1
-		elif diff_x <= 0 and diff_y <= 0:
-		    feature[3] = 1
-		elif diff_x >=0 and diff_y <= 0:
-		    feature[2] = 1
-
+		feature[self.determine_index(diff_x, diff_y)] = 1
 
 		if self.prev_dist is None or self.prev_dist == current_dist:
 
-			feature[4+1] = 1
+			feature[8+1] = 1
 			self.prev_dist = current_dist
 			return reset_wrapper(feature)
 
 		if self.prev_dist > current_dist:
 
-			feature[4+0] = 1
+			feature[8+0] = 1
 
 		if self.prev_dist < current_dist:
 
-			feature[4+2] = 1
+			feature[8+2] = 1
 
 		self.prev_dist = current_dist
 
@@ -559,10 +599,10 @@ class SocialNav():
 
 	def generate_state_dictionary(self):
 		counter = 0
-		for j in range(4):
+		for j in range(8):
 
-			for i in range(4,7):
-				state = np.zeros(7)
+			for i in range(8,11):
+				state = np.zeros(11)
 				state[j] = 1
 				state[i] = 1
 				self.state_dictionary[np.array2string(state)] = counter
@@ -579,7 +619,7 @@ class SocialNav():
 if __name__=='__main__':
 
 	#f = SocialNav(fieldList = ['agent_state','goal_state'])
-	f = LocalGlobal(window_size = 1 ,fieldList = ['agent_state', 'goal_state','obstacles'])
+	f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
 	#print(f.state_dictionary)
 	print(f.state_str_arr_dict)
 	print(f.state_dictionary)
