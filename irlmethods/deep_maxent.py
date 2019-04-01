@@ -139,7 +139,15 @@ class DeepMaxEnt():
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
-        dotProd.backward()
+        
+        #adding L1 regularization
+        lambda1 = 1
+        l1_reg = torch.tensor(0)
+        for param in self.reward.parameters():
+            l1_reg += torch.norm(param,1)
+
+        loss = dotProd+(lablda1*l1_reg)   
+        loss.backward()
 
     '''
     def per_state_reward(self, reward_function, rows, cols):
