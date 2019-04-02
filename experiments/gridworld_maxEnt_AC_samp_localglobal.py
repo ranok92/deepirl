@@ -49,8 +49,17 @@ def main():
     # initialize the environment
 
     #**set is_onehot to false
-    goal_state = np.asarray([3,8])
+    #goal_state = np.asarray([3,8])
 
+    env = GridWorld(display=args.render, is_onehot= False,is_random=False,
+                    rows =10,
+                    cols =10,
+                    seed = 7,
+                    obstacles = [np.asarray([5,5])],
+                                
+                    goal_state = np.asarray([1,5]))
+
+    '''
     env = GridWorld(display=args.render, 
                     obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])],
@@ -59,7 +68,7 @@ def main():
                     seed = 3,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
-
+    '''
     #CHANGE HERE
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
@@ -89,7 +98,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_locglobv2_3/'
+    trajectory_path = './trajs/ac_gridworld_user_keep_left/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
