@@ -146,6 +146,53 @@ class ActorCritic:
                                                      state_value))
         return action.item()
 
+
+
+
+    def generate_trajectory_user(self, num_trajs , path):
+
+        for traj_i in range(num_trajs):
+
+            actions = []
+            if self.feature_extractor is None:
+                states = [self.env.reset()]
+            else:
+                states = [self.feature_extractor.extract_features(self.env.reset())]
+
+            done = False
+            for i in count(0):
+                t= 0
+                while t < self.max_ep_length:
+                
+                    action,action_flag = self.env.take_user_action()
+
+                    state, rewards, done, _ = self.env.step(action)
+                    
+                    if self.feature_extractor is not None:
+                        state = self.feature_extractor.extract_features(state)
+
+                    if action_flag:
+                        t+=1
+                        print("current state :", state)
+                        states.append(state)
+                    if t >= self.max_ep_length or done:
+                        break
+
+                print ("the states traversed : ", states)
+
+                break
+                
+            actions_tensor = torch.tensor(actions)
+            states_tensor = torch.stack(states)
+
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+            torch.save(actions_tensor,
+                       os.path.join(path, 'traj%s.acts' % str(traj_i)))
+
+            torch.save(states_tensor,
+                       os.path.join(path, 'traj%s.states' % str(traj_i)))
+
     def generate_trajectory(self, num_trajs, path):
 
         for traj_i in range(num_trajs):
