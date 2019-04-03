@@ -246,6 +246,215 @@ class LocalGlobal():
 
 
 
+
+class FrontBackSideSimple():
+
+
+	def __init__(self, thresh1 = 2, thresh2 = 4, thresh3 = 6,  
+					agent_rad = 1, obs_rad = 1 , fieldList = []):
+
+			self.thresh1 = thresh1
+			self.thresh2 = thresh2
+			self.thresh3 = thresh3
+
+			self.agent_radius = agent_rad
+			self.obs_rad = obs_rad
+
+
+			self.field_list = fieldList
+			self.prev_dist = None
+			#added new (26-3-19)
+			#based on the state representation, this should contain a 
+			#dictionary containing all possible states
+
+			self.state_dictionary = {}
+			self.state_str_arr_dict = {}
+			print('Loading state space dictionary. . . ')
+			self.generate_state_dictionary()
+			print('Done!')
+
+	#generates the state dictionary based on the structure of the 
+	#hand crafted state space
+	
+	#the keys in the dictionary are strings converted from 
+	#numpy arrays
+	
+	def generate_state_dictionary(self):
+		indexval = 0
+		for i in range(9):
+			for j in range(9,12):
+				for k in range(0,4*3+1):
+					combos = itertools.combinations(range(4*3),k)
+					for combination in combos:
+						state = np.zeros(24)
+						'''
+						if i < 4:
+							state[i] = 1
+						else:
+							state[i%4] = 1
+							state[(i+1)%4] = 1
+						'''
+						state[i] = 1
+						state[j] = 1
+						for val in combination:
+							state[12+val]=1
+
+						#the base state
+						#removing the base case, now for the local representation 
+						#only presence of an obstacle will make it 1
+						#state[4+math.floor((self.window_size*self.window_size)/2)] = 1
+
+						self.state_dictionary[np.array2string(state)] = indexval
+						self.state_str_arr_dict[np.array2string(state)] = state
+						n = np.array2string(
+							np.asarray([0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 1., 0., 1., 1., 0, 0, 1.]))
+
+						if n in self.state_dictionary.keys():
+							print (self.state_dictionary[n])
+						indexval = len(self.state_dictionary.keys())
+
+
+
+	#reads the list of fields from the state to create its features
+	def get_info_from_state(self,state):
+
+		state_list = []
+		for field in self.field_list:
+			if type(state[field]) is list:
+				for val in state[field]:
+					state_list.append(val)
+			else:
+				state_list.append(state[field])
+
+		return np.array(state_list)
+
+
+
+	def determine_index(self,diff_r, diff_c):
+
+
+		if diff_r==0 and diff_c >0: #right
+			index = 1
+		elif diff_r==0 and diff_c < 0: #left
+			index = 3
+		elif diff_r > 0 and diff_c == 0: #down
+			index = 2
+		elif diff_r < 0  and diff_c ==0: #up
+			index = 0
+		elif diff_r > 0 and diff_c > 0: #quad4
+		    index = 7
+		elif diff_r < 0  and diff_c > 0: #quad1
+		    index = 4
+		elif diff_r < 0 and diff_c < 0:	#quad2
+		    index = 5
+		elif diff_r >0 and diff_c < 0: #quad1
+		    index = 6
+		else:
+			index = 8
+
+		return index
+
+
+	def closeness_indicator(self,state_info):
+
+		agent_pos = state_info[0,:]
+		goal_pos = state_info[1,:]
+		feature = np.zeros(3)
+		current_dist = np.linalg.norm(agent_pos-goal_pos)
+
+		if self.prev_dist is None or self.prev_dist == current_dist:
+
+			feature[1] = 1
+			self.prev_dist = current_dist
+			return feature
+
+		if self.prev_dist > current_dist:
+
+			feature[0] = 1
+
+		if self.prev_dist < current_dist:
+
+			feature[2] = 1
+
+		self.prev_dist = current_dist
+
+		return feature
+
+	def get_orientation_distance(self, agent_pos, obs_pos):
+
+		diff_r = obs_pos[0] - agent_pos[0]
+		diff_c = obs_pos[1] - agent_pos[1]
+		orient_bin = -1
+		dist_bin = -1
+		dist = abs(diff_r)+abs(diff_c)
+		if dist <= self.thresh3:
+			if dist > self.thresh2:
+				dist_bin = 2
+
+			elif dist <= self.thresh2 and dist > self.thresh1:
+				dist_bin = 1
+
+			else:
+				dist_bin = 0 
+			#select orientation bin
+			if abs(diff_c) < abs(diff_r):
+				if diff_r > 0: #down
+					orient_bin = 2
+				else: #top
+					orient_bin = 0
+			else:
+				if diff_c > 0:#right
+					orient_bin = 1
+				else: #left
+					orient_bin = 3
+
+		return orient_bin, dist_bin
+
+	def extract_features(self,state):
+
+		#pdb.set_trace()
+		state = self.get_info_from_state(state)
+
+		mod_state = np.zeros(9+3+12)
+
+		#a = int((window_size**2-1)/2)
+		
+		agent_pos = state[0]
+		goal_pos = state[1]
+		diff_r = goal_pos[0] - agent_pos[0]
+		diff_c = goal_pos[1] - agent_pos[1]
+		'''
+		if diff_x >= 0 and diff_y >= 0:
+		    mod_state[1] = 1
+		elif diff_x < 0  and diff_y >= 0:
+		    mod_state[0] = 1
+		elif diff_x < 0 and diff_y < 0:
+		    mod_state[3] = 1
+		else:
+		    mod_state[2] = 1
+		'''
+		index = self.determine_index(diff_r,diff_c)
+		mod_state[index] = 1
+
+		feat = self.closeness_indicator(state)
+
+		mod_state[9:12] = feat
+
+		for i in range(2,len(state)):
+
+		    #as of now this just measures the distance from the center of the obstacle
+		    #this distance has to be measured from the circumferance of the obstacle
+
+		    #new method, simulate overlap for each of the neighbouring places
+		    #for each of the obstacles
+		    obs_pos = state[i]
+		    orient, dist = self.get_orientation_distance(agent_pos, obs_pos)
+		    if dist >= 0 and orient >= 0:
+		    	mod_state[12+dist*4+orient] = 1 # clockwise starting from the inner most circle
+
+			
+		return reset_wrapper(mod_state)
+
 class FrontBackSide():
 
 	def __init__(self,window_size=5,grid_size=1,fieldList = []):
@@ -619,9 +828,14 @@ class SocialNav():
 if __name__=='__main__':
 
 	#f = SocialNav(fieldList = ['agent_state','goal_state'])
-	f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
+	#f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
+	f = FrontBackSideSimple(fieldList = ['agent_state', 'goal_state','obstacles'])
 	#print(f.state_dictionary)
-	print(f.state_str_arr_dict)
-	print(f.state_dictionary)
+
+	k = np.zeros(24)
+
+	key = np.array2string(k)
+	print(f.state_str_arr_dict[key])
+	#print(f.state_dictionary)
 
 
