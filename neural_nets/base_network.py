@@ -38,3 +38,4 @@ class BaseNN(nn.Module):
         """
         self.load_state_dict(torch.load(path, map_location=self.device))
         self.eval()
+        self.to(self.device)
