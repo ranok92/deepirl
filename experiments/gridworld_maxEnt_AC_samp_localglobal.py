@@ -45,12 +45,12 @@ def main():
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
-    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav
+    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
     # initialize the environment
 
     #**set is_onehot to false
-    #goal_state = np.asarray([3,8])
-
+    goal_state = np.asarray([3,8])
+    '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=False,
                     rows =10,
                     cols =10,
@@ -60,22 +60,23 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    env = GridWorld(display=args.render, 
+    env = GridWorld(display=args.render, is_random=True,
+                    rows = 10, cols = 10,
                     obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed = 3,
+                    seed = 1,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
-    '''
+    
     #CHANGE HERE
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    feat_ext = LocalGlobal(window_size=3, 
-                           fieldList = ['agent_state','goal_state','obstacles'])
-    
+    #feat_ext = LocalGlobal(window_size=3, 
+    #                       fieldList = ['agent_state','goal_state','obstacles'])
+    feat_ext = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles'])
     #CHANGE HERE
     #initialize loss based termination
 
@@ -98,7 +99,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_user_keep_left/'
+    trajectory_path = './trajs/ac_gridworld_fbs_simple/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
