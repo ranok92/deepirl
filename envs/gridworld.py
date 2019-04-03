@@ -4,7 +4,7 @@ import time
 import pdb
 import sys
 sys.path.insert(0, '..')
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal
+from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
 from itertools import count
 import utils  # NOQA: E402
@@ -91,7 +91,7 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = LocalGlobal(window_size = 3,fieldList = ['agent_state','goal_state','obstacles']) 
+    featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
     world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles=[np.asarray([1,2])])
     for i in range(100):
         print ("here")
