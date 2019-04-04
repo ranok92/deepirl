@@ -141,7 +141,7 @@ class DeepMaxEnt():
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
         
         #adding L1 regularization
-        lambda1 = 1
+        lambda1 = 0
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)

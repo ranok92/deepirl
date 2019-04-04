@@ -157,6 +157,7 @@ class ActorCritic:
         action = m.sample()
         self.policy.saved_actions.append(SavedAction(m.log_prob(action),
                                                      state_value))
+
         return action.item()
 
 
@@ -188,6 +189,7 @@ class ActorCritic:
                         t+=1
                         print("current state :", state)
                         states.append(state)
+                        actions.append(action)
                     if t >= self.max_ep_length or done:
                         break
 
