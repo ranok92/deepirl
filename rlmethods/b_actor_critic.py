@@ -11,6 +11,9 @@ from collections import namedtuple
 import gym
 import numpy as np
 
+import statistics
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -90,7 +93,7 @@ class ActorCritic:
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
                  log_interval=100, max_episodes=0, max_ep_length=200,
-                 reward_threshold_ratio=0.99):
+                 reward_threshold_ratio=0.99 , plot_loss = False):
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
@@ -131,6 +134,16 @@ class ActorCritic:
         # optimizer setup
         self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-4)
         self.EPS = np.finfo(np.float32).eps.item()
+
+        #for plotting loss
+        self.plot_loss = plot_loss
+
+        if self.plot_loss:
+            self.loss_interval = 50
+            self.loss_mean = []
+            self.loss = []
+
+
 
     def select_action(self, state):
         """based on current policy, given the current state, select an action
@@ -271,6 +284,15 @@ class ActorCritic:
             self.termination.update_loss_diff_list(loss.item())
             self.termination.plot_avg_loss()
         loss.backward()
+
+        #adding loss in the loss list
+        if self.plot_loss:
+            self.loss_mean.append(loss.item())
+            if len(self.loss_mean)==self.loss_interval:
+                self.loss.append(statistics.mean(self.loss_mean))
+                self.loss_mean = []
+
+        #torch.nn.utils.clip_grad_norm_(self.policy.parameters(),.5)
         self.optimizer.step()
 
         del self.policy.rewards[:]
@@ -339,6 +361,13 @@ class ActorCritic:
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward))
+
+                        if self.plot_loss:
+
+                            plt.plot(self.loss)
+                            plt.draw()
+                            plt.pause(.0001)
+
                     else:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f} \
                             \tLoss diff :{:.4f}'.format(
