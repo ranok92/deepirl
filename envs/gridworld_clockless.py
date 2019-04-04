@@ -133,7 +133,8 @@ class GridWorldClockless:
         #if true, the state will not change with any action
 
         self.release_control = False
-
+        self.agent_spawn_clearance = 2
+        self.goal_spawn_clearance = 2
 
 
     def reset(self):
@@ -142,7 +143,7 @@ class GridWorldClockless:
 
         #if this flag is true, the position of the obstacles and the goal 
         #change with each reset
-
+        dist_g = self.goal_spawn_clearance
         if self.is_random:
             self.obstacles = []
             for i in range(num_obs):
@@ -150,10 +151,30 @@ class GridWorldClockless:
                 obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
                 self.obstacles.append(obs_pos)
 
-            self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+
+            while True:
+                flag = False
+                self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+
+                for i in range(num_obs):
+                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+
+                        flag = True
+                if not flag:
+                    break
+
+        dist = self.agent_spawn_clearance
+        while True:
+            flag = False
+            self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            for i in range(num_obs):
+                if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                    flag = True
+
+            if not flag:
+                break
 
 
-        self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
         self.release_control = False
         if self.is_onehot:
