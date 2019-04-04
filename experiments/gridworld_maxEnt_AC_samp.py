@@ -26,7 +26,7 @@ parser.add_argument('--store-interval', action='store_true',
 parser.add_argument('--rl-episodes', type=int, default=50)
 parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
-parser.add_argument('--rl-log-intervals', type=int, default=100)
+parser.add_argument('--rl-log-intervals', type=int, default=10)
 
 
 def main():
@@ -44,14 +44,14 @@ def main():
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
-    from featureExtractor.gridworld_featureExtractor import OneHot
+    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal
     # initialize the environment
 
     #**set is_onehot to false
     goal_state = np.asarray([5,5])
 
     env = GridWorld(display=args.render, 
-                    obstacles=[np.asarray([1, 2])],
+                    obstacles = [np.asarray([3,7])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = 3,
@@ -61,10 +61,10 @@ def main():
     #initialize feature extractor
 
     feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-
+    #feat_ext = LocalGlobal(window_size=3, 
+    #                       fieldList = ['agent_state','goal_state','obstacles'])
     #initialize loss based termination
 
-    lbt = LossBasedTermination(list_size = 80, stop_threshold = 1.5 , info= False)
     # intialize RL method
     #pass the appropriate feature extractor
     rlMethod = ActorCritic(env, gamma=0.99,
@@ -78,7 +78,7 @@ def main():
         rlMethod.policy.load(args.policy_path)
 
     # initialize IRL method
-    trajectory_path = './trajs/ac_gridworld_5_5/'
+    trajectory_path = './trajs/ac_gridworld_locglob_3/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
