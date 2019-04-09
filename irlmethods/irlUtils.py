@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
-from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav
+from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
@@ -247,7 +247,6 @@ def expert_svf(traj_path, state_dict = None):
 
         # traj_svf stores the state hist
         traj_hist = np.zeros((1,len(state_dict.keys())))
-
         #load up a trajectory and convert it to numpy
         torch_traj = torch.load(state_file, map_location=DEVICE)
         traj_np = torch_traj.cpu().numpy()
@@ -278,6 +277,68 @@ def expert_svf(traj_path, state_dict = None):
 
     return svf
 
+
+#function for sanity check for the states generated in the trajectories in the traj_path 
+# mainly for debugging/visualizing the states in the path.
+def debug_custom_path(traj_path, criteria ,state_dict = None):
+
+	actions = glob.glob(os.path.join(traj_path, '*.acts'))
+	states = glob.glob(os.path.join(traj_path, '*.states'))
+
+
+	if criteria=='distance':
+		histogram_bin = np.zeros(3)
+		xaxis = np.arange(3)
+	if criteria=='orientation':
+		histogram_bin = np.zeros(12)
+		xaxis = np.arange(4)
+	if criteria=='both':
+		histogram_bin = np.zeros(12)
+		xaxis = np.arange(12)
+	for idx, state_file in enumerate(states):
+
+	    # traj_svf stores the state hist
+	    traj_hist = np.zeros((1,len(state_dict.keys())))
+	    #load up a trajectory and convert it to numpy
+	    torch_traj = torch.load(state_file, map_location=DEVICE)
+	    traj_np = torch_traj.cpu().numpy()
+
+	    #iterating through each of the states 
+	    #in the trajectory
+
+
+	    for i in range(traj_np.shape[0]):
+
+	    	#this is for onehot
+	    	if criteria=='distance':
+
+	    		if np.sum(traj_np[i][12:16]) > 0:
+
+	    			histogram_bin[0]+=1
+	    		if np.sum(traj_np[i][16:20]) > 0:
+	    			histogram_bin[1]+=1
+	    		if np.sum(traj_np[i][20:24]) > 0:
+
+	    			histogram_bin[2]+=1
+
+	    	else:
+
+	    		histogram_bin+= traj_np[i][12:24]
+
+	if criteria=='orientation':
+
+		orient_bin = np.zeros(4)
+		for i in range(12):
+
+			orient_bin[i%4]+=histogram_bin[i]
+			histogram_bin = orient_bin
+
+
+	print(histogram_bin)
+	plt.bar(xaxis,histogram_bin)
+	plt.show()
+
+	
 
 
 
@@ -479,10 +540,14 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 if __name__ == '__main__':
 
+
+
     r = 10
     c = 10
 
-    feat = SocialNav(fieldList = ['agent_state','goal_state'])
+    feat = FrontBackSideSimple(thresh1 = 1, thresh2 = 2,
+    						   thresh3 = 3,
+    						   fieldList = ['agent_state','goal_state'])
     #feat = OneHot(grid_rows=10,grid_cols=10)
     #feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
@@ -492,14 +557,16 @@ if __name__ == '__main__':
     				is_onehot = False)
     print(env.reset())
     print(len(env.reset()))
-    
+    '''
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
     policy.load('../experiments/saved-models/socialNav_g5_5_no_obs.pt')
     policy.eval()
     policy.to(DEVICE)
-  	
-  	
+'''
+    debug_custom_path('../experiments/trajs/ac_gridworld_user_avoid',
+     					'distance',state_dict = feat.state_dictionary)
+
     '''
     reward = RewardNet(state_space)
     reward.load('../experiments/saved-models-rewards/319.pt')
@@ -507,7 +574,7 @@ if __name__ == '__main__':
     reward.to(DEVICE)
 	'''
 
-    
+    '''
     exp_svf = expert_svf('../experiments/trajs/ac_gridworld_socialNav_no_obs/',
      			state_dict = feat.state_dictionary)
     exp_svf = np.squeeze(exp_svf)
@@ -527,13 +594,13 @@ if __name__ == '__main__':
 
     #print ("The expert svf :", exp_svf)
     
-    '''
+    
     statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
                                      num_actions = 5 , 
                                      goal_state = np.asarray([5,5]),
                                      episode_length = 20)
 
-	'''
+	
     statevisit3 = get_svf_from_sampling(no_of_samples = 3000 , env = env ,
 						 policy_nn = policy , reward_nn = None,
 						 episode_length = 20, feature_extractor = feat)
@@ -546,7 +613,7 @@ if __name__ == '__main__':
 
 
 
-    '''
+    
     statevisitMat = np.resize(statevisit,(r,c))
     #statevisitMat2 = np.resize(statevisit2,(r,c))
     statevisitMat3 = np.resize(statevisit3,(r,c))
