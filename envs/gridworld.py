@@ -3,6 +3,7 @@ import torch
 import time
 import pdb
 import sys
+import math
 sys.path.insert(0, '..')
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
@@ -48,7 +49,58 @@ class GridWorld(GridWorldClockless):
         self.clock = pygame.time.Clock()
 
         self.tickSpeed = 60
- 
+        if obstacles=='By hand':
+
+            self.obstacles = self.draw_obstacles_on_board()
+
+
+    def draw_obstacles_on_board(self):
+
+
+        print("printing from here")
+     
+        self.clock.tick(self.tickSpeed)
+        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+
+        self.gameDisplay.fill((255,255,255))
+
+        obstacle_list = []
+        RECORD_FLAG = False
+        while True:
+
+            p = pygame.event.get()
+            for event in p:
+
+                if event.type== pygame.MOUSEBUTTONDOWN:
+
+                    RECORD_FLAG=True
+                if event.type==pygame.MOUSEBUTTONUP:
+
+                    RECORD_FLAG = False
+
+                if event.type==pygame.MOUSEMOTION and RECORD_FLAG:
+                    #record the coordinate of the mouse
+                    #convert that to a location in the gridworld
+                    #store that location into the obstacle_list
+                    
+                    grid_loc = ([math.floor(event.pos[0]/self.cellWidth), math.floor(event.pos[1]/self.cellWidth)])
+                    
+                    if grid_loc not in obstacle_list:
+                        obstacle_list.append(grid_loc)
+                    
+                
+                #the recording stops when the key 'q' is pressed
+                if event.type== pygame.KEYDOWN: #
+
+                    if event.key==113:
+                        
+                        self.obstacle_list = obstacle_list
+                        return obstacle_list
+
+        
+
+        return None
+    
 
     def render(self):
 
@@ -91,8 +143,8 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
-    world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles=[np.asarray([1,2])])
+    featExt = LocalGlobal(window_size = 3,fieldList = ['agent_state','goal_state','obstacles']) 
+    world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles='By hand',rows = 50 , cols = 50 , width = 10)
     for i in range(100):
         print ("here")
         state = world.reset()
