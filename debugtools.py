@@ -108,11 +108,17 @@ def numericalSort(value):
     parts[1::2] = map(int, parts[1::2])
     return parts
 
-def plot_reward_across_policy_models(filename,feature_extractor = None,
+def plot_reward_across_policy_models(foldername,
+                                    expert = None,
+                                    feature_extractor = None,
                                     seed_list = [],
-                                    iterations_per_model = 50):
+                                    iterations_per_model = 50,
+                                    compare_expert = True):
     color_list = ['r','g','b','c','m','y','k']
     counter = 0
+
+    reward_across_seeds = []
+    xaxis = None
     for seed in seed_list:
 
         env = GridWorld(display=False, is_onehot= False,is_random =True,
@@ -128,65 +134,124 @@ def plot_reward_across_policy_models(filename,feature_extractor = None,
         rl_method = ActorCritic(env, feat_extractor= feature_extractor, gamma = 0.99,
                                 max_ep_length=max_ep_length, log_interval=50)
 
-        model_names = glob.glob(os.path.join(filename,'*.pt'))
+        model_names = glob.glob(os.path.join(foldername,'*.pt'))
+
+        xaxis = np.arange(len(model_names))
+
+        reward_exp = get_rewards_for_model(expert,env = env,
+                                feature_extractor = feature_extractor,
+                                rl_method = rl_method,
+                                max_ep_length = max_ep_length,
+                                iterations = iterations_per_model)
+
+
+
 
         reward_across_models = []
+        reward_expert = []
         for policy_file in sorted(model_names,key=numericalSort):
 
-            rl_method.policy.load(policy_file)
-
-        
-            reward_per_model = 0
-            print('Loading file :',policy_file)
-
-            for r in range(iterations_per_model):
-                state = feature_extractor.extract_features(env.reset())
-                reward_per_run = 0
-                for t in range(max_ep_length):
-
-                    action = rl_method.select_action(state)
-                    state,reward,done,_ = env.step(action)
-                    reward_per_run+=reward
-                    state = feature_extractor.extract_features(state)
-
-                reward_per_model+=reward_per_run
 
 
-            reward_per_model/=iterations_per_model
+            reward_per_model = get_rewards_for_model(policy_file,env = env,
+                                feature_extractor = feature_extractor,
+                                rl_method = rl_method,
+                                max_ep_length = max_ep_length,
+                                iterations = iterations_per_model)
+
             print('Average reward for the model:', reward_per_model)
             reward_across_models.append(reward_per_model)
+            reward_expert.append(reward_exp)
 
-        plt.plot(reward_across_models,color = color_list[counter])
-        plt.draw()
-        plt.pause(0.001)
-        counter+=1
+
+        reward_across_seeds.append(reward_across_models)
+
+    np_reward_across_seeds = np.array(reward_across_seeds)
+
+    print(np_reward_across_seeds.shape)
+    means_rewards = np.mean(np_reward_across_seeds, axis = 0)
+
+    print ("the mean rewards :", means_rewards)
+
+    print("The mean across all runs and seeds : ",np.mean(means_rewards))
+
+    std_rewards = np.std(np_reward_across_seeds, axis = 0)
+
+    print ('the std :', std_rewards)
+    plt.xlabel('IRL iteration no.')
+    plt.ylabel('Reward obtained')
+    plt.plot(xaxis,means_rewards,color = color_list[counter],label='IRL trained agent')
+    plt.fill_between(xaxis , means_rewards-std_rewards , 
+                    means_rewards+std_rewards, alpha = 0.5, facecolor = color_list[counter])
+    plt.plot(reward_expert, color = 'k' , label='Expert agent')
+    plt.legend()
+    plt.draw()
+    plt.pause(0.001)
     plt.show()
     return reward_across_models
 
+def get_rewards_for_model(policy_file,
+                env= None,
+                feature_extractor = None,
+                rl_method = None,
+                max_ep_length = 20,
+                iterations = 50):
 
+    rl_method.policy.load(policy_file)
+    reward_per_model = 0
+    print('Loading file :',policy_file)
+
+    for r in range(iterations):
+        state = feature_extractor.extract_features(env.reset())
+        reward_per_run = 0
+        for t in range(max_ep_length):
+
+            action = rl_method.select_action(state)
+            state,reward,done,_ = env.step(action)
+            reward_per_run+=reward
+            state = feature_extractor.extract_features(state)
+
+        reward_per_model+=reward_per_run
+
+    reward_per_model/=iterations
+
+    return reward_per_model
+
+
+
+    
 def generate_trajectories(policy_fname_list,feature_extractor = None):
 
     #list containing the points of trajectories of all the policies
     trajectory_point_master_list = []
 
-    env = GridWorld(display=True, is_onehot= False,is_random =False,
+    env = GridWorld(display=False, is_onehot= False,is_random =False,
             rows =10,
             cols =10,
             seed = 7,
             obstacles = [np.asarray([5,5])],
             goal_state = np.asarray([1,5]))
 
-    max_ep_length = 20
-    run_iterations = 20
+    max_ep_length = 15
+    run_iterations = 50
 
     rl_method = ActorCritic(env, feat_extractor= feature_extractor, gamma = 0.99,
                                 max_ep_length=max_ep_length, log_interval=50)
+
+    labels = ['0','1','2','3','4','5','6','7','8','9']
 
     for name in policy_fname_list:
 
         #ready the policy
         rl_method.policy.load(name)
         trajectory_point_policy = []
+
+        env = GridWorld(display=False, is_onehot= False,is_random =False,
+                        rows =10,
+                        cols =10,
+                        seed = 7,
+                        obstacles = [np.asarray([5,5])],
+                        goal_state = np.asarray([1,5]))
 
         heat_map = np.zeros((env.rows,env.cols))    
 
@@ -208,14 +273,30 @@ def generate_trajectories(policy_fname_list,feature_extractor = None):
 
 
         trajectory_point_master_list.append(trajectory_point_policy)
-        plt.figure()
-        plt.imshow(heat_map)
-        plt.clim(0,70)
-        plt.colorbar()
+        fig,ax = plt.subplots()
+
+        im = ax.imshow(heat_map,vmin=0,vmax=40)
+        ax.set_xticks(np.arange(10))
+        ax.set_yticks(np.arange(10))
+
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(labels)
+
+        ax.set_xlabel('Columns of the gridworld',fontsize='large')
+        ax.set_ylabel('Rows of the gridworld',fontsize='large')
+
+        for i in range(len(labels)):
+            for j in range(len(labels)):
+
+                text = ax.text(j,i,heat_map[i,j], ha="center", va="center", color="black")
+
+        #ax.set_title("Grid location visitation frequency for a unbiased agent")
+
+        #plt.colorbar()
+        #plt.clim(0,70)
         plt.draw()
         plt.pause(.001)
     plt.show()
-    env.draw_trajectories(trajectory_point_master_list,rows,cols)
 
 
 if __name__ == '__main__':
@@ -223,17 +304,25 @@ if __name__ == '__main__':
     r = 10
     c = 10
     #initialize environment
-
+    '''
+    env = GridWorld(display=False, is_onehot= False,is_random =False,
+                rows =10,
+                cols =10,
+                seed = 12,
+                obstacles = [np.asarray([5,1]),np.array([5,9])],
+                            
+                goal_state = np.asarray([1,5]))
+    '''
     #initialize feature extractor
-    feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
+    #feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
     #feat = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
-    #                            thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
+    feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
+                                thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
     #initialize reward network
     #print(env.reset())
     '''
     reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
-    reward_network.load('./experiments/saved-models-rewards/50_fbs_simple.pt')
+    reward_network.load('./experiments/saved-models-rewards/30local_global.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
@@ -247,14 +336,18 @@ if __name__ == '__main__':
         plt.colorbar()
         plt.show()
    
-
+    
     plot_reward_across_policy_models("./experiments/saved-models/Run_info_localglobal_v3_1/",
-                                seed_list = [1,2,3,4],
+                                expert = './experiments/saved-models/loc_glob_v3.1_win_3.pt',
+                                seed_list = [1,2,3,4,5],
                                 feature_extractor = feat,
-                                iterations_per_model = 10)
+                                iterations_per_model = 30)
+
+
 
     '''
-    policy_name_list = ["./experiments/saved-models/loc_glob_v3.1_win_3.pt",
-                        "./experiments/saved-models/loc_glob_v3-1_keep_left.pt"]
+    policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
+                        "./experiments/saved-models/Run_info_fbs_keep_left/45.pt"]
 
     generate_trajectories(policy_name_list,feature_extractor = feat)
+    
