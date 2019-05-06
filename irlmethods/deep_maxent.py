@@ -49,15 +49,6 @@ class RewardNet(BaseNN):
         return x
 
 
-'''
-***Passing the parameters for the RL block :
-    Directly to the RL block in the experiment folder and not through the IRL block as before
-'''
-'''
-    the parameters rlmethod and env take objects of rlmethod and env respectively
-
-'''
-
 
 class DeepMaxEnt():
     def __init__(
@@ -103,12 +94,9 @@ class DeepMaxEnt():
 
         self.reward = self.reward.to(self.device)
 
-        #making it run on server
         self.on_server = on_server
 
 
-
-    #******parts being operated on
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path,state_dict= self.rl.feature_extractor.state_dictionary)
 
@@ -133,13 +121,10 @@ class DeepMaxEnt():
                                             episode_length = episode_length,
                                             feature_extractor = feature_extractor)
 
-    #***********
-
-
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
-        
+
         #adding L1 regularization
         lambda1 = 0
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
@@ -149,20 +134,6 @@ class DeepMaxEnt():
         loss = dotProd+(lambda1*l1_reg)   
         loss.backward()
 
-    '''
-    def per_state_reward(self, reward_function, rows, cols):
-        all_states = itertools.product(range(rows), range(cols))
-
-        oh_states = []
-        for state in all_states:
-            oh_states.append(utils.to_oh(state[0]*cols+state[1], rows*cols))
-
-        all_states = torch.tensor(oh_states,
-                                  dtype=torch.float).to(self.device)
-
-        return reward_function(all_states)
-
-    '''
 
     def per_state_reward(self, reward_function):
 
@@ -173,7 +144,7 @@ class DeepMaxEnt():
         for state in state_dict:
 
             state_tensor = state_dict[state]
-       
+
             all_state_list.append(state_tensor)
 
         all_states = torch.tensor(all_state_list, dtype=torch.float).to(self.device)
@@ -259,10 +230,7 @@ class DeepMaxEnt():
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
 
-            # current_agent_policy = self.rl.policy
-
             self.resetTraining(self.state_size,self.action_size, self.graft)
-
 
             self.reward.save('./saved-models-rewards/')
 
