@@ -28,6 +28,10 @@ parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
 parser.add_argument('--rl-log-intervals', type=int, default=10)
 
+parser.add_argument('--regularizer', type=int, default=0, help='The regularizer to use.')
+
+
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -101,7 +105,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_user_avoid/'
+    trajectory_path = './trajs/ac_gridworld_user_fbs_simple_avoid/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,

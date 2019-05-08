@@ -71,6 +71,7 @@ class DeepMaxEnt():
             plot_save_folder=None,
             rl_max_episodes = 30,
             graft = True,
+            regularizer=0.1
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -105,6 +106,8 @@ class DeepMaxEnt():
 
         #making it run on server
         self.on_server = on_server
+
+        self.regularizer = regularizer
 
 
 
@@ -141,7 +144,7 @@ class DeepMaxEnt():
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
         
         #adding L1 regularization
-        lambda1 = 0
+        lambda1 = self.regularizer
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)
@@ -263,8 +266,11 @@ class DeepMaxEnt():
 
             self.resetTraining(self.state_size,self.action_size, self.graft)
 
+            #save the reward network
+            reward_network_folder = './saved-models-rewards/'+'reg-'+str(self.regularizer)+'/'
 
-            self.reward.save('./saved-models-rewards/')
+            pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
+            self.reward.save(reward_network_folder)
 
             current_agent_policy = self.rl.train_mp(
                 n_jobs=4,
@@ -279,7 +285,10 @@ class DeepMaxEnt():
                                                 episode_length = self.rl_max_episodes)
 
 
-            current_agent_policy.save('./saved-models/')
+            #save the policy network
+            policy_network_folder = './saved-models/'+'reg-'+str(self.regularizer)+'/'
+            pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
+            current_agent_policy.save(policy_network_folder)
 
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)

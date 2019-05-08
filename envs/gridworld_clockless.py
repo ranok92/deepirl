@@ -133,7 +133,7 @@ class GridWorldClockless:
         #if true, the state will not change with any action
 
         self.release_control = False
-        self.agent_spawn_clearance = 2
+        self.agent_spawn_clearance = 3
         self.goal_spawn_clearance = 2
 
 

@@ -141,6 +141,21 @@ class GridWorld(GridWorldClockless):
         return 4,False
 
 
+#created this to trace the trajectory of the agents whose trajectory informations are provided in the 
+#master list
+    def draw_trajectories(self, trajectory_master_list):
+
+        self.reset()
+        color = [(0,0,0),(255,0,0),(0,255,0),(0,0,255),(255,255,0)]
+        counter = 0
+        for trajectory_list in trajectory_master_list:
+            for trajectory_run in trajectory_list:
+                pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
+            counter+=1
+
+        pygame.image.save(self.gameDisplay,'traced_trajectories')
+
+
 if __name__=="__main__":
 
     featExt = LocalGlobal(window_size = 3,fieldList = ['agent_state','goal_state','obstacles']) 
