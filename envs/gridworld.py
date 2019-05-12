@@ -33,6 +33,7 @@ class GridWorld(GridWorldClockless):
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
+        show_trail = False
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -49,6 +50,9 @@ class GridWorld(GridWorldClockless):
         self.clock = pygame.time.Clock()
 
         self.tickSpeed = 60
+        self.show_trail = show_trail
+
+
         if obstacles=='By hand':
 
             self.obstacles = self.draw_obstacles_on_board()
@@ -118,6 +122,9 @@ class GridWorld(GridWorldClockless):
         pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]*self.cellWidth, self.goal_state[0]*self.cellWidth,self.cellWidth, self.cellWidth])
         #render agent
         pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]*self.cellWidth, self.agent_state[0]*self.cellWidth, self.cellWidth, self.cellWidth])
+        if self.show_trail:
+            self.draw_trajectory()
+
         pygame.display.update()
         return 0
 
@@ -143,15 +150,53 @@ class GridWorld(GridWorldClockless):
 
 #created this to trace the trajectory of the agents whose trajectory informations are provided in the 
 #master list
-    def draw_trajectories(self, trajectory_master_list):
 
-        self.reset()
-        color = [(0,0,0),(255,0,0),(0,255,0),(0,0,255),(255,255,0)]
-        counter = 0
-        for trajectory_list in trajectory_master_list:
-            for trajectory_run in trajectory_list:
-                pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
-            counter+=1
+
+    def draw_arrow(self, base_position , next_position):
+
+        #base_position = (row,col)
+
+        #draw the stalk
+        arrow_width  = 10 #in pixels
+        base_pos_pixel = (base_position+.5)*self.cellWidth
+        next_pos_pixel = (next_position+.5)*self.cellwidth
+        pygame.draw.polygon(self.gameDisplay, (0,0,0),
+                            ((base_pos_pixel[0],base_pos_pixel[1]),
+                            (next_pos_pixel[0],next_pos_pixel[1]))
+                                
+
+        #draw the head
+        ref_pos = base_pos_pixel+(base_pos_pixel-next_pos_pixel)*.75
+        if base_position[0]==next_position[0]:
+            #same row (movement left/right)
+
+            pygame.draw.polygon(self.gameDisplay,(0,0,0),
+                            (
+                            (ref_pos[0],ref_pos[1]+(arrow_width/2)),
+                            (ref_pos[0],ref_pos[1]-(arrow_width/2)),
+                            (next_pos_pixel[0],next_pos_pixel[1])   )
+                            )
+        if base_position[1]==next_position[1]:
+
+            pygame.draw.polygon(self.gameDisplay,(0,0,0),
+                (
+                (ref_pos[0]+(arrow_width/2),ref_pos[1]),
+                (ref_pos[0]-(arrow_width/2),ref_pos[1]),
+                (next_pos_pixel[0],next_pos_pixel[1])   )
+                )
+
+
+    def draw_trajectory(self):
+
+        arrow_length = 1
+        arrow_head_width = 1
+        arrow_width = .1
+
+        for count in len(self.pos_history)-1:
+            #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
+            self.draw_arrow(self.pos_history[count],self.pos_history[count+1])
+
+
 
         pygame.image.save(self.gameDisplay,'traced_trajectories')
 
