@@ -114,6 +114,10 @@ def plot_reward_across_policy_models(foldername,
                                     seed_list = [],
                                     iterations_per_model = 50,
                                     compare_expert = True):
+
+    #given a folder of policy networks, the function will go through them one by one and
+    #create a plot of the rewards obtained by each of the policy networks and compare them
+    #to that of an expert (if provided)
     color_list = ['r','g','b','c','m','y','k']
     counter = 0
 
@@ -190,13 +194,14 @@ def plot_reward_across_policy_models(foldername,
     plt.show()
     return reward_across_models
 
+
 def get_rewards_for_model(policy_file,
                 env= None,
                 feature_extractor = None,
                 rl_method = None,
                 max_ep_length = 20,
                 iterations = 50):
-
+    #given a policy file it returns the amount of rewards it will get across some runs.
     rl_method.policy.load(policy_file)
     reward_per_model = 0
     print('Loading file :',policy_file)
@@ -219,16 +224,44 @@ def get_rewards_for_model(policy_file,
 
 
 
-    
+def annotate_trajectory(policy_file_name, env ,
+                        rl_method, run_length,
+                        ax, feature_extractor=None):
+
+    rl_method.policy.load(policy_file_name)
+    state = env.reset()
+    #agent_state = np.array(row,col)
+    cur_pos = state['agent_state']
+    state_rep = feature_extractor.extract_features(state)
+    for i in range(run_length):
+
+        action = rl_method.select_action(state_rep)
+        new_state,reward,done,_ = env.step(action)
+        new_pos = new_state['agent_state']
+        arrow = ax.arrow(cur_pos[1],cur_pos[0]+.25,
+                         .1*(new_pos[1]-cur_pos[1]),
+                         .1*(new_pos[0]-cur_pos[0]),
+                         shape='full',head_width= .15,
+                         linewidth=1.2)
+        cur_pos = new_pos
+        state_rep = feature_extractor.extract_features(new_state)
+
+
+  
 def generate_trajectories(policy_fname_list,feature_extractor = None):
+
+    #given the policy file name list and feature extractor creates a heatmap of the 
+    #agent on the gridworld based on the trajectories in the list
+
 
     #list containing the points of trajectories of all the policies
     trajectory_point_master_list = []
+    traj_to_plot = 2
 
     env = GridWorld(display=False, is_onehot= False,is_random =False,
             rows =10,
             cols =10,
-            seed = 7,
+            seed = 3,
             obstacles = [np.asarray([5,5])],
             goal_state = np.asarray([1,5]))
 
@@ -240,8 +273,11 @@ def generate_trajectories(policy_fname_list,feature_extractor = None):
 
     labels = ['0','1','2','3','4','5','6','7','8','9']
 
+    counter = 0
     for name in policy_fname_list:
-
+        counter+=1
+        if counter==traj_to_plot:
+            policy_name_to_plot = name
         #ready the policy
         rl_method.policy.load(name)
         trajectory_point_policy = []
@@ -282,20 +318,27 @@ def generate_trajectories(policy_fname_list,feature_extractor = None):
         ax.set_xticklabels(labels)
         ax.set_yticklabels(labels)
 
-        ax.set_xlabel('Columns of the gridworld',fontsize='large')
-        ax.set_ylabel('Rows of the gridworld',fontsize='large')
+        ax.set_xlabel('Columns of the gridworld', fontsize='large')
+        ax.set_ylabel('Rows of the gridworld', fontsize='large')
+
+
 
         for i in range(len(labels)):
             for j in range(len(labels)):
 
-                text = ax.text(j,i,heat_map[i,j], ha="center", va="center", color="black")
-
+                text = ax.text(j,i,heat_map[i,j], ha="center", va="bottom", color="black")
+                #arrow = ax.arrow(j,i,.1,.1,shape='full',head_width= .2)
+                #arrow = ax.annotate("",xy = (j,i) , arrowprops = arrow)
+                pass
         #ax.set_title("Grid location visitation frequency for a unbiased agent")
 
         #plt.colorbar()
         #plt.clim(0,70)
         plt.draw()
         plt.pause(.001)
+    annotate_trajectory(policy_name_to_plot, env, rl_method,
+                        max_ep_length, ax, feature_extractor=feature_extractor)
+
     plt.show()
 
 
@@ -304,15 +347,15 @@ if __name__ == '__main__':
     r = 10
     c = 10
     #initialize environment
-    '''
+    
     env = GridWorld(display=False, is_onehot= False,is_random =False,
                 rows =10,
                 cols =10,
                 seed = 12,
-                obstacles = [np.asarray([5,1]),np.array([5,9])],
+                obstacles = [np.asarray([5,5])],
                             
                 goal_state = np.asarray([1,5]))
-    '''
+    
     #initialize feature extractor
     #feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
     #feat = SocialNav(fieldList = ['agent_state','goal_state'])
@@ -322,7 +365,7 @@ if __name__ == '__main__':
     #print(env.reset())
     '''
     reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
-    reward_network.load('./experiments/saved-models-rewards/30local_global.pt')
+    reward_network.load('./experiments/saved-models-rewards/Run-info-reg-0.001/95.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
@@ -337,17 +380,18 @@ if __name__ == '__main__':
         plt.show()
    
     
-    plot_reward_across_policy_models("./experiments/saved-models/Run_info_localglobal_v3_1/",
-                                expert = './experiments/saved-models/loc_glob_v3.1_win_3.pt',
+    
+    plot_reward_across_policy_models("./experiments/saved-models/Run_info_reg_001/",
+                                expert = './experiments/saved-models/fbs_simple.pt',
                                 seed_list = [1,2,3,4,5],
                                 feature_extractor = feat,
                                 iterations_per_model = 30)
 
-
-
     '''
+    
     policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
-                        "./experiments/saved-models/Run_info_fbs_keep_left/45.pt"]
+                        "./experiments/saved-models/Run_info_reg_001/60.pt"]
+                       
 
     generate_trajectories(policy_name_list,feature_extractor = feat)
     
