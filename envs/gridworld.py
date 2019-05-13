@@ -83,7 +83,7 @@ class GridWorld(GridWorldClockless):
                     #convert that to a location in the gridworld
                     #store that location into the obstacle_list
                     
-                    grid_loc = ([math.floor(event.pos[0]/self.cellWidth), math.floor(event.pos[1]/self.cellWidth)])
+                    grid_loc = ([math.floor(event.pos[1]/self.cellWidth), math.floor(event.pos[0]/self.cellWidth)])
                     
                     if grid_loc not in obstacle_list:
                         obstacle_list.append(grid_loc)
@@ -158,7 +158,7 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = LocalGlobal(window_size = 3,fieldList = ['agent_state','goal_state','obstacles']) 
+    featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
     world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles='By hand',rows = 50 , cols = 50 , width = 10)
     for i in range(100):
         print ("here")
