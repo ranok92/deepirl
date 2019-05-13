@@ -133,8 +133,13 @@ class GridWorldClockless:
         #if true, the state will not change with any action
 
         self.release_control = False
+
+        #distance to be maintained between the agent and the obstacles
         self.agent_spawn_clearance = 3
+        #distance to be maintained between the goal and the obstacles
         self.goal_spawn_clearance = 2
+
+        self.pos_history = []
 
 
     def reset(self):
@@ -196,6 +201,7 @@ class GridWorldClockless:
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
 
+        self.pos_history.append(self.agent_state)
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
         return self.state
@@ -204,6 +210,7 @@ class GridWorldClockless:
     #action is a number which points to the index of the action to be taken
     def step(self,action):
         #print('printing the keypress status',self.agent_action_keyboard)
+        self.prev_pos = self.agent_state
         if not self.release_control:
             self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
         reward, done = self.calculateReward()

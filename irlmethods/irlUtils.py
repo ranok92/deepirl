@@ -235,7 +235,7 @@ def expert_svf_onehot(traj_path, ncols=10, nrows=10):
 #state representation provided the state dictionary
 #corresponding to that state representation is provided
 
-def expert_svf(traj_path, state_dict = None):
+def expert_svf(traj_path, state_dict=None, gamma=0.99):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
@@ -262,7 +262,7 @@ def expert_svf(traj_path, state_dict = None):
         	state_index = state_dict[state_str]
 
         	# +1 for that index in the trajectory histogram
-        	traj_hist[0,state_index]+=1
+        	traj_hist[0,state_index]+=1*math.pow(gamma,i)
 
 
         # normalize each trajectory over timesteps
@@ -368,7 +368,7 @@ def select_action(policy,state):
 
 def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 						 policy_nn = None , reward_nn = None,
-						 episode_length = 20, feature_extractor = None):
+						 episode_length = 20, feature_extractor = None, gamma=.99):
 	
 
 	num_states = 100
@@ -495,7 +495,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
 
 
-			svf_policy[state_index,i] += 1 #marks the visitation for 
+			svf_policy[state_index,i] += 1*math.pow(gamma,t) #marks the visitation for 
 												   #the state for the run
 			
 	
