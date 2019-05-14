@@ -210,9 +210,12 @@ class GridWorldClockless:
     #action is a number which points to the index of the action to be taken
     def step(self,action):
         #print('printing the keypress status',self.agent_action_keyboard)
-        self.prev_pos = self.agent_state
+        
         if not self.release_control:
             self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
+        
+        if not np.array_equal(self.pos_history[-1],self.agent_state):
+            self.pos_history.append(self.agent_state)
         reward, done = self.calculateReward()
 
         #if you are done ie hit an obstacle or the goal

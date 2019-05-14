@@ -51,6 +51,7 @@ class GridWorld(GridWorldClockless):
 
         self.tickSpeed = 60
         self.show_trail = show_trail
+        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
 
 
         if obstacles=='By hand':
@@ -157,32 +158,42 @@ class GridWorld(GridWorldClockless):
         #base_position = (row,col)
 
         #draw the stalk
-        arrow_width  = 10 #in pixels
+        arrow_width  = self.cellWidth*.3 #in pixels
         base_pos_pixel = (base_position+.5)*self.cellWidth
-        next_pos_pixel = (next_position+.5)*self.cellwidth
-        pygame.draw.polygon(self.gameDisplay, (0,0,0),
-                            ((base_pos_pixel[0],base_pos_pixel[1]),
-                            (next_pos_pixel[0],next_pos_pixel[1]))
-                                
-
+        next_pos_pixel = (next_position+.5)*self.cellWidth
+       
         #draw the head
-        ref_pos = base_pos_pixel+(base_pos_pixel-next_pos_pixel)*.75
+        ref_pos = base_pos_pixel+(next_pos_pixel-base_pos_pixel)*.35
+
         if base_position[0]==next_position[0]:
             #same row (movement left/right)
+            gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
+            pygame.draw.line(self.gameDisplay, (0,0,0),
+                            (base_pos_pixel[1],base_pos_pixel[0]),
+                            (next_pos_pixel[1]-gap,next_pos_pixel[0]))
 
+            
             pygame.draw.polygon(self.gameDisplay,(0,0,0),
                             (
-                            (ref_pos[0],ref_pos[1]+(arrow_width/2)),
-                            (ref_pos[0],ref_pos[1]-(arrow_width/2)),
-                            (next_pos_pixel[0],next_pos_pixel[1])   )
+                            (ref_pos[1],ref_pos[0]+(arrow_width/2)),
+                            (next_pos_pixel[1]-gap,next_pos_pixel[0]),
+                            (ref_pos[1],ref_pos[0]-(arrow_width/2))  ),
+                            0
                             )
+            
         if base_position[1]==next_position[1]:
+
+            gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
+            pygame.draw.line(self.gameDisplay, (0,0,0),
+                            (base_pos_pixel[1],base_pos_pixel[0]),
+                            (next_pos_pixel[1],next_pos_pixel[0]-gap))
 
             pygame.draw.polygon(self.gameDisplay,(0,0,0),
                 (
-                (ref_pos[0]+(arrow_width/2),ref_pos[1]),
-                (ref_pos[0]-(arrow_width/2),ref_pos[1]),
-                (next_pos_pixel[0],next_pos_pixel[1])   )
+                (ref_pos[1]+(arrow_width/2),ref_pos[0]),
+                (ref_pos[1]-(arrow_width/2),ref_pos[0]),
+                (next_pos_pixel[1],next_pos_pixel[0]-gap)   ),
+                0
                 )
 
 
@@ -191,20 +202,101 @@ class GridWorld(GridWorldClockless):
         arrow_length = 1
         arrow_head_width = 1
         arrow_width = .1
+        #denotes the start and end positions of the trajectory
+        
+        rad = int(self.cellWidth*.4)
+        start_pos=(self.pos_history[0]+.5)*self.cellWidth
+        end_pos=(self.pos_history[-1]+0.5)*self.cellWidth 
 
-        for count in len(self.pos_history)-1:
+        pygame.draw.circle(self.gameDisplay,(0,255,0),
+                            (int(start_pos[1]),int(start_pos[0])),
+                            rad)
+
+        pygame.draw.circle(self.gameDisplay,(0,0,255),
+                    (int(end_pos[1]),int(end_pos[0])),
+                    rad)
+
+        for count in range(len(self.pos_history)-1):
             #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
             self.draw_arrow(self.pos_history[count],self.pos_history[count+1])
+    
+
+    def reset(self):
+
+        pygame.image.save(self.gameDisplay,'traced_trajectories.png')
+        self.pos_history = []
+
+        num_obs=len(self.obstacles)
+
+        #if this flag is true, the position of the obstacles and the goal 
+        #change with each reset
+        dist_g = self.goal_spawn_clearance
+        if self.is_random:
+            self.obstacles = []
+            for i in range(num_obs):
+
+                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.obstacles.append(obs_pos)
 
 
+            while True:
+                flag = False
+                self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
 
-        pygame.image.save(self.gameDisplay,'traced_trajectories')
+                for i in range(num_obs):
+                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+
+                        flag = True
+                if not flag:
+                    break
+
+        dist = self.agent_spawn_clearance
+        while True:
+            flag = False
+            self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            for i in range(num_obs):
+                if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                    flag = True
+
+            if not flag:
+                break
+
+
+        self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
+        self.release_control = False
+        if self.is_onehot:
+            self.state = self.onehotrep()
+        else:
+
+            self.state = {}
+            self.state['agent_state'] = self.agent_state
+            self.state['agent_head_dir'] = 0 #starts heading towards top
+            self.state['goal_state'] = self.goal_state
+
+            self.state['release_control'] = self.release_control
+            #if self.obstacles is not None:
+            self.state['obstacles'] = self.obstacles
+
+        self.pos_history.append(self.agent_state)
+
+ 
+        pygame.display.set_caption('Your friendly grid environment')
+        self.render()
+
+        if self.is_onehot:
+            self.state = self.reset_wrapper(self.state)
+        return self.state
+
+
+        #pygame.image.save(self.gameDisplay,'traced_trajectories')
 
 
 if __name__=="__main__":
 
     featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
-    world = GridWorld(display=True, is_onehot = False ,seed = 0 , obstacles='By hand',rows = 50 , cols = 50 , width = 10)
+    world = GridWorld(display=True, is_onehot = False, 
+                        seed = 0 , obstacles='By hand', show_trail=True,
+                        rows = 10 , cols = 10 , width = 50)
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -222,7 +314,7 @@ if __name__=="__main__":
                 state  = featExt.extract_features(next_state)
                 if flag:
                     t+=1
-                    print(state)
+                    print(world.pos_history)
                     states.append(state)
                 if t>20 or done:
                     break
