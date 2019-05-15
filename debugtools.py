@@ -46,7 +46,72 @@ def getperStateReward(rewardNetwork, rows=10 , cols =10):
     return stateRewardTable
 
 
+def visualize_rewards_from_reward_directory(directory_name, feature_extractor ,  env):
+
+    #given a directory name, this function will read each of the reward network
+    #from the directory and plots the reward for each of the actions and stores them
+    #in different directories based on the action and directory name
+
+
+    #create parent directory
+
+    dir_name = directory_name.split('/')
+    cdw = os.getcwd()
+
+    create_dir_path = os.path.join(cdw,'experiments/plots/')
+
+    parent_reward_directory = os.path.join(create_dir_path,dir_name[-1])
+    try:  
+        os.mkdir(parent_reward_directory)
+    except OSError:  
+        print ("Creation of the directory failed.")
+    else:  
+        print ("Successfully created the directory.")
+
+    reward_network_names = glob.glob(os.path.join(directory_name,'*.pt'))
+
+    actions = ['left','right','up','down']
+
+    #create directories for reward plots obtained from each of the actions
+
+    for act in actions:
+            action_dir = act
+            try:
+                os.mkdir(os.path.join(parent_reward_directory,action_dir))
+            except OSError:
+                print("cant create directory")
+
+
+    for network_fname in reward_network_names:
+
+        network_number = network_fname.split('/')[-1].split('.')[0]
+
+        reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
+        reward_network.load(network_fname)
+        reward_network.eval()
+        reward_network.to(DEVICE)
+        
+        #run function
+
+        for act in actions:
+
+            dir_to_save = os.path.join(parent_reward_directory,act)
+            fname = dir_to_save+'/'+network_number+'.png'
+            reward_values = visualize_rewards_in_environment(act,env,reward_network, feat)
+            plt.figure(act)
+            plt.imshow(reward_values)
+            plt.colorbar()
+            plt.savefig(fname)
+            plt.clf()
+       
+
+
 def visualize_rewards_in_environment(action,env , reward_network , feature_extractor):
+
+    #given the action, the environment, the reward network and feature extractor this function
+    #returns the reward for each grid location of the environment as depicted by the reward_network
+    #The reward at a particular grid location is the reward the agents get by landing at that position 
+    #using the action provided in 'action'.
 
     rows = env.rows
     cols = env.cols
@@ -108,6 +173,7 @@ def numericalSort(value):
     parts[1::2] = map(int, parts[1::2])
     return parts
 
+
 def plot_reward_across_policy_models(foldername,
                                     expert = None,
                                     feature_extractor = None,
@@ -129,7 +195,8 @@ def plot_reward_across_policy_models(foldername,
                     rows =10,
                     cols =10,
                     seed = seed,
-                    obstacles = [np.asarray([5,1]),np.array([5,9])],
+                    obstacles = [np.asarray([5,1]),np.array([5,9]),
+                                np.asarray([6,1]),np.array([3,9])],
                                 
                     goal_state = np.asarray([1,5]))
 
@@ -219,32 +286,9 @@ def get_rewards_for_model(policy_file,
         reward_per_model+=reward_per_run
 
     reward_per_model/=iterations
-
+    torch.cuda.empty_cache() 
     return reward_per_model
 
-
-
-def annotate_trajectory(policy_file_name, env ,
-                        rl_method, run_length,
-                        ax, feature_extractor=None):
-
-    rl_method.policy.load(policy_file_name)
-    state = env.reset()
-    #agent_state = np.array(row,col)
-    cur_pos = state['agent_state']
-    state_rep = feature_extractor.extract_features(state)
-    for i in range(run_length):
-
-        action = rl_method.select_action(state_rep)
-        new_state,reward,done,_ = env.step(action)
-        new_pos = new_state['agent_state']
-        arrow = ax.arrow(cur_pos[1],cur_pos[0]+.25,
-                         .1*(new_pos[1]-cur_pos[1]),
-                         .1*(new_pos[0]-cur_pos[0]),
-                         shape='full',head_width= .15,
-                         linewidth=1.2)
-        cur_pos = new_pos
-        state_rep = feature_extractor.extract_features(new_state)
 
 
   
@@ -336,9 +380,6 @@ def generate_trajectories(policy_fname_list,feature_extractor = None):
         #plt.clim(0,70)
         plt.draw()
         plt.pause(.001)
-    annotate_trajectory(policy_name_to_plot, env, rl_method,
-                        max_ep_length, ax, feature_extractor=feature_extractor)
-
     plt.show()
 
 
@@ -347,6 +388,7 @@ if __name__ == '__main__':
     r = 10
     c = 10
     #initialize environment
+    
     
     env = GridWorld(display=False, is_onehot= False,is_random =False,
                 rows =10,
@@ -365,7 +407,7 @@ if __name__ == '__main__':
     #print(env.reset())
     '''
     reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
-    reward_network.load('./experiments/saved-models-rewards/Run-info-reg-0.001/95.pt')
+    reward_network.load('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001/35.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
@@ -381,17 +423,18 @@ if __name__ == '__main__':
    
     
     
-    plot_reward_across_policy_models("./experiments/saved-models/Run_info_reg_001/",
-                                expert = './experiments/saved-models/fbs_simple.pt',
+    plot_reward_across_policy_models("./experiments/saved-models/Run-info-fbs-simple-reg0.0005-extended/",
+                                expert = './experiments/saved-models/Run-info-fbs-simple-reg0.001/1.pt',
                                 seed_list = [1,2,3,4,5],
                                 feature_extractor = feat,
                                 iterations_per_model = 30)
 
-    '''
+  
     
     policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
                         "./experiments/saved-models/Run_info_reg_001/60.pt"]
                        
 
     generate_trajectories(policy_name_list,feature_extractor = feat)
-    
+    '''
+    visualize_rewards_from_reward_directory('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001',feat,env)
