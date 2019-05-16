@@ -22,7 +22,7 @@ numbers = re.compile(r'(\d+)')
 
 #for visual
 import matplotlib.pyplot as plt
-
+import pickle
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
@@ -129,7 +129,9 @@ def plot_reward_across_policy_models(foldername,
                     rows =10,
                     cols =10,
                     seed = seed,
-                    obstacles = [np.asarray([5,1]),np.array([5,9])],
+                    obstacles = [np.asarray([5,1]),np.array([5,9]),
+                    np.asarray([4,1]),np.array([6,9]),
+                    np.asarray([3,1]),np.array([7,9])],
                                 
                     goal_state = np.asarray([1,5]))
 
@@ -248,10 +250,11 @@ def annotate_trajectory(policy_file_name, env ,
 
 
   
-def generate_trajectories(policy_fname_list,feature_extractor = None):
+def generate_agent_grid_visitation_map(policy_fname_list,feature_extractor = None, store = False):
 
     #given the policy file name list and feature extractor creates a heatmap of the 
     #agent on the gridworld based on the trajectories in the list
+    #if store=True, the figure is stored in the form of a pickle
 
 
     #list containing the points of trajectories of all the policies
@@ -330,14 +333,17 @@ def generate_trajectories(policy_fname_list,feature_extractor = None):
                 #arrow = ax.arrow(j,i,.1,.1,shape='full',head_width= .2)
                 #arrow = ax.annotate("",xy = (j,i) , arrowprops = arrow)
                 pass
-        #ax.set_title("Grid location visitation frequency for a unbiased agent")
+        ax.set_title("Grid location visitation frequency for a unbiased agent")
 
         #plt.colorbar()
         #plt.clim(0,70)
         plt.draw()
+        if store:
+            pickle_filename = 'FigureObject'+str(counter)+'.fig.pickle' 
+            pickle.dump(fig,open(pickle_filename, 'wb'))
         plt.pause(.001)
-    annotate_trajectory(policy_name_to_plot, env, rl_method,
-                        max_ep_length, ax, feature_extractor=feature_extractor)
+    #annotate_trajectory(policy_name_to_plot, env, rl_method,
+    #                    max_ep_length, ax, feature_extractor=feature_extractor)
 
     plt.show()
 
@@ -365,7 +371,7 @@ if __name__ == '__main__':
     #print(env.reset())
     '''
     reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
-    reward_network.load('./experiments/saved-models-rewards/Run-info-reg-0.001/95.pt')
+    reward_network.load('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.0005/24.pt')
     reward_network.eval()
     reward_network.to(DEVICE)
     
@@ -381,17 +387,17 @@ if __name__ == '__main__':
    
     
     
-    plot_reward_across_policy_models("./experiments/saved-models/Run_info_reg_001/",
+    plot_reward_across_policy_models("./experiments/saved-models/Run_info_fbs_simple/",
                                 expert = './experiments/saved-models/fbs_simple.pt',
                                 seed_list = [1,2,3,4,5],
                                 feature_extractor = feat,
                                 iterations_per_model = 30)
 
     '''
-    
+    #fbs_keep_left/30.pt
     policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
                         "./experiments/saved-models/Run_info_reg_001/60.pt"]
                        
 
-    generate_trajectories(policy_name_list,feature_extractor = feat)
+    generate_agent_grid_visitation_map(policy_name_list,feature_extractor = feat, store=True)
     
