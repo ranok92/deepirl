@@ -43,6 +43,18 @@ class VarianceTermination():
         # self.variances = collections.deque(maxlen=window_size)
         self.variances = []
         self.means = []
+
+        # derivatives
+        self.delta_variances = collections.deque(maxlen=window_size)
+        self.delta_means = collections.deque(maxlen=window_size)
+
+        # running averages
+        self.avg_delta_means = []
+        self.avg_delta_variances = []
+
+        self.avg_variances = []
+        self.avg_means = []
+
         self.log_counter = 0
         self.log_interval = log_interval
 
@@ -79,29 +91,36 @@ class VarianceTermination():
         variance = sum([(loss - mean)**2 for loss in self.losses])
         variance /= len(self.losses) - 1
 
-        if math.sqrt(variance) < self.stop_threshold * mean:
-            return True
+        # if variance < self.stop_threshold * mean:
+            # return True
 
         # store debug info
         self.means.append(mean)
         self.variances.append(variance)
+
+        # store derivatives
+        self.avg_delta_means.append(np.mean(np.abs(np.array(self.delta_means))))
+        self.avg_delta_variances.append(np.mean(np.abs(np.array(self.delta_variances))))
+
+        if len(self.variances) >= 2:
+            self.delta_variances.append(self.variances[-1] - self.variances[-2])
+
+        if len(self.means) >= 2:
+            self.delta_means.append(self.means[-1] - self.means[-2])
 
         return False
 
     def print_debug(self):
         plt.cla()
 
-        plt.plot(self.means, 'b')
-        plt.plot(self.variances, 'r')
+        plt.plot(self.avg_delta_means, 'b')
+        plt.plot(self.avg_delta_variances, 'r')
 
         plt.draw()
         plt.pause(0.0001)
 
     def plot_avg_loss(self):
-        if self.log_counter % self.log_interval  == 0:
-            self.print_debug()
-
-        self.log_counter += 1
+        self.print_debug()
 
 
 class LossBasedTermination(BaseTermination):

@@ -222,8 +222,7 @@ class ActorCritic:
                 self.policy.parameters()]
         gradient_magnitude = sum(gradient_magnitude)/len(gradient_magnitude)
 
-        self.termination.add_loss(gradient_magnitude)
-        self.termination.plot_avg_loss()
+        self.termination.add_loss(loss.item())
 
         del self.policy.rewards[:]
         del saved_actions[:]
@@ -285,9 +284,13 @@ class ActorCritic:
                 if i_episode % self.log_interval == 0:
                     print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                         i_episode, t, running_reward))
+                    self.termination.print_debug()
 
                 if self.termination.is_terminated():
                     break
+
+                if running_reward >= 0.95:
+                    plt.axvline(x=i_episode)
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes and self.max_episodes > 0:
