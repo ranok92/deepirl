@@ -126,7 +126,7 @@ class DeepMaxEnt():
                                                 episode_length=episode_length)
 
 
-    def agent_svf_sampling(self,num_of_samples = 1000 , env = None,
+    def agent_svf_sampling(self,num_of_samples = 10000 , env = None,
                             policy_nn = None , reward_nn = None,
                             episode_length = 20, feature_extractor = None):
 
@@ -267,7 +267,7 @@ class DeepMaxEnt():
             self.resetTraining(self.state_size,self.action_size, self.graft)
 
             #save the reward network
-            reward_network_folder = './saved-models-rewards/'+'reg-'+str(self.regularizer)+'/'
+            reward_network_folder = './saved-models-rewards/'+'fbs_avoid_reg-'+str(self.regularizer)+'/'
 
             pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(reward_network_folder)
@@ -286,7 +286,7 @@ class DeepMaxEnt():
 
 
             #save the policy network
-            policy_network_folder = './saved-models/'+'reg-'+str(self.regularizer)+'/'
+            policy_network_folder = './saved-models/'+'fbs_avoid_reg-'+str(self.regularizer)+'/'
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
 

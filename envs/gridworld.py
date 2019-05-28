@@ -149,6 +149,10 @@ class GridWorld(GridWorldClockless):
         return 4,False
 
 
+
+    def close_game(self):
+
+        pygame.quit()
 #created this to trace the trajectory of the agents whose trajectory informations are provided in the 
 #master list
 
