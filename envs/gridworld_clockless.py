@@ -1,8 +1,10 @@
 import numpy as np
+import os
 import torch
 import time
 import pdb
 import sys
+from PIL import Image
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
 
@@ -29,7 +31,7 @@ class GridWorldClockless:
         cols = 10,
         width = 10,
         goal_state = None,
-        obstacles = [],
+        obstacles = None,
         display = True,
         is_onehot = True,
         is_random = False,
@@ -75,7 +77,12 @@ class GridWorldClockless:
 
         self.agent_action_keyboard = [False for i in range(4)]
         #does not matter if none or not.
-        self.obstacles = obstacles
+        if isinstance(obstacles,str):
+
+            self.read_obstacles_from_image(obstacles)
+        else:
+
+            self.obstacles = obstacles
 
         '''
         this decides the state information based on whether 
@@ -135,11 +142,52 @@ class GridWorldClockless:
         self.release_control = False
 
         #distance to be maintained between the agent and the obstacles
-        self.agent_spawn_clearance = 3
+        self.agent_spawn_clearance = 0
         #distance to be maintained between the goal and the obstacles
-        self.goal_spawn_clearance = 2
+        self.goal_spawn_clearance = 0
 
         self.pos_history = []
+
+
+    def if_red(self,value):
+
+        if value[0] >180 and value[1] <20 and value[2] < 20:
+            return True
+
+    def read_obstacles_from_image(self, file_path):
+
+        if not os.path.isfile(file_path):
+            print("The existing file does not exist.")
+            self.obstacles = []
+        
+        else:
+
+            self.obstacles = []
+            img = Image.open(file_path)
+            imgval = img.load()
+            row_norm = self.rows/img.height
+            col_norm = self.cols/img.width
+
+            for r in range(img.height):
+                for c in range(img.width):
+
+                    if self.if_red(imgval[c,r]):
+                        flag = False
+                        new_arr = np.asarray([int(r*row_norm),int(c*col_norm)])
+                        for i in range(len(self.obstacles)):
+                            if np.array_equal(new_arr,self.obstacles[i]):
+                                flag = True
+                        if not flag:
+
+                            self.obstacles.append(np.asarray([int(r*row_norm),int(c*col_norm)]))
+
+        print ("Done reading obstacles.")
+
+
+
+
+
+
 
 
     def reset(self):

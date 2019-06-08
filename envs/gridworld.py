@@ -299,8 +299,8 @@ if __name__=="__main__":
 
     featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
     world = GridWorld(display=True, is_onehot = False, 
-                        seed = 0 , obstacles='By hand', show_trail=True,
-                        rows = 10 , cols = 10 , width = 50)
+                        seed = 0 , obstacles='/home/thalassa/akonar/Pictures/test_map.jpg', show_trail=True,
+                        rows = 50 , cols = 50 , width = 10)
     for i in range(100):
         print ("here")
         state = world.reset()
