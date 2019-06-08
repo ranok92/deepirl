@@ -28,7 +28,7 @@ parser.add_argument('--rl-ep-length', type=int, default=30)
 parser.add_argument('--irl-iterations', type=int, default=100)
 parser.add_argument('--rl-log-intervals', type=int, default=10)
 
-parser.add_argument('--regularizer', type=int, default=0, help='The regularizer to use.')
+parser.add_argument('--regularizer', type=float, default=0, help='The regularizer to use.')
 
 
 
@@ -109,6 +109,7 @@ def main():
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
+                           regularizer = args.regularizer,
                            plot_save_folder='./plots/')
     print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
