@@ -236,16 +236,20 @@ class ActorCritic:
                 
             print('Reward for the run :',run_reward)
 
-            actions_tensor = torch.tensor(actions)
-            states_tensor = torch.stack(states)
+            if run_reward > 0: # not a bad run
 
-            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+                actions_tensor = torch.tensor(actions)
+                states_tensor = torch.stack(states)
 
-            torch.save(actions_tensor,
-                       os.path.join(path, 'traj%s.acts' % str(traj_i)))
+                pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-            torch.save(states_tensor,
-                       os.path.join(path, 'traj%s.states' % str(traj_i)))
+                torch.save(actions_tensor,
+                           os.path.join(path, 'traj%s.acts' % str(traj_i)))
+
+                torch.save(states_tensor,
+                           os.path.join(path, 'traj%s.states' % str(traj_i)))
+            else:
+                print("Rejecting bad run.")
 
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
