@@ -246,6 +246,21 @@ class LocalGlobal():
 
 
 
+	def state_to_spatial_representation(self,state):
+		'''
+		reads the local information of the state and converts that back to a 2d spatial representation
+		which would lead to the reading of the given local state representation
+		'''
+		local_info = state[self.gl_size+self.rl_size:]
+
+		local_info_spatial = np.reshape(local_info,(self.window_size,self.window_size))
+
+		return local_info_spatial
+
+
+
+
+
 
 class FrontBackSideSimple():
 
@@ -828,8 +843,8 @@ class SocialNav():
 if __name__=='__main__':
 
 	#f = SocialNav(fieldList = ['agent_state','goal_state'])
-	#f = LocalGlobal(window_size = 3 ,fieldList = ['agent_state', 'goal_state','obstacles'])
-	f = FrontBackSideSimple(fieldList = ['agent_state', 'goal_state','obstacles'])
+	f = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
+	#f = FrontBackSideSimple(fieldList = ['agent_state', 'goal_state','obstacles'])
 	#print(f.state_dictionary)
 
 	k = np.zeros(24)
