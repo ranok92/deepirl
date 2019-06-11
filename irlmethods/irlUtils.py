@@ -21,6 +21,8 @@ import torch.nn.functional as F
 import pdb
 from utils import to_oh
 
+
+from scipy import signal
 import re
 #for visual
 import matplotlib.pyplot as plt
@@ -121,6 +123,51 @@ def toTorch(nparray):
 
 def toNumpy(torchTensor):
     return torchTensor.to("cpu").detach().numpy()
+
+
+
+def smoothing_over_state_space(state, feat, window):
+    '''
+    given a state this function returns a distribution over nearby states using a smoothing function0
+    '''
+    state_list = []
+    sum_weights = 0
+    global_rep = state[0:feat.gl_size+feat.rl_size]
+    spatial_rep = feat.state_to_spatial_representation(state)
+    print(spatial_rep)
+    total_obs = int(np.sum(spatial_rep))
+    print(total_obs)
+    conv = signal.convolve2d(spatial_rep,window,'same')
+    conv_flatten = conv.flatten()
+    non_zero_list = []
+    if total_obs > 0:
+        for i in range(conv_flatten.shape[0]):
+            if conv_flatten[i] > 0:
+                non_zero_list.append(i)
+
+
+        for combo in (itertools.combinations(non_zero_list,total_obs)):
+
+            temp_local = np.zeros(conv_flatten.shape)
+            for obs in combo:
+
+                temp_local[obs] = 1
+
+            weight = np.dot(conv_flatten,temp_local)
+            sum_weights+=weight
+            comb_state = np.concatenate((global_rep,temp_local))
+            state_list.append([np.reshape(temp_local,(3,3)),weight])
+
+        for entry in state_list:
+
+            entry[1]/=sum_weights
+    else:
+
+        state_list.append((state,1))
+
+    return state_list
+
+
 
 def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
                             goal_state = np.asarray([3,3]), episode_length = 30):
@@ -235,10 +282,12 @@ def expert_svf_onehot(traj_path, ncols=10, nrows=10):
 #state representation provided the state dictionary
 #corresponding to that state representation is provided
 
-def expert_svf(traj_path, state_dict=None, gamma=0.99):
+def expert_svf(traj_path, feat=None, gamma=0.99):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
+    state_dict = feat.state_dictionary
+
 
     # histogram to accumulate state visitations
     svf = np.zeros((1,len(state_dict.keys())))
@@ -259,7 +308,9 @@ def expert_svf(traj_path, state_dict=None, gamma=0.99):
 
             #convert state to state index
             state_str = np.array2string(traj_np[i])
-            print (len(state_dict.keys()))
+            #print('The state: ', traj_np[i][12:])
+            #print('The local representation :', feat.state_to_spatial_representation(traj_np[i]))
+            #print (len(state_dict.keys()))
             state_index = state_dict[state_str]
 
             # +1 for that index in the trajectory histogram
@@ -537,78 +588,6 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 
 
-def compare_svf(expert_folder, agent_policy, feat = None):
-    '''
-    expert folder - folder containing expert trajectories
-    agent_policy_folder/policy - a folder or a single policy
-    Given these two information, the compare_svf function 
-    saves the svf for all the policies which can be used for visual comparison.
-    '''
-    environment = GridWorld(display=False, reset_wrapper=reset_wrapper,
-                            step_wrapper=step_wrapper,
-                            obstacles=[],
-                            goal_state=np.array([5, 5]),
-                            is_onehot=False)
-    state_space = feat.extract_features(environment.reset()).shape[0]
-
-    #plotting for the expert
-    expert = expert_svf(expert_folder, 
-                        state_dict=feat.state_dictionary,
-                        gamma=0.99)
-    expert = np.squeeze(expert)
-
-    print('The expert shape', expert.shape)
-
-    print('The sum :', np.sum(expert))
-    plt.plot(expert)
-    expert_file_name = expert_folder.split('/')[-2]
-    plt.savefig('../experiments/svf_visual/'+expert_file_name+'.jpg')
-
-
-    #plotting for the agents
-
-    if os.path.isfile(agent_policy):
-        policy = Policy(state_space, environment.action_space.n)
-        policy.load(agent_policy)
-        policy.eval()
-        policy.to(DEVICE)
-
-        agent_file_name = agent_policy.strip().split('/')[-1].split('.')[0]
-        agent_svf = get_svf_from_sampling(no_of_samples=100, env=environment,
-                                          policy_nn=policy, reward_nn=None,
-                                          episode_length=20, feature_extractor=feat,
-                                          gamma=.99)
-        plt.plot(agent_svf)
-        plt.savefig('../experiments/svf_visual/'+agent_file_name+'.jpg')
-        plt.clf()
-    if os.path.isdir(agent_policy):
-
-        #read files from the directory
-        model_names = glob.glob(os.path.join(agent_policy, '*.pt'))
-
-        for name in sorted(model_names, key=numericalSort):
-            policy = Policy(state_space, environment.action_space.n)
-            print('Loading file:', name)
-            policy.load(name)
-            policy.eval()
-            policy.to(DEVICE)
-
-            agent_file_name = name.split('/')[-1].split('.')[0]
-            agent_svf = get_svf_from_sampling(no_of_samples=1000, env=environment,
-                                              policy_nn=policy, reward_nn=None,
-                                              episode_length=20, feature_extractor=feat,
-                                              gamma=.99)
-            plt.plot(agent_svf)
-            plt.savefig('../experiments/svf_visual/'+agent_file_name+'.jpg')
-            plt.clf()
-   
-numbers = re.compile(r'(\d+)')
-
-def numericalSort(value):
-    parts = numbers.split(value)
-    parts[1::2] = map(int, parts[1::2])
-    return parts
-
 
 if __name__ == '__main__':
 
@@ -624,10 +603,18 @@ if __name__ == '__main__':
     feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper= step_wrapper,
-    				obstacles=[],
+    				obstacles=[np.array([3,2])],
     				goal_state= np.array([5,5]),
     				is_onehot = False)
 
+
+    state = feat.extract_features(env.reset())
+    state = state.cpu().numpy()
+    print(state)
+    window = np.array([[0,.1,0],[.1,.6,.1],[0,.1,0]])
+    v = smoothing_over_state_space(state,feat,window)
+
+    print(v)
     '''
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
@@ -709,6 +696,3 @@ if __name__ == '__main__':
     #mat = createStateTransitionMatix(rows=5,cols=5)
 	'''
 
-    compare_svf('../experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
-        '../experiments/saved-models/loc_glob_simple_rectified--0.05/',
-        feat=feat)

@@ -6,6 +6,10 @@ import numpy as np
 import sys
 sys.path.insert(0, '..')
 
+
+from utils import reset_wrapper, step_wrapper
+from rlmethods.b_actor_critic import Policy
+
 from rlmethods.b_actor_critic import ActorCritic
 from irlmethods.deep_maxent import RewardNet
 from featureExtractor.gridworld_featureExtractor import LocalGlobal,SocialNav,FrontBackSideSimple
@@ -16,6 +20,7 @@ import pdb
 from utils import to_oh
 from irlmethods.irlUtils import toTorch
 
+from irlmethods.irlUtils import expert_svf, get_svf_from_sampling
 import re
 numbers = re.compile(r'(\d+)')
 
@@ -393,6 +398,83 @@ def generate_agent_grid_visitation_map(policy_fname_list,feature_extractor = Non
     plt.show()
 
 
+
+def compare_svf(expert_folder, agent_policy, feat = None):
+    '''
+    expert folder - folder containing expert trajectories
+    agent_policy_folder/policy - a folder or a single policy
+    Given these two information, the compare_svf function 
+    saves the svf for all the policies which can be used for visual comparison.
+    '''
+
+    dot_product_loss = []
+
+    environment = GridWorld(display=False, reset_wrapper=reset_wrapper,
+                            step_wrapper=step_wrapper,
+                            obstacles=[],
+                            goal_state=np.array([5, 5]),
+                            is_onehot=False)
+    state_space = feat.extract_features(environment.reset()).shape[0]
+
+    #plotting for the expert
+    expert = expert_svf(expert_folder, 
+                        feat=feat,
+                        gamma=0.99)
+    expert = np.squeeze(expert)
+
+    print('The expert shape', expert.shape)
+
+    print('The sum :', np.sum(expert))
+    plt.plot(expert)
+    expert_file_name = expert_folder.split('/')[-2]
+    plt.savefig('./experiments/svf_visual/'+expert_file_name+'.jpg')
+
+
+    #plotting for the agents
+
+    if os.path.isfile(agent_policy):
+        policy = Policy(state_space, environment.action_space.n)
+        policy.load(agent_policy)
+        policy.eval()
+        policy.to(DEVICE)
+
+        agent_file_name = agent_policy.strip().split('/')[-1].split('.')[0]
+        agent_svf = get_svf_from_sampling(no_of_samples=100, env=environment,
+                                          policy_nn=policy, reward_nn=None,
+                                          episode_length=20, feature_extractor=feat,
+                                          gamma=.99)
+        plt.plot(agent_svf)
+        plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
+        plt.clf()
+
+    if os.path.isdir(agent_policy):
+
+        #read files from the directory
+        model_names = glob.glob(os.path.join(agent_policy, '*.pt'))
+
+        for name in sorted(model_names, key=numericalSort):
+            policy = Policy(state_space, environment.action_space.n)
+            print('Loading file:', name)
+            policy.load(name)
+            policy.eval()
+            policy.to(DEVICE)
+
+            agent_file_name = name.split('/')[-1].split('.')[0]
+            agent_svf = get_svf_from_sampling(no_of_samples=1000, env=environment,
+                                              policy_nn=policy, reward_nn=None,
+                                              episode_length=20, feature_extractor=feat,
+                                              gamma=.99)
+
+            dot_product_loss.append(np.dot(expert,agent_svf))
+            plt.plot(agent_svf)
+            plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
+            plt.clf()
+
+        plt.plot(dot_product_loss)
+        plt.savefig('./experiments/svf_visual/dot_prod.jpg')
+   
+
+
 if __name__ == '__main__':
 
     r = 10
@@ -409,10 +491,10 @@ if __name__ == '__main__':
                 goal_state = np.asarray([1,5]))
     
     #initialize feature extractor
-    #feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
+    feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
     #feat = SocialNav(fieldList = ['agent_state','goal_state'])
-    feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
-                                thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
+    #feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
+    #                            thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
     #initialize reward network
     #print(env.reset())
     '''
@@ -441,7 +523,7 @@ if __name__ == '__main__':
     '''
     #fbs_keep_left/30.pt
 
-  
+    '''
     policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
                         "./experiments/saved-models/Run_info_reg_001/60.pt"]
                        
@@ -451,4 +533,7 @@ if __name__ == '__main__':
     
 
     visualize_rewards_from_reward_directory('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001',feat,env)
-
+    '''
+    compare_svf('./experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
+                './experiments/saved-models/loc_glob_simple_rectified--0.05/',
+                feat=feat)
