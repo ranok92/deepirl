@@ -134,10 +134,8 @@ def smoothing_over_state_space(state, feat, window):
     sum_weights = 0
     global_rep = state[0:feat.gl_size+feat.rl_size]
     spatial_rep = feat.state_to_spatial_representation(state)
-    print(spatial_rep)
     total_obs = int(np.sum(spatial_rep))
-    print(total_obs)
-    conv = signal.convolve2d(spatial_rep,window,'same')
+    conv = signal.convolve2d(spatial_rep, window, 'same')
     conv_flatten = conv.flatten()
     non_zero_list = []
     if total_obs > 0:
@@ -146,24 +144,25 @@ def smoothing_over_state_space(state, feat, window):
                 non_zero_list.append(i)
 
 
-        for combo in (itertools.combinations(non_zero_list,total_obs)):
+        for combo in (itertools.combinations(non_zero_list, total_obs)):
 
             temp_local = np.zeros(conv_flatten.shape)
+            weight = 1
             for obs in combo:
 
                 temp_local[obs] = 1
+                weight *= conv_flatten[obs]
 
-            weight = np.dot(conv_flatten,temp_local)
-            sum_weights+=weight
-            comb_state = np.concatenate((global_rep,temp_local))
-            state_list.append([np.reshape(temp_local,(3,3)),weight])
+            sum_weights += weight
+            comb_state = np.concatenate((global_rep, temp_local))
+            #state_list.append([np.reshape(temp_local, (3, 3)), weight])
+            state_list.append([comb_state, weight]) 
 
         for entry in state_list:
-
-            entry[1]/=sum_weights
+            entry[1] /= sum_weights
     else:
 
-        state_list.append((state,1))
+        state_list.append((state, 1))
 
     return state_list
 
@@ -600,12 +599,12 @@ if __name__ == '__main__':
     # 						   thresh3 = 3,
     #						   fieldList = ['agent_state','goal_state'])
     #feat = OneHot(grid_rows=10,grid_cols=10)
-    feat = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
+    feat = LocalGlobal(window_size=3, fieldList=['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
-    				step_wrapper= step_wrapper,
-    				obstacles=[np.array([3,2])],
-    				goal_state= np.array([5,5]),
-    				is_onehot = False)
+    				step_wrapper=step_wrapper,
+    				obstacles=[np.array([3,2]), np.array([3,4])],
+    				goal_state=np.array([5,5]),
+    				is_onehot=False)
 
 
     state = feat.extract_features(env.reset())
