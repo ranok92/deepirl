@@ -7,6 +7,7 @@ sys.path.insert(0, '..')
 import math
 import pdb
 import itertools
+import torch
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
 
@@ -74,9 +75,9 @@ class LocalGlobal():
         #dictionary containing all possible states
         self.state_dictionary = {}
         self.state_str_arr_dict = {}
-
-        self.hash_variable = self.generate_hash_variable()
-        #self.generate_state_dictionary()
+        self.hash_variable = None
+        self.generate_hash_variable()
+        self.generate_state_dictionary()
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space
@@ -86,14 +87,43 @@ class LocalGlobal():
     
 
     def generate_hash_variable(self):
-
+        '''
+        The hash variable basically is an array of the size of the current state. 
+        This creates an array of the following format:
+        [. . .  16 8 4 2 1] and so on.
+        '''
         self.hash_variable = np.zeros(self.gl_size+self.rl_size+self.window_size**2)
-        print(self.hash_variable.shape[0])
         for i in range(self.hash_variable.shape[0]-1,-1,-1):
-            print(i)
+  
             self.hash_variable[i] = math.pow(2,self.hash_variable.shape[0]-1-i)
-        print(self.hash_variable)
 
+
+        
+
+    def recover_state_from_hash_value(self, hash_value):
+
+        size = self.gl_size+self.rl_size+self.window_size**2
+        binary_str = np.binary_repr(hash_value, size)
+        state_val = np.zeros(size)
+        i = 0
+        for digit in binary_str:
+            state_val[i] = digit 
+            i += 1
+
+        return reset_wrapper(state_val)
+
+
+    def hash_function(self,state):
+        '''
+        This function takes in a state and returns an integer which uniquely identifies that 
+        particular state in the entire state space.
+        '''
+        if isinstance(state, torch.Tensor):
+
+            state = state.cpu().numpy()
+
+
+        return int(np.dot(self.hash_variable,state))
 
 
     def generate_state_dictionary(self):
@@ -857,10 +887,12 @@ class SocialNav():
 if __name__=='__main__':
 
     #f = SocialNav(fieldList = ['agent_state','goal_state'])
-    f = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
+    f = LocalGlobal(window_size=7, fieldList=['agent_state', 'goal_state','obstacles'])
     #f = FrontBackSideSimple(fieldList = ['agent_state', 'goal_state','obstacles'])
     #print(f.state_dictionary)
     print(f.hash_variable)
+    i = f.hash_variable
+    print(f.recover_state_from_hash_value(i))
     k = np.zeros(24)
 
     key = np.array2string(k)

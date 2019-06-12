@@ -329,6 +329,50 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     return svf
 
 
+def calculate_expert_svf(traj_path, feat=None, gamma=0.99):
+    '''
+    Does the state visitation frequency calculation without creating a dictionary or storing the 
+    entire state space.
+
+    returns a dictionary where the keys are only the states that the expert has seen
+    and the coressponding value is its visitation.
+    '''
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+
+    # histogram to accumulate state visitations
+    svf = {}
+
+    for idx, state_file in enumerate(states):
+
+
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+            #this is for onehot
+            state_hash = feat.hash_function(traj_np[i])
+            if state_hash not in svf.keys():
+                svf[state_hash] = 1*math.pow(gamma,i)
+            else:
+                svf[state_hash] += 1*math.pow(gamma,i)
+
+    #normalize the svf
+    total_visitation = 0
+    for state in svf.keys():
+
+        total_visitation += svf[state]
+
+    for state in svf.keys():
+
+        svf[state] /= total_visitation
+
+    return svf
+
 #function for sanity check for the states generated in the trajectories in the traj_path 
 # mainly for debugging/visualizing the states in the path.
 def debug_custom_path(traj_path, criteria ,state_dict = None):
@@ -410,13 +454,101 @@ def select_action(policy,state):
     probs, state_value = policy(state)
     m = Categorical(probs)
     action = m.sample()
-    return action.item()
+    #return action.item()
+    val, ind = torch.max(probs,0)
+    return ind
+
+
+def calculate_svf_from_sampling(no_of_samples=1000, env=None,
+                                policy_nn=None, reward_nn=None,
+                                episode_length=20, feature_extractor=None,
+                                gamma=0.99):
+    
+    '''
+    calculating the state visitation frequency from sampling. This function
+    returns a dictionary, where the keys consists of only the states that has been
+    visited and their corresponding values are the visitation frequency
+    '''
+    eps = 0.000001
+    if feature_extractor is None:
+        print('Featrue extractor missing. Exiting.')
+        return None
+
+    rewards = np.zeros(no_of_samples)
+    norm_factor = np.zeros(no_of_samples)
+
+    svf_dict_list = []
+    for i in range(no_of_samples):
+        run_reward = 0
+        current_svf_dict = {}
+        state = env.reset()
+        #print('agent position:', state['agent_state'])
+        state = feature_extractor.extract_features(state)
+        current_svf_dict[feature_extractor.hash_function(state)] = 1
+
+        for t in range(episode_length-1):
+
+            action = select_action(policy_nn, state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+            
+            #get the state index
+
+            state = feature_extractor.extract_features(state)
+            if feature_extractor.hash_function(state) not in current_svf_dict.keys():
+                current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t)
+            else:
+                current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
+                                                  
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+            if done:
+                pass
+                
+            if t >= episode_length:
+                rewards[i]=run_reward
+                break
+
+        svf_dict_list.append(current_svf_dict)
+
+    rewards = rewards - np.min(rewards)+eps
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+
+    #merge the different dictionaries to a master dictionary and adjust the visitation 
+    #frequencies according to the weights calculated
+
+    for i in range(len(svf_dict_list)):
+
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            norm_factor[i] += dictionary[key]
+
+    master_dict = {}
+
+    for i in range(len(svf_dict_list)):
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            if key not in master_dict:
+                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
+            else:
+                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
+
+    return master_dict
+
+
 
 #should calculate the SVF of a policy network by running the agent a number of times
 #on the given environment. Once the trajectories are obtained, each of the trajectories 
 #multiplied by a certain weight, w, where w = e^(r)/ sum(e^(r) for r of all the 
 #trajectories played)
-
 def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 						 policy_nn = None , reward_nn = None,
 						 episode_length = 20, feature_extractor = None, gamma=.99):
@@ -457,51 +589,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 	for i in range(no_of_samples):
 		run_reward = 0
 
-		#for debugging purpose, shows the histogram of the start states 
-		'''
-		if i%50==0:
-			plt.bar(xaxis,start_state)
-			plt.draw()
-			plt.pause(.001)
-		'''
-		#to make sure the start state is uniform among all possible states
 
-		#the continues to restart unless the starting points are somewhat uniformly
-		#distributed
-
-		#unfortunately this only works for onehot representations 
-		# for more generic features this needs to go
-		'''
-		while True:
-
-			state = env.reset()
-			if feature_extractor is not None:
-				state = feature_extractor.extract_features(state)
-
-			if 'torch' in state.type():
-				state_np = state.cpu().numpy()
-			else:
-				state_np = state
-			#from the one_hot state representation get the state
-			#to get the index of the state
-
-			#keeping this to make it work with the default case of onehot
-			#**will be removed in the future
-			if feature_extractor is None:
-				state_index = np.where(state_np==1)[0][0]
-			else:
-				#feature_extractor wraps the state in torch tensor so convert that back
-
-				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
-			if start_state[state_index] > (no_of_samples/num_states)+2:
-				pass
-			else:
-				start_state[state_index]+=1
-				break
-		'''
-		#*******basically the same block as above without the 
-		#constrain of making the starting point uniform 
-		#because this will not be possible for all feature extractors
 		state = env.reset()
 
 		if feature_extractor is not None:
@@ -602,25 +690,67 @@ if __name__ == '__main__':
     feat = LocalGlobal(window_size=3, fieldList=['agent_state','goal_state','obstacles'])
     env = GridWorld(display=False, reset_wrapper=reset_wrapper,
     				step_wrapper=step_wrapper,
-    				obstacles=[np.array([3,2]), np.array([3,4])],
+    				obstacles=[],
     				goal_state=np.array([5,5]),
     				is_onehot=False)
 
-
+    '''
     state = feat.extract_features(env.reset())
     state = state.cpu().numpy()
     print(state)
     window = np.array([[0,.1,0],[.1,.6,.1],[0,.1,0]])
     v = smoothing_over_state_space(state,feat,window)
-
-    print(v)
     '''
+    dir_path = '../experiments/trajs/ac_gridworld/'
+
+
+    
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/socialNav_g5_5_no_obs.pt')
+    policy.load('../experiments/saved-models/loc_glob_win_3.pt')
     policy.eval()
     policy.to(DEVICE)
-'''
+
+    np.random.seed(0)
+    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
+                                     policy_nn=policy, reward_nn=None,
+                                     episode_length=20, feature_extractor=feat,
+                                     gamma=0.99)
+
+    s = 0
+    for i in svf:
+        print(i,svf[i])
+        s+=svf[i]
+
+    print('Sum :',s)
+
+    np.random.seed(0)
+    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
+                                     policy_nn=policy, reward_nn=None,
+                                     episode_length=20, feature_extractor=feat,
+                                     gamma=0.99)
+
+    s = 0
+    for i in svf:
+        print(i,svf[i])
+        s+=svf[i]
+
+    print('Sum :',s)
+
+
+    np.random.seed(0)
+    svf_2 = get_svf_from_sampling(no_of_samples=100, env=env,
+                                  policy_nn=policy, reward_nn=None,
+                                  episode_length=20, feature_extractor=feat,
+                                  gamma=0.99)
+
+
+
+    for i in range(svf_2.shape[0]):
+
+        if svf_2[i] > 0:
+            print(svf_2[i])
+
 
     #debug_custom_path('../experiments/trajs/ac_gridworld_user_avoid',
     # 					'distance',state_dict = feat.state_dictionary)
