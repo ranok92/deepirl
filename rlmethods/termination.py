@@ -1,13 +1,14 @@
-import random
 '''
 file should contain methods and classes needed specifically to help run the rl methods
 '''
+import random
+import datetime
 import math
 import collections
-import numpy as np
 import pdb
-from matplotlib import pyplot as plt
 import sys
+import numpy as np
+from matplotlib import pyplot as plt
 sys.path.insert(0, '..')
 
 
@@ -19,6 +20,27 @@ class BaseTermination():
     def is_terminated(self):
         raise NotImplementedError
 
+
+class DataDumperTermination():
+
+    def __init__(self, max_episodes):
+        self.max_episodes = max_episodes
+        self.current_episode = 0
+
+    def add_loss(self, **loss):
+        """Adds loss(es) to the data dumper for dumping.
+
+        :param **loss: losses to accumulate for dumping.
+        """
+        if not loss:
+            raise ValueError("No losses were provided, dict is empty!")
+
+    def is_terminated(self):
+        """Returns True if RL training has terminated."""
+        if self.current_episode >= self.max_episodes:
+            return True
+
+        return False
 
 class VarianceTermination():
 
