@@ -139,6 +139,29 @@ class DeepMaxEnt():
     #***********
 
 
+    #***********
+    def expert_svf_dict(self):
+        return irlUtils.calculate_expert_svf(self.traj_path, feature_extractor= self.rl.feature_extractor)
+
+
+
+    def agent_svf_sampling_dict(self,num_of_samples = 10000 , env = None,
+                            policy_nn = None , reward_nn = None,
+                            episode_length = 20, feature_extractor = None):
+
+        return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
+                                            env=  env, policy_nn = policy_nn,
+                                            reward_nn = reward_nn ,
+                                            episode_length = episode_length,
+                                            feature_extractor = feature_extractor)
+
+    #***********
+
+
+
+
+
+
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
         optimizer.zero_grad()
         dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
@@ -151,6 +174,7 @@ class DeepMaxEnt():
 
         loss = dotProd+(lambda1*l1_reg)   
         loss.backward()
+        return loss
 
     '''
     def per_state_reward(self, reward_function, rows, cols):
@@ -167,6 +191,7 @@ class DeepMaxEnt():
 
     '''
 
+
     def per_state_reward(self, reward_function):
 
         all_state_list = []
@@ -182,6 +207,14 @@ class DeepMaxEnt():
         all_states = torch.tensor(all_state_list, dtype=torch.float).to(self.device)
 
         return reward_function(all_states)
+
+
+    def get_rewards_of_states(self, reward_function, state_list):
+
+
+        state_tensors = torch.tensor(state_list, dtype=torch.float).to(self.device)
+
+        return reward_function(state_tensors)
 
 
     def plot(self, images, titles, save_path=None):
@@ -215,8 +248,12 @@ class DeepMaxEnt():
         for cb in colorbars:
             cb.remove()
 
-    def plotLoss(self,x_axis,lossList):
-        plt.plot(x_axis, lossList)
+    def plotLoss(self,x_axis,lossList,diff_freq_list):
+        plt.figure(0)
+        plt.plot(x_axis, lossList, color='r')
+        plt.draw()
+        plt.figure(1)
+        plt.plot(x_axis, diff_freq_list, color='g')
         plt.draw()
         plt.pause(.0001)
 
@@ -255,10 +292,10 @@ class DeepMaxEnt():
         '''
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
-        expertdemo_svf = self.expert_svf()
+        expertdemo_svf = self.expert_svf_dict()
         lossList = []
         x_axis = []
-
+        diff_freq_list = []
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
 
@@ -267,17 +304,19 @@ class DeepMaxEnt():
             self.resetTraining(self.state_size,self.action_size, self.graft)
 
             #save the reward network
-            reward_network_folder = './saved-models-rewards/'+'fbs_avoid_reg-'+str(self.regularizer)+'/'
+            reward_network_folder = './saved-models-rewards/'+'loc_glob_simple_rectified--'+str(self.regularizer)+'/'
 
             pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(reward_network_folder)
 
+            torch.manual_seed(7)
+            np.random.seed(7)
             current_agent_policy = self.rl.train_mp(
-                n_jobs=4,
+                n_jobs=1,
                 reward_net=self.reward,
                 irl=True
             )
-            current_agent_svf = self.agent_svf_sampling(num_of_samples = 300,
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples = 300,
                                                 env = self.env,
                                                 policy_nn= self.rl.policy,
                                                 reward_nn = self.reward,
@@ -286,16 +325,24 @@ class DeepMaxEnt():
 
 
             #save the policy network
-            policy_network_folder = './saved-models/'+'fbs_avoid_reg-'+str(self.regularizer)+'/'
+            policy_network_folder = './saved-models/'+'loc_glob_simple_rectified--'+str(self.regularizer)+'/'
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
 
-            diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
-            diff_freq = diff_freq.to(self.device)
+            #***********changing this block
+            #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
+            #diff_freq = diff_freq.to(self.device)
 
             # returns a tensor of size (no_of_states x 1)
-            reward_per_state = self.per_state_reward(
-                self.reward)
+            #reward_per_state = self.per_state_reward(
+            #    self.reward)
+            #*******************************
+
+            states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
+            diff_freq_list.append(np.dot(diff_freq,diff_freq))
+            diff_freq = torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
+
+            state_rewards = self.get_rewards_of_states(self.reward, states_visited)
 
             # PLOT
             '''
@@ -315,10 +362,23 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
             '''
             # GRAD AND BACKPROP
-            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
+            loss = self.calculate_grads(self.optimizer, state_rewards, diff_freq)
+
+            #*****plotting
+            lossList.append(loss)
+            x_axis.append(i)
+            
+            self.plotLoss(x_axis,lossList,diff_freq_list)
+
 
             self.optimizer.step()
 
             print('done')
+        plt.figure(0)
+        save_file = self.plot_save_folder+'loss_plot.jpg'
+        plt.savefig(save_file)
+        plt.figure(1)
+        save_file = self.plot_save_folder+'svf_diff_plot.jpg'
+        plt.savefig(save_file)
 
         return self.reward

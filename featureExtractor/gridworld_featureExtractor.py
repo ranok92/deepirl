@@ -110,7 +110,7 @@ class LocalGlobal():
             state_val[i] = digit 
             i += 1
 
-        return reset_wrapper(state_val)
+        return state_val
 
 
     def hash_function(self,state):
