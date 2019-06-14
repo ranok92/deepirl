@@ -1,12 +1,14 @@
 '''
 file should contain methods and classes needed specifically to help run the rl methods
 '''
+import os
 import random
 import datetime
 import math
 import collections
 import pdb
 import sys
+import csv
 import numpy as np
 from matplotlib import pyplot as plt
 sys.path.insert(0, '..')
@@ -26,6 +28,11 @@ class DataDumperTermination():
     def __init__(self, max_episodes):
         self.max_episodes = max_episodes
         self.current_episode = 0
+        self.loss = {}
+
+    def print_debug(self):
+        pass
+
 
     def add_loss(self, **loss):
         """Adds loss(es) to the data dumper for dumping.
@@ -35,12 +42,36 @@ class DataDumperTermination():
         if not loss:
             raise ValueError("No losses were provided, dict is empty!")
 
+        for key in loss:
+            try:
+                self.loss[key].append(loss[key])
+            except KeyError:
+                # Create list if non-existant
+                self.loss[key] = []
+                self.loss[key].append(loss[key])
+
+    def dump(self):
+        """Dump collected data into './rl-dumps/' directory."""
+        if not os.path.exists('rl-dumps'):
+            os.mkdir('rl-dumps')
+
+        filename = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S.%f')[:-3]
+
+        with open('./rl-dumps/'+filename+'.csv', 'w') as csv_file:
+            csv_writer = csv.writer(csv_file)
+
+            for key in self.loss:
+                self.loss[key].insert(0, key)
+                csv_writer.writerow(self.loss[key])
+
     def is_terminated(self):
         """Returns True if RL training has terminated."""
         if self.current_episode >= self.max_episodes:
+            self.dump()
             return True
 
         return False
+
 
 class VarianceTermination():
 
@@ -114,18 +145,21 @@ class VarianceTermination():
         variance /= len(self.losses) - 1
 
         # if variance < self.stop_threshold * mean:
-            # return True
+        # return True
 
         # store debug info
         self.means.append(mean)
         self.variances.append(variance)
 
         # store derivatives
-        self.avg_delta_means.append(np.mean(np.abs(np.array(self.delta_means))))
-        self.avg_delta_variances.append(np.mean(np.abs(np.array(self.delta_variances))))
+        self.avg_delta_means.append(
+            np.mean(np.abs(np.array(self.delta_means))))
+        self.avg_delta_variances.append(
+            np.mean(np.abs(np.array(self.delta_variances))))
 
         if len(self.variances) >= 2:
-            self.delta_variances.append(self.variances[-1] - self.variances[-2])
+            self.delta_variances.append(
+                self.variances[-1] - self.variances[-2])
 
         if len(self.means) >= 2:
             self.delta_means.append(self.means[-1] - self.means[-2])

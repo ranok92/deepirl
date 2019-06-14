@@ -222,7 +222,17 @@ class ActorCritic:
                 self.policy.parameters()]
         gradient_magnitude = sum(gradient_magnitude)/len(gradient_magnitude)
 
-        self.termination.add_loss(loss.item())
+        self.termination.add_loss(
+                **{
+                    "value_loss": torch.stack(value_losses).sum().item(),
+                    "policy_loss": torch.stack(policy_losses).sum().item(),
+                    "total_loss": loss.item()
+                }
+        )
+
+        #FIXME Better more universal way to handle this? Also seperate episodes
+        # from RL itself and move into termination
+        self.termination.current_episode += 1
 
         del self.policy.rewards[:]
         del saved_actions[:]
