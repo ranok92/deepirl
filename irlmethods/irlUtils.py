@@ -21,7 +21,7 @@ import torch.nn.functional as F
 import pdb
 from utils import to_oh
 
-
+import collections
 from scipy import signal
 import re
 #for visual
@@ -329,7 +329,7 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     return svf
 
 
-def calculate_expert_svf(traj_path, feat=None, gamma=0.99):
+def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
     '''
     Does the state visitation frequency calculation without creating a dictionary or storing the 
     entire state space.
@@ -355,7 +355,7 @@ def calculate_expert_svf(traj_path, feat=None, gamma=0.99):
         for i in range(traj_np.shape[0]):
 
             #this is for onehot
-            state_hash = feat.hash_function(traj_np[i])
+            state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
                 svf[state_hash] = 1*math.pow(gamma,i)
             else:
@@ -371,7 +371,7 @@ def calculate_expert_svf(traj_path, feat=None, gamma=0.99):
 
         svf[state] /= total_visitation
 
-    return svf
+    return collections.OrderedDict(sorted(svf.items()))
 
 #function for sanity check for the states generated in the trajectories in the traj_path 
 # mainly for debugging/visualizing the states in the path.
@@ -515,7 +515,9 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
         svf_dict_list.append(current_svf_dict)
 
-    rewards = rewards - np.min(rewards)+eps
+    #rewards = rewards - np.min(rewards)+eps
+    #changing it to the more generic exp
+    rewards = np.exp(rewards)
     #print('Rewards :',rewards)
     total_reward = sum(rewards)
     weights = rewards/total_reward
@@ -541,7 +543,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             else:
                 master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
 
-    return master_dict
+    return collections.OrderedDict(sorted(master_dict.items()))
 
 
 
@@ -566,7 +568,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	rewards = np.zeros(no_of_samples)
 	approx_Z = 0 #this should be the sum of all the rewards obtained
-	eps = 0.00001 # so that the reward is never 0.
+	eps = 0.000001 # so that the reward is never 0.
 
 	#start_state contains the distribution of the start state
 	#as of now the code focuses on starting from all possible states uniformly
@@ -615,7 +617,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 		svf_policy[state_index,i] = 1 #marks the visitation for 
 												   #the state for the run
 		
-		for t in range(episode_length):
+		for t in range(episode_length-1):
 			action = select_action(policy_nn,state)
 			state, reward, done,_ = env.step(action)
 			#feature_extractor wraps the state in torch tensor so convert that back
@@ -673,6 +675,72 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 	return svf_policy
 
+def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
+    '''
+    takes in the svf dictionaries for the expert and the agent
+    and returns two ordered lists containing the states visited and the 
+    difference in their visitation frequency.
+    '''
+    state_list = []
+    diff_list = []
+    expert_iterator = 0
+    agent_iterator = 0
+    
+    expert_key_list = list(expert_svf_dict.keys())
+    agent_key_list = list(agent_svf_dict.keys())
+
+    while True:
+
+
+        exp_state = expert_key_list[expert_iterator]
+        agent_state = agent_key_list[agent_iterator]
+        if exp_state == agent_state:
+
+            state_list.append(feat.recover_state_from_hash_value(exp_state))
+            diff_list.append(expert_svf_dict[exp_state]-agent_svf_dict[agent_state])
+
+            expert_iterator += 1
+            agent_iterator += 1
+
+        elif exp_state > agent_state:
+
+            state_list.append(feat.recover_state_from_hash_value(agent_state))
+            diff_list.append(0 - agent_svf_dict[agent_state])
+
+            agent_iterator += 1
+
+        elif agent_state > exp_state:
+
+            state_list.append(feat.recover_state_from_hash_value(exp_state))
+            diff_list.append(expert_svf_dict[exp_state] - 0)
+
+            expert_iterator += 1
+
+        if expert_iterator >= len(expert_key_list) or agent_iterator >= len(agent_key_list):
+
+            if expert_iterator >= len(expert_key_list):
+
+                while agent_iterator < len(agent_key_list):
+                    
+                    state_list.append(feat.recover_state_from_hash_value(agent_state))
+                    diff_list.append(0 - agent_svf_dict[agent_state])
+                    agent_iterator += 1
+
+                break
+
+            if agent_iterator >= len(agent_key_list):
+
+                while expert_iterator < len(expert_key_list):
+                    
+                    state_list.append(feat.recover_state_from_hash_value(exp_state))
+                    diff_list.append(expert_svf_dict[exp_state] - 0)
+                    expert_iterator += 1
+
+                break
+
+    return state_list , diff_list
+
+        
 
 
 
@@ -725,11 +793,14 @@ if __name__ == '__main__':
     print('Sum :',s)
 
     np.random.seed(0)
-    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
+    svf_3 = calculate_svf_from_sampling(no_of_samples=100, env=env,
                                      policy_nn=policy, reward_nn=None,
                                      episode_length=20, feature_extractor=feat,
                                      gamma=0.99)
 
+
+    exp_svf = calculate_expert_svf('../experiments/trajs/ac_gridworld/', feature_extractor=feat)
+    '''
     s = 0
     for i in svf:
         print(i,svf[i])
@@ -750,6 +821,10 @@ if __name__ == '__main__':
 
         if svf_2[i] > 0:
             print(svf_2[i])
+    '''
+    states, diff = get_states_and_freq_diff(svf,exp_svf,feat)
+    for i in range(len(states)):
+        print('State :',states[i], ' : ', diff[i])
 
 
     #debug_custom_path('../experiments/trajs/ac_gridworld_user_avoid',
