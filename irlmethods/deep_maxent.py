@@ -151,6 +151,8 @@ class DeepMaxEnt():
 
         loss = dotProd+(lambda1*l1_reg)   
         loss.backward()
+        return loss, dotProd,
+               (lambda1*l1_reg), torch.norm(stateRewards.squeeze(), 1)
 
     '''
     def per_state_reward(self, reward_function, rows, cols):
@@ -215,10 +217,17 @@ class DeepMaxEnt():
         for cb in colorbars:
             cb.remove()
 
-    def plotLoss(self,x_axis,lossList):
-        plt.plot(x_axis, lossList)
-        plt.draw()
-        plt.pause(.0001)
+    def plot_info(self,inp_list):
+
+        color_list = ['r','g','b','c','m']
+        i = 0
+        for val in inp_list:
+            plt.figure(i)
+            plt.plot(val, color_list)
+            plt.draw()
+            plt.pause(0.0001)
+            i += 1
+
 
     def resetTraining(self,inp_size,out_size, graft=True):
 
@@ -256,8 +265,12 @@ class DeepMaxEnt():
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
         expertdemo_svf = self.expert_svf()
+
         lossList = []
-        x_axis = []
+        dot_prod_list = []
+        svf_diff_list = []
+        l1_reg_list = []
+        rewards_norm_list = []
 
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
@@ -290,6 +303,8 @@ class DeepMaxEnt():
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
 
+            diff = np.squeeze(expertdemo_svf - current_agent_svf)
+            svf_diff_list.append(np.dot(diff,diff))
             diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             diff_freq = diff_freq.to(self.device)
 
@@ -315,10 +330,43 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
             '''
             # GRAD AND BACKPROP
-            self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
+            loss, dot_prod, l1val , rewards_norm = self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
 
+            lossList.append(loss)
+            dot_prod_list.append(dot_prod)
+            
+            l1_reg_list.append(l1val)
+
+            rewards_norm_list.append(rewards_norm)
+            
+            self.plot_info((lossList, svf_diff_list, 
+                            l1_reg_list, dot_prod_list, rewards_norm_list))
             self.optimizer.step()
 
             print('done')
+
+            if i+1 % 3 == 0:
+
+                plt.figure(0)
+                file_name = self.plot_save_folder+'loss-iter'+str(i)+'.jpg'
+                plt.savefig(file_name)
+                
+                plt.figure(1)
+                file_name = self.plot_save_folder+'svf-diff'+str(i)+'.jpg'
+                plt.savefig(file_name)
+                
+                plt.figure(2)
+                file_name = self.plot_save_folder+'l1-reg'+str(i)+'.jpg'
+                plt.savefig(file_name)
+                
+                plt.figure(3)
+                file_name = self.plot_save_folder+'dot-prod'+str(i)+'.jpg'
+                plt.savefig(file_name)
+                
+                plt.figure(4)
+                file_name = self.plot_save_folder+'rewards-norm'+str(i)+'.jpg'
+                plt.savefig(file_name)
+
+
 
         return self.reward
