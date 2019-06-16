@@ -12,7 +12,7 @@ from utils import step_wrapper, reset_wrapper
 from rlmethods.termination import DataDumperTermination
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--max_episodes', type=int, default=10**5)
+parser.add_argument('--max_episodes', type=int, default=10**4)
 parser.add_argument('--njobs', type=int, default=4)
 
 def main():
