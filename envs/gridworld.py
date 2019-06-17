@@ -297,14 +297,17 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
+    #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
+    feat_ext = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorld(display=True, is_onehot = False, 
-                        seed = 0 , obstacles='/home/thalassa/akonar/Pictures/test_map.jpg', show_trail=True,
-                        rows = 50 , cols = 50 , width = 10)
+                        seed = 0, obstacles=[np.asarray([2, 3]), np.asarray([2, 2]), np.asarray([5, 6])], 
+                        show_trail=True,
+                        rows = 10, cols = 10, width = 10)
+    print ("here")
     for i in range(100):
         print ("here")
         state = world.reset()
-        state = featExt.extract_features(state)
+        state = feat_ext.extract_features(state)
         totalReward = 0
         done = False
 
@@ -315,10 +318,12 @@ if __name__=="__main__":
             while t < 20:
                 action,flag = world.take_user_action()
                 next_state, reward,done,_ = world.step(action)
-                state  = featExt.extract_features(next_state)
+                state  = feat_ext.extract_features(next_state)
+                print('Hashed values :', feat_ext.hash_function(state))
+                print('Rehashed_value :', feat_ext.hash_function(feat_ext.recover_state_from_hash_value(feat_ext.hash_function(state))))
                 if flag:
                     t+=1
-                    print(world.pos_history)
+                    #print(world.pos_history)
                     states.append(state)
                 if t>20 or done:
                     break

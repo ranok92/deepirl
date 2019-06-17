@@ -54,6 +54,7 @@ def main():
 
     #**set is_onehot to false
     goal_state = np.asarray([1,5])
+    seed = 123
     '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=False,
                     rows =10,
@@ -64,12 +65,14 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    env = GridWorld(display=args.render, is_random=False,
+    env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
-                    obstacles = [np.asarray([5,5])],
+                    obstacles = [np.asarray([5,5]), np.asarray([1,2]),
+                                np.asarray([6,5]), np.asarray([3,4]),
+                                np.asarray([7,3])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed = 7,
+                    seed = seed,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     
@@ -77,12 +80,12 @@ def main():
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat_ext = LocalGlobal(window_size=3, 
-    #                       fieldList = ['agent_state','goal_state','obstacles'])
-    feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                    thresh2 = 2,
-                                    thresh3 = 3,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+    feat_ext = LocalGlobal(window_size=3, 
+                           fieldList = ['agent_state','goal_state','obstacles'])
+    #feat_ext = FrontBackSideSimple(thresh1 = 1,
+    #                                thresh2 = 2,
+    #                                thresh3 = 3,
+    #                                fieldList = ['agent_state','goal_state','obstacles'])
     #CHANGE HERE
     #initialize loss based termination
 
@@ -105,12 +108,13 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_user_fbs_simple_avoid/'
+    trajectory_path = './trajs/ac_gridworld_rectified_loc_glob_window_3/'
+    plot_folder = './plots/Run_seed_'+str(seed)+'/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer = args.regularizer,
-                           plot_save_folder='./plots/')
+                           plot_save_folder=plot_folder)
     print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
 

@@ -229,7 +229,7 @@ def plot_reward_across_policy_models(foldername,
         reward_expert = []
         for policy_file in sorted(model_names,key=numericalSort):
 
-
+            print('asdfasfsa',policy_file)
 
             reward_per_model = get_rewards_for_model(policy_file,env = env,
                                 feature_extractor = feature_extractor,
@@ -515,12 +515,15 @@ if __name__ == '__main__':
         plt.colorbar()
         plt.show()
    
-    
-    
-    plot_reward_across_policy_models("./experiments/saved-models/Run-info-fbs-simple-reg0.0005-extended/",
-                                expert = './experiments/saved-models/Run-info-fbs-simple-reg0.001/1.pt',
-
     '''
+    
+    plot_reward_across_policy_models("./experiments/saved-models/local_global_simple_win_3-0.0seed_98/",
+                                expert='./experiments/saved-models/loc_glob_win_3.pt',
+                                feature_extractor=feat,
+                                iterations_per_model=40,
+                                seed_list=[98,10,20,30])
+
+
     #fbs_keep_left/30.pt
 
     '''
@@ -533,7 +536,8 @@ if __name__ == '__main__':
     
 
     visualize_rewards_from_reward_directory('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001',feat,env)
-    '''
+   
     compare_svf('./experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
                 './experiments/saved-models/loc_glob_simple_rectified--0.05/',
                 feat=feat)
+    '''

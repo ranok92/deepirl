@@ -76,7 +76,7 @@ class LocalGlobal():
         self.state_str_arr_dict = {}
 
         self.hash_variable = self.generate_hash_variable()
-        #self.generate_state_dictionary()
+        self.generate_state_dictionary()
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space
