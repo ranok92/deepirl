@@ -226,7 +226,8 @@ class ActorCritic:
                 **{
                     "value_loss": torch.stack(value_losses).sum().item(),
                     "policy_loss": torch.stack(policy_losses).sum().item(),
-                    "total_loss": loss.item()
+                    "total_loss": loss.item(),
+                    "rewards": sum(self.policy.rewards)
                 }
         )
 
