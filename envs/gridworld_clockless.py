@@ -46,6 +46,7 @@ class GridWorldClockless:
         #pygame.key.set_repeat(1,200)
         self.rows = rows
         self.cols = cols
+        self.seed = seed
         self.cellWidth = width
         self.upperLimit = np.asarray([self.rows-1, self.cols-1])
         self.lowerLimit = np.asarray([0,0])

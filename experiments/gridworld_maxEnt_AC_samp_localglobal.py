@@ -30,6 +30,7 @@ parser.add_argument('--rl-log-intervals', type=int, default=10)
 
 parser.add_argument('--regularizer', type=float, default=0, help='The regularizer to use.')
 
+parser.add_argument('--seed', type=int, default=7, help='The seed for the run')
 
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
@@ -69,7 +70,7 @@ def main():
                     obstacles = [np.asarray([5,5])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed = 7,
+                    seed=args.seed,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     
@@ -77,12 +78,12 @@ def main():
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat_ext = LocalGlobal(window_size=3, 
-    #                       fieldList = ['agent_state','goal_state','obstacles'])
-    feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                    thresh2 = 2,
-                                    thresh3 = 3,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+    feat_ext = LocalGlobal(window_size=3, 
+                           fieldList = ['agent_state','goal_state','obstacles'])
+    #feat_ext = FrontBackSideSimple(thresh1 = 1,
+    #                                thresh2 = 2,
+    #                                thresh3 = 3,
+    #                                fieldList = ['agent_state','goal_state','obstacles'])
     #CHANGE HERE
     #initialize loss based termination
 
@@ -105,12 +106,19 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_user_fbs_simple_avoid/'
+    trajectory_path = './trajs/ac_gridworld_rectified_loc_glob_window_3/'
+    save_plot = './plots/Adam_seed_'+str(args.seed)+'/'
+
+    if os.path.exists(save_plot):
+        pass
+    else:
+        os.mkdir(save_plot)
+
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer = args.regularizer,
-                           plot_save_folder='./plots/')
+                           plot_save_folder=save_plot)
     print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
 

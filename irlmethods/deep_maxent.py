@@ -94,7 +94,7 @@ class DeepMaxEnt():
             self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size)
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-2)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-3, weight_decay=0.045)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
@@ -174,8 +174,7 @@ class DeepMaxEnt():
 
         loss = dotProd+(lambda1*l1_reg)   
         loss.backward()
-        return loss, dotProd,
-               (lambda1*l1_reg), torch.norm(stateRewards.squeeze(), 1)
+        return loss, dotProd, (lambda1*l1_reg), torch.norm(stateRewards.squeeze(), 1)
 
 
     '''
@@ -256,7 +255,7 @@ class DeepMaxEnt():
         i = 0
         for val in inp_list:
             plt.figure(i)
-            plt.plot(val, color_list)
+            plt.plot(val, color_list[i])
             plt.draw()
             plt.pause(0.0001)
             i += 1
@@ -313,7 +312,7 @@ class DeepMaxEnt():
             self.resetTraining(self.state_size,self.action_size, self.graft)
 
             #save the reward network
-            reward_network_folder = './saved-models-rewards/'+'loc_glob_simple_rectified--'+str(self.regularizer)+'/'
+            reward_network_folder = './saved-models-rewards/'+'loc_glob_simple_rectified_svf_dict_Adam-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
 
             pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(reward_network_folder)
@@ -334,14 +333,17 @@ class DeepMaxEnt():
 
 
             #save the policy network
-            policy_network_folder = './saved-models/'+'loc_glob_simple_rectified--'+str(self.regularizer)+'/'
+            policy_network_folder = './saved-models/'+'loc_glob_simple_rectified_svf_dict_Adam-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
+            
 
-            diff = np.squeeze(expertdemo_svf - current_agent_svf)
-            svf_diff_list.append(np.dot(diff,diff))
-            diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
-            diff_freq = diff_freq.to(self.device)
+            states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
+            diff_freq = np.asarray(diff_freq)
+            svf_diff_list.append(np.dot(diff_freq,diff_freq))
+   
+            #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
+            diff_freq = torch.from_numpy(diff_freq).to(self.device)
 
             #***********changing this block
             #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
@@ -353,8 +355,8 @@ class DeepMaxEnt():
             #*******************************
 
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
-            diff_freq_list.append(np.dot(diff_freq,diff_freq))
-            diff_freq = torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
+            
+            diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
             state_rewards = self.get_rewards_of_states(self.reward, states_visited)
 
@@ -376,7 +378,7 @@ class DeepMaxEnt():
                       save_path=self.plot_save_folder)
             '''
             # GRAD AND BACKPROP
-            loss, dot_prod, l1val , rewards_norm = self.calculate_grads(self.optimizer, reward_per_state, diff_freq)
+            loss, dot_prod, l1val , rewards_norm = self.calculate_grads(self.optimizer, state_rewards, diff_freq)
 
             lossList.append(loss)
             dot_prod_list.append(dot_prod)
@@ -389,7 +391,7 @@ class DeepMaxEnt():
 
             print('done')
 
-            if i+1 % 3 == 0:
+            if (i+1) % 3 == 0:
 
                 plt.figure(0)
                 file_name = self.plot_save_folder+'loss-iter'+str(i)+'.jpg'
