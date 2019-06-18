@@ -506,13 +506,6 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
             run_reward+=reward
 
-            if done:
-                pass
-                
-            if t >= episode_length:
-                rewards[i]=run_reward
-                break
-
         rewards[i] = run_reward
         svf_dict_list.append(current_svf_dict)
 
