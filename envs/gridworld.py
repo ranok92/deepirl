@@ -51,7 +51,7 @@ class GridWorld(GridWorldClockless):
 
         self.tickSpeed = 60
         self.show_trail = show_trail
-        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+        #self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
 
 
         if obstacles=='By hand':
