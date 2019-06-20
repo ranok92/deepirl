@@ -65,9 +65,9 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    env = GridWorld(display=args.render, is_random=False,
-                    rows = 10, cols = 10,
-                    obstacles = [np.asarray([5,5])],
+    env = GridWorld(display=args.render, is_random=True,
+                    rows = 30, cols = 30,
+                    obstacles = '../envs/map3.jpg',
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
@@ -106,7 +106,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_rectified_loc_glob_window_3/'
+    trajectory_path = './trajs/ac_gridworld_static_world_map3/'
     save_plot = './plots/Svf_dict_seed_'+str(args.seed)+'/'
 
     if os.path.exists(save_plot):
