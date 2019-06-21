@@ -66,7 +66,7 @@ def main():
 
     '''
     env = GridWorld(display=args.render, is_random=True,
-                    rows = 30, cols = 30,
+                    rows = 30, cols = 30,width=10,
                     obstacles = '../envs/map3.jpg',
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
