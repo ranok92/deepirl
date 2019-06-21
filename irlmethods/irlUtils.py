@@ -506,22 +506,19 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
             run_reward+=reward
 
-            if done:
-                pass
-                
-            if t >= episode_length:
-                rewards[i]=run_reward
-                break
-
+        rewards[i] = run_reward
         svf_dict_list.append(current_svf_dict)
 
     #rewards = rewards - np.min(rewards)+eps
     #changing it to the more generic exp
+    #print('rewards non exp', rewards)
     rewards = np.exp(rewards)
     #print('Rewards :',rewards)
     total_reward = sum(rewards)
     weights = rewards/total_reward
-
+    #print('weights :',weights)
+    #plt.plot(weights)
+    #plt.show()
     #merge the different dictionaries to a master dictionary and adjust the visitation 
     #frequencies according to the weights calculated
 
@@ -533,7 +530,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             norm_factor[i] += dictionary[key]
 
     master_dict = {}
-
+    #print ('The norm factor :', norm_factor)
     for i in range(len(svf_dict_list)):
         dictionary = svf_dict_list[i]
         for key in dictionary:
@@ -780,7 +777,7 @@ if __name__ == '__main__':
     policy.to(DEVICE)
 
     np.random.seed(0)
-    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
+    svf = calculate_svf_from_sampling(no_of_samples=1, env=env,
                                      policy_nn=policy, reward_nn=None,
                                      episode_length=20, feature_extractor=feat,
                                      gamma=0.99)
