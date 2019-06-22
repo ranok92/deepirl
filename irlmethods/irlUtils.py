@@ -516,10 +516,10 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #print('Rewards :',rewards)
     total_reward = sum(rewards)
     weights = rewards/total_reward
-    print('weights from svf_dict:',weights)
-    plt.plot(weights)
-    plt.draw()
-    plt.pause(0.001)
+    #print('weights from svf_dict:',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
     #merge the different dictionaries to a master dictionary and adjust the visitation 
     #frequencies according to the weights calculated
 
@@ -651,10 +651,10 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
     #print('Rewards :',rewards)
     total_reward = sum(rewards)
     weights = rewards/total_reward
-    print('Weights from state_dict :',weights)
-    plt.plot(weights)
-    plt.draw()
-    plt.pause(0.001)
+    #print('Weights from state_dict :',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
     #normalize the visitation histograms so that for each run the 
     #sum of all the visited states becomes 1
 

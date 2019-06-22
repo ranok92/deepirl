@@ -72,7 +72,7 @@ def main():
                                 np.asarray([7,3])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed = seed,
+                    seed = args.seed,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     
