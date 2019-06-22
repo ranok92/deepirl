@@ -65,12 +65,15 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    env = GridWorld(display=args.render, is_random=True,
-                    rows = 30, cols = 30,width=10,
-                    obstacles = '../envs/map3.jpg',
+
+    env = GridWorld(display=args.render, is_random = True,
+                    rows = 10, cols = 10,
+                    obstacles = [np.asarray([5,5]), np.asarray([1,2]),
+                                np.asarray([6,5]), np.asarray([3,4]),
+                                np.asarray([7,3])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed=args.seed,
+                    seed = args.seed,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     

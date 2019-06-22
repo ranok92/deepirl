@@ -44,7 +44,7 @@ def main():
                                 np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
                                 '''
-    env = GridWorld(display=args.render, is_onehot= False,is_random=True,
+    env = GridWorld(display=args.render, is_onehot= False,is_random=False,
                     rows =10,
                     cols =10,
                     seed = 7,

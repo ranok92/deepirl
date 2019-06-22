@@ -11,7 +11,7 @@ import torch
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
 
-
+import os
 '''
     Creating a new class?? Keeps these POINTS in mind.
     
@@ -75,6 +75,7 @@ class LocalGlobal():
         #dictionary containing all possible states
         self.state_dictionary = {}
         self.state_str_arr_dict = {}
+        self.inv_state_dictionary = {}
         self.hash_variable = None
         self.generate_hash_variable()
         self.generate_state_dictionary()
@@ -94,9 +95,12 @@ class LocalGlobal():
         '''
         self.hash_variable = np.zeros(self.gl_size+self.rl_size+self.window_size**2)
         for i in range(self.hash_variable.shape[0]-1,-1,-1):
-  
+    
             self.hash_variable[i] = math.pow(2,self.hash_variable.shape[0]-1-i)
 
+        print(self.hash_variable)
+
+        os.system('pause')
 
         
 
@@ -107,7 +111,7 @@ class LocalGlobal():
         state_val = np.zeros(size)
         i = 0
         for digit in binary_str:
-            state_val[i] = digit 
+            state_val[i] = int(digit) 
             i += 1
 
         return state_val
@@ -156,6 +160,8 @@ class LocalGlobal():
 
                         self.state_dictionary[np.array2string(state)] = indexval
                         self.state_str_arr_dict[np.array2string(state)] = state
+                        self.inv_state_dictionary[indexval] = state
+
                         indexval = len(self.state_dictionary.keys())
 
 
