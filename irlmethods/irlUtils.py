@@ -373,6 +373,58 @@ def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
 
     return collections.OrderedDict(sorted(svf.items()))
 
+
+def calculate_expert_svf_with_smoothing(traj_path, smoothing_window=None, feature_extractor=None, gamma=0.99):
+
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+
+    # histogram to accumulate state visitations
+    svf = {}
+
+    for idx, state_file in enumerate(states):
+
+
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+            print(traj_np[i])
+            print('The state :', traj_np[i][-9:].reshape([3,3]))
+            smoothened_list = smoothing_over_state_space(traj_np[i], feature_extractor, smoothing_window)
+            print('The smooth-list :')
+            for j in smoothened_list:
+                print(j[0][-9:].reshape([3, 3]),j[1])
+
+            input('press 1')
+            for val in smoothened_list:
+                #val is a list of size 2: val[0] : the state vector val[1] = 
+                state_hash = feature_extractor.hash_function(val[0])
+                if state_hash not in svf.keys():
+                    svf[state_hash] = val[1]*math.pow(gamma,i)
+                else:
+                    svf[state_hash] += val[1]*math.pow(gamma,i)
+
+    #normalize the svf
+    total_visitation = 0
+    for state in svf.keys():
+
+        total_visitation += svf[state]
+
+    for state in svf.keys():
+
+        svf[state] /= total_visitation
+
+    return collections.OrderedDict(sorted(svf.items()))
+
+
+
+
+
 #function for sanity check for the states generated in the trajectories in the traj_path 
 # mainly for debugging/visualizing the states in the path.
 def debug_custom_path(traj_path, criteria ,state_dict = None):
@@ -721,7 +773,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                     
                     agent_state = agent_key_list[agent_iterator]
                     state_list.append(feat.recover_state_from_hash_value(agent_state))
-                    diff_list.append(0 - agent_svf_dict[agent_state])
+                    diff_list.append(0 - agent_svf_dict[aget_statessdfgent_state])
                     agent_iterator += 1
 
                 break
@@ -754,24 +806,35 @@ if __name__ == '__main__':
     # 						   thresh3 = 3,
     #						   fieldList = ['agent_state','goal_state'])
     #feat = OneHot(grid_rows=10,grid_cols=10)
+    np.random.seed(0)
     feat = LocalGlobal(window_size=3, fieldList=['agent_state','goal_state','obstacles'])
-    env = GridWorld(display=False, reset_wrapper=reset_wrapper, is_random = True,
+    env = GridWorld(display=False, reset_wrapper=reset_wrapper, is_random = False,
     				step_wrapper=step_wrapper,
-    				obstacles=[np.array([1,2]),np.array([5,1]),np.array([7,5]),
-                                np.array([1,1]),np.array([4,1]),np.array([2,5])],
+    				obstacles=[np.array([2,3])],
     				goal_state=np.array([5,5]),
     				is_onehot=False)
 
-    '''
+    
+    state_list = []
+    
+
     state = feat.extract_features(env.reset())
-    state = state.cpu().numpy()
+    state = np.array([0., 1. ,0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+
     print(state)
+    print('The state :',state[-9:].reshape([3,3]))    
     window = np.array([[0,.1,0],[.1,.6,.1],[0,.1,0]])
     v = smoothing_over_state_space(state,feat,window)
-    '''
+    
+    print('The smooth list :')
+    for item in v:
+        loc_info = item[0][-9:].reshape([3,3])
+        print(loc_info, item[1])
+    input("Press a key to continue . . .")
+    
     dir_path = '../experiments/trajs/ac_gridworld/'
 
-
+    
     
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
@@ -780,6 +843,7 @@ if __name__ == '__main__':
     policy.to(DEVICE)
 
     #calculating the SVF for policy
+    '''
     np.random.seed(0)
     svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
                                      policy_nn=policy, reward_nn=None,
@@ -810,21 +874,87 @@ if __name__ == '__main__':
         print(index,' ',svf[key],' ',svf_3[index])
 
 
-
+    '''
     #calculating the svf for experts
     
-    exp_svf = calculate_expert_svf('../experiments/trajs/ac_gridworld_locglobv3-1_3-subset30/', feature_extractor=feat)
+    exp_svf = calculate_expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feature_extractor=feat)
 
 
     print('printing from the expert :',exp_svf)
-    exp_svf_3 = expert_svf('../experiments/trajs/ac_gridworld_locglobv3-1_3-subset30/', feat=feat)
-  
+    exp_svf_3 = expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feat=feat)
+    
+    window = np.asarray([[0,.1,0],[.1,.5,.1],[0,.1,.1]])
+    exp_smooth = calculate_expert_svf_with_smoothing('../experiments/trajs/ac_gridworld_smooth_test',
+                                                     feature_extractor=feat, 
+                                                     smoothing_window=window)
+
+    #for key in exp_svf.keys():
+
+        #index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
+        #print(index,' ',exp_svf[key],' ',exp_svf_3[0][index] , ' - ',exp_svf[key]-exp_svf_3[0][index]  )
+
+
+    stl1 = []
+    stl_smooth = []
+    comb_dict = {}
+
+    d1 = 0
+    d2 = 0
+    
+    d1key_list = exp_svf.keys()
+    d2key_list = exp_smooth.keys()
+    comb_dict = {}
     for key in exp_svf.keys():
 
-        index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
-        print(index,' ',exp_svf[key],' ',exp_svf_3[0][index] , ' - ',exp_svf[key]-exp_svf_3[0][index]  )
+        state = feat.recover_state_from_hash_value(key)
+        print(key)
+        print(state)
+        print(state[-9:].reshape([3,3]), exp_svf[key])
+        if key not in comb_dict.keys():
+            comb_dict[key] = 0
 
 
+    print ('Normal :', len(d1key_list))
+    print ('Smooth :', len(d2key_list))
+    input('Press')
+    print('############################')
+    for key in exp_smooth.keys():
+
+        print(key)
+        state = feat.recover_state_from_hash_value(key)
+        print(state)
+        print(state[-9:].reshape([3,3]), exp_smooth[key])
+        if key not in comb_dict.keys():
+            comb_dict[key] = 0
+
+    comb_dict = collections.OrderedDict(sorted(comb_dict.items()))
+
+    for key in exp_svf.keys():
+        comb_dict[key] = exp_svf[key]
+
+    for key in comb_dict.keys():
+        
+        stl1.append(comb_dict[key])
+        comb_dict[key] = 0
+    
+
+    for key in exp_smooth.keys():
+        comb_dict[key] = exp_smooth[key]
+
+    for key in comb_dict.keys():
+        #state = feat.recover_state_from_hash_value(key)
+        #print(state[-9:].reshape([3,3]), comb_dict[key])
+        stl_smooth.append(comb_dict[key])
+        comb_dict[key] = 0
+
+    plt.figure(0)
+    plt.plot(stl1,'r')
+    plt.draw()
+    plt.figure(1)
+    plt.plot(stl_smooth,'b')
+    plt.show()
+
+    input('Press key to continue')
     #calculating the difference
 
     states_visited , diff = get_states_and_freq_diff(exp_svf, svf, feat)
@@ -928,3 +1058,4 @@ if __name__ == '__main__':
     #mat = createStateTransitionMatix(rows=5,cols=5)
 	'''
 
+    
