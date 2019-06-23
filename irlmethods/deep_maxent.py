@@ -277,7 +277,8 @@ class DeepMaxEnt():
     #############################################
 
     def extract_svf_difference(self,svf_dict, svf_array):
-
+        #here the dict is converted to array and the difference is taken
+        #diff = array - dict
         svf_diff = []
         svf_from_dict = []
         svf_from_arr = []
@@ -308,10 +309,25 @@ class DeepMaxEnt():
                 
         return svf_diff, svf_from_dict, svf_from_arr
 
+    def relevant_states(self, svf_diff_array):
 
+        state_list = []
+        svf_diff_array = np.squeeze(svf_diff_array)
+        st_counter = 0
+        for i in range(svf_diff_array.shape[0]):
+
+            if svf_diff_array[i] != 0:
+
+                state = self.rl.feature_extractor.inv_state_dictionary[i]
+                state_list.append(state)
+                st_counter += 1
+                print('State :', state , '  ', svf_diff_array[i])
+
+        print('Total states from array :', st_counter)
+        return state_list
 
     def extract_svf_difference_2(self,svf_dict, svf_array):
-
+        #here the array is converted into a dict and then the difference is taken
         svf_array = np.squeeze(svf_array)
         svf_new_dict = {}
         svf_diff_list = []
@@ -328,15 +344,15 @@ class DeepMaxEnt():
 
             if key not in svf_new_dict.keys():
 
-                print('Miss type 1')
+                print('Miss type 1', key )
             else:
-                svf_diff_list.append(svf_dict[key]-svf_new_dict[key])
+                svf_diff_list.append(svf_new_dict[key] - svf_dict[key])
 
         for key in svf_new_dict.keys():
 
             if key not in svf_dict.keys():
 
-                print('Miss type 2')
+                print('Miss type 2', key)
 
         return svf_diff_list
 
@@ -414,7 +430,7 @@ class DeepMaxEnt():
             )
 
             #np.random.seed(11)
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=3000,
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=300,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
@@ -422,25 +438,19 @@ class DeepMaxEnt():
                                                              episode_length=self.rl_max_episodes)
 
             #np.random.seed(11)
-            test_agent_svf = self.agent_svf_sampling(num_of_samples=3000,
-                                                env = self.env,
-                                                policy_nn= self.rl.policy,
-                                                reward_nn = self.reward,
-                                                feature_extractor = self.rl.feature_extractor,
-                                                episode_length = self.rl_max_episodes)
+            #test_agent_svf = self.agent_svf_sampling(num_of_samples=300,
+            #                                    env = self.env,
+            #                                    policy_nn= self.rl.policy,
+            #                                    reward_nn = self.reward,
+            #                                    feature_extractor = self.rl.feature_extractor,
+            #                                    episode_length = self.rl_max_episodes)
             #save the policy network
             policy_network_folder = './saved-models/'+'loc_glob_simple_rectified_svf_dict_Adam-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
             
 
-            states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
-            diff_freq = np.asarray(diff_freq)
-            svf_diff_list.append(np.dot(diff_freq,diff_freq))
-   
-            #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
-            diff_freq = torch.from_numpy(diff_freq).to(self.device)
-
+        
             #***********changing this block
             #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
             #diff_freq = diff_freq.to(self.device)
@@ -451,7 +461,8 @@ class DeepMaxEnt():
             #*******************************
 
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
-            
+            svf_diff_list.append(np.dot(diff_freq,diff_freq))
+
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
             state_rewards = self.get_rewards_of_states(self.reward, states_visited)
@@ -465,16 +476,26 @@ class DeepMaxEnt():
 
 
 
-            diff_freq_arr = -torch.from_numpy(expert_svf_arr - test_agent_svf).type(torch.FloatTensor).to(self.device)
+            #diff_freq_arr = -torch.from_numpy(expert_svf_arr - test_agent_svf).type(torch.FloatTensor).to(self.device)
 
 
-            dot_prod_from_arr = torch.dot(all_state_rewards.squeeze(), diff_freq_arr.squeeze())
+            #dot_prod_from_arr = torch.dot(all_state_rewards.squeeze(), diff_freq_arr.squeeze())
 
+            #state_list_from_arr = self.relevant_states(expert_svf_arr - test_agent_svf)
 
-            print("THE DOT PROD FROM ARR :", dot_prod_from_arr)
-            print("The DOT PROD FROM DICT :", dot_prod_from_dict)
+            st_counter = 0
+            #for i in range(len(states_visited)):
 
-            input('Press enter to continue: ')
+            #    print('State :', states_visited[i], '  ', -diff_freq[i])
+            #    st_counter+=1
+
+            #print('Total states from dict :',st_counter)
+            #input('Press enter to continue: ')
+
+            #print("THE DOT PROD FROM ARR :", dot_prod_from_arr)
+            #print("The DOT PROD FROM DICT :", dot_prod_from_dict)
+
+            #input('Press enter to continue: ')
 
             #############################3
 
@@ -510,31 +531,30 @@ class DeepMaxEnt():
             print('done')
 
 
-            ext_svf, svf_from_dict, svf_from_arr = self.extract_svf_difference(current_agent_svf, test_agent_svf)
+            #ext_svf, svf_from_dict, svf_from_arr = self.extract_svf_difference(current_agent_svf, test_agent_svf)
             
-            print('information from state dict:', current_agent_svf)
-            print('information from svf:', self.array_to_state_dict(test_agent_svf))
+            #print('information from state dict:', current_agent_svf)
+            #print('information from svf:', self.array_to_state_dict(test_agent_svf))
 
-            input('Press enter to continue: ')
-            plt.figure(5)
-            plt.clf()
-            plt.plot(ext_svf, 'r')
-            file_name = self.plot_save_folder+'svf_difference'+str(i)+'.jpg'
-            plt.savefig(file_name)
+            #plt.figure(5)
+            #plt.clf()
+            #plt.plot(ext_svf, 'r')
+            #file_name = self.plot_save_folder+'svf_difference'+str(i)+'.jpg'
+            #plt.savefig(file_name)
 
-            plt.figure(6)
-            plt.clf()
-            plt.plot(svf_from_dict, 'r')
-            plt.plot(svf_from_arr, 'b')
-            file_name = self.plot_save_folder+'indiv_svfs'+str(i)+'.jpg'
-            plt.savefig(file_name)
+            #plt.figure(6)
+            #plt.clf()
+            #plt.plot(svf_from_dict, 'r')
+            #plt.plot(svf_from_arr, 'b')
+            #file_name = self.plot_save_folder+'indiv_svfs'+str(i)+'.jpg'
+            #plt.savefig(file_name)
 
-            svf_diff_2 = self.extract_svf_difference_2(current_agent_svf, test_agent_svf)
-            plt.figure(7)
-            plt.clf()
-            plt.plot(svf_diff_2, 'r')
-            file_name = self.plot_save_folder+'svf_difference_another'+str(i)+'.jpg'
-            plt.savefig(file_name)
+            #svf_diff_2 = self.extract_svf_difference_2(current_agent_svf, test_agent_svf)
+            #plt.figure(7)
+            #plt.clf()
+            #plt.plot(svf_diff_2, 'r')
+            #file_name = self.plot_save_folder+'svf_difference_another'+str(i)+'.jpg'
+            #plt.savefig(file_name)
 
 
             if (i+1) % 3 == 0:
