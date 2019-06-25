@@ -122,17 +122,17 @@ class GridWorldClockless:
                 self.state['obstacles'] = self.obstacles
 
         # 0: up, 1: right, 2: down, 3: left
-        #self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
-        #                    np.asarray([0,-1]),np.asarray([0,0])]
+        self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
+                            np.asarray([0,-1]),np.asarray([0,0])]
 
 
         # augmented action space:
         #0 : up, 1:top-right 2:right and so on ... 7: top left (in a clockwise manner
         #starting from top)
-        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
-                            np.asarray([0,1]),np.asarray([1,1]),
-                            np.asarray([1,0]),np.asarray([1,-1]),
-                            np.asarray([0,-1]),np.asarray([-1,-1])]
+        #self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
+        #                    np.asarray([0,1]),np.asarray([1,1]),
+        #                    np.asarray([1,0]),np.asarray([1,-1]),
+        #                    np.asarray([0,-1]),np.asarray([-1,-1])]
         self.stepReward = stepReward
 
         # TODO: Remove the below mock environment in favor of gym.space
