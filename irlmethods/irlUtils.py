@@ -129,10 +129,14 @@ def toNumpy(torchTensor):
 def smoothing_over_state_space(state, feat, window):
     '''
     given a state this function returns a distribution over nearby states using a smoothing function0
+
+    the total number of obstacles before and after the smoothing remains the same
+    
     '''
     state_list = []
     sum_weights = 0
     global_rep = state[0:feat.gl_size+feat.rl_size]
+    #print(type(state))
     spatial_rep = feat.state_to_spatial_representation(state)
     total_obs = int(np.sum(spatial_rep))
     conv = signal.convolve2d(spatial_rep, window, 'same')
@@ -233,50 +237,6 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
     return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
 
-#will remove this once onehot becomes a feature extractor class
-#but till then this stays 
-def expert_svf_onehot(traj_path, ncols=10, nrows=10):
-
-    actions = glob.glob(os.path.join(traj_path, '*.acts'))
-    states = glob.glob(os.path.join(traj_path, '*.states'))
-
-    # histogram to accumulate state visitations
-    svf = np.zeros((1,ncols*nrows))
-
-    for idx, state_file in enumerate(states):
-
-        # traj_svf stores the state hist
-        traj_hist = np.zeros((1,ncols*nrows))
-
-        #load up a trajectory and convert it to numpy
-        torch_traj = torch.load(state_file, map_location=DEVICE)
-        traj_np = torch_traj.numpy()
-
-        #iterating through each of the states 
-        #in the trajectory
-        for i in range(traj_np.shape[0]):
-
-        	#this is for onehot
-
-        	#convert state to state index
-        	state_index = np.where(traj_np[i]==1)[0][0]
-
-        	# +1 for that index in the trajectory histogram
-        	traj_hist[0,state_index]+=1
-
-
-        # normalize each trajectory
-        traj_hist/=np.sum(traj_hist)
-
-        # accumulate frequencies through time
-
-        svf += traj_hist
-
-    svf /= len(states)
-
-    return svf
-
-
 #This is a more general function and should work with any
 #state representation provided the state dictionary
 #corresponding to that state representation is provided
@@ -374,7 +334,10 @@ def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
     return collections.OrderedDict(sorted(svf.items()))
 
 
-def calculate_expert_svf_with_smoothing(traj_path, smoothing_window=None, feature_extractor=None, gamma=0.99):
+def calculate_expert_svf_with_smoothing(traj_path, 
+                                        smoothing_window=None, 
+                                        feature_extractor=None, 
+                                        gamma=0.99):
 
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
     states = glob.glob(os.path.join(traj_path, '*.states'))
@@ -393,14 +356,14 @@ def calculate_expert_svf_with_smoothing(traj_path, smoothing_window=None, featur
         #in the trajectory
         for i in range(traj_np.shape[0]):
 
-            print(traj_np[i])
-            print('The state :', traj_np[i][-9:].reshape([3,3]))
+            #print(traj_np[i])
+            #print('The state :', traj_np[i][-9:].reshape([3,3]))
             smoothened_list = smoothing_over_state_space(traj_np[i], feature_extractor, smoothing_window)
-            print('The smooth-list :')
-            for j in smoothened_list:
-                print(j[0][-9:].reshape([3, 3]),j[1])
+            #print('The smooth-list :')
+            #for j in smoothened_list:
+                #print(j[0][-9:].reshape([3, 3]),j[1])
 
-            input('press 1')
+            #input('press 1')
             for val in smoothened_list:
                 #val is a list of size 2: val[0] : the state vector val[1] = 
                 state_hash = feature_extractor.hash_function(val[0])
@@ -509,92 +472,6 @@ def select_action(policy,state):
     #return action.item()
     val, ind = torch.max(probs,0)
     return ind
-
-
-def calculate_svf_from_sampling(no_of_samples=1000, env=None,
-                                policy_nn=None, reward_nn=None,
-                                episode_length=20, feature_extractor=None,
-                                gamma=0.99):
-    
-    '''
-    calculating the state visitation frequency from sampling. This function
-    returns a dictionary, where the keys consists of only the states that has been
-    visited and their corresponding values are the visitation frequency
-    '''
-    eps = 0.000001
-    if feature_extractor is None:
-        print('Featrue extractor missing. Exiting.')
-        return None
-
-    rewards = np.zeros(no_of_samples)
-    norm_factor = np.zeros(no_of_samples)
-
-    svf_dict_list = []
-    for i in range(no_of_samples):
-        run_reward = 0
-        current_svf_dict = {}
-        state = env.reset()
-        #print('agent position:', state['agent_state'])
-        state = feature_extractor.extract_features(state)
-        current_svf_dict[feature_extractor.hash_function(state)] = 1
-
-        for t in range(episode_length):
-
-            action = select_action(policy_nn, state)
-            state, reward, done,_ = env.step(action)
-            #feature_extractor wraps the state in torch tensor so convert that back
-
-            
-            #get the state index
-
-            state = feature_extractor.extract_features(state)
-            if feature_extractor.hash_function(state) not in current_svf_dict.keys():
-                current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t)
-            else:
-                current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
-                                                  
-            if reward_nn is not None:
-                reward  = reward_nn(state)
-
-            run_reward+=reward
-
-        rewards[i] = run_reward
-        svf_dict_list.append(current_svf_dict)
-
-    #rewards = rewards - np.min(rewards)+eps
-    #changing it to the more generic exp
-    #print('rewards non exp', rewards)
-    rewards = np.exp(rewards)
-    #print('Rewards :',rewards)
-    total_reward = sum(rewards)
-    weights = rewards/total_reward
-    #print('weights from svf_dict:',weights)
-    #plt.plot(weights)
-    #plt.draw()
-    #plt.pause(0.001)
-    #merge the different dictionaries to a master dictionary and adjust the visitation 
-    #frequencies according to the weights calculated
-
-    for i in range(len(svf_dict_list)):
-
-        dictionary = svf_dict_list[i]
-        for key in dictionary:
-
-            norm_factor[i] += dictionary[key]
-
-    master_dict = {}
-    #print ('The norm factor :', norm_factor)
-    for i in range(len(svf_dict_list)):
-        dictionary = svf_dict_list[i]
-        for key in dictionary:
-
-            if key not in master_dict:
-                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
-            else:
-                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
-
-    return collections.OrderedDict(sorted(master_dict.items()))
-
 
 
 #should calculate the SVF of a policy network by running the agent a number of times
@@ -720,6 +597,187 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
     svf_policy = np.matmul(svf_policy,weights)
 
     return svf_policy
+
+
+
+def calculate_svf_from_sampling(no_of_samples=1000, env=None,
+                                policy_nn=None, reward_nn=None,
+                                episode_length=20, feature_extractor=None,
+                                gamma=0.99):
+    
+    '''
+    calculating the state visitation frequency from sampling. This function
+    returns a dictionary, where the keys consists of only the states that has been
+    visited and their corresponding values are the visitation frequency
+    '''
+    eps = 0.000001
+    if feature_extractor is None:
+        print('Featrue extractor missing. Exiting.')
+        return None
+
+    rewards = np.zeros(no_of_samples)
+    norm_factor = np.zeros(no_of_samples)
+
+    svf_dict_list = []
+    for i in range(no_of_samples):
+        run_reward = 0
+        current_svf_dict = {}
+        state = env.reset()
+        #print('agent position:', state['agent_state'])
+        state = feature_extractor.extract_features(state)
+        current_svf_dict[feature_extractor.hash_function(state)] = 1
+
+        for t in range(episode_length):
+
+            action = select_action(policy_nn, state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+            
+            #get the state index
+
+            state = feature_extractor.extract_features(state)
+            if feature_extractor.hash_function(state) not in current_svf_dict.keys():
+                current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t)
+            else:
+                current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
+                                                  
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+        rewards[i] = run_reward
+        svf_dict_list.append(current_svf_dict)
+
+    #rewards = rewards - np.min(rewards)+eps
+    #changing it to the more generic exp
+    #print('rewards non exp', rewards)
+    rewards = np.exp(rewards)
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+    #print('weights from svf_dict:',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
+    #merge the different dictionaries to a master dictionary and adjust the visitation 
+    #frequencies according to the weights calculated
+
+    for i in range(len(svf_dict_list)):
+
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            norm_factor[i] += dictionary[key]
+
+    master_dict = {}
+    #print ('The norm factor :', norm_factor)
+    for i in range(len(svf_dict_list)):
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            if key not in master_dict:
+                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
+            else:
+                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
+
+    return collections.OrderedDict(sorted(master_dict.items()))
+
+
+
+def calculate_svf_from_sampling_using_smoothing(no_of_samples=1000, env=None,
+                                                policy_nn=None, reward_nn=None,
+                                                episode_length=20, feature_extractor=None,
+                                                gamma=0.99, window=None):
+    
+    '''
+    calculating the state visitation frequency from sampling. This function
+    returns a dictionary, where the keys consists of only the states that has been
+    visited and their corresponding values are the visitation frequency
+    '''
+    eps = 0.000001
+    if feature_extractor is None:
+        print('Featrue extractor missing. Exiting.')
+        return None
+
+    rewards = np.zeros(no_of_samples)
+    norm_factor = np.zeros(no_of_samples)
+
+    svf_dict_list = []
+    for i in range(no_of_samples):
+        run_reward = 0
+        current_svf_dict = {}
+        state = env.reset()
+        #print('agent position:', state['agent_state'])
+        state = feature_extractor.extract_features(state)
+
+        state_np = state.cpu().numpy()
+        state_list = smoothing_over_state_space(state_np, feature_extractor, window)
+
+        for item in state_list:
+            #item = [ state , weight ]
+            current_svf_dict[feature_extractor.hash_function(item[0])] = item[1]
+
+        for t in range(episode_length):
+
+            action = select_action(policy_nn, state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+            
+            #get the state index
+
+            state = feature_extractor.extract_features(state)
+            state_np = state.cpu().numpy()
+            state_list = smoothing_over_state_space(state_np, feature_extractor, window)
+            for item in state_list:
+                if feature_extractor.hash_function(item[0]) not in current_svf_dict.keys():
+                    current_svf_dict[feature_extractor.hash_function(item[0])] = item[1]*math.pow(gamma,t)
+                else:
+                    current_svf_dict[feature_extractor.hash_function(item[0])] += item[1]*math.pow(gamma,t) 
+                                                  
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+        rewards[i] = run_reward
+        svf_dict_list.append(current_svf_dict)
+
+    #rewards = rewards - np.min(rewards)+eps
+    #changing it to the more generic exp
+    #print('rewards non exp', rewards)
+    rewards = np.exp(rewards)
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+    #print('weights from svf_dict:',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
+    #merge the different dictionaries to a master dictionary and adjust the visitation 
+    #frequencies according to the weights calculated
+
+    for i in range(len(svf_dict_list)):
+
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            norm_factor[i] += dictionary[key]
+
+    master_dict = {}
+    #print ('The norm factor :', norm_factor)
+    for i in range(len(svf_dict_list)):
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            if key not in master_dict:
+                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
+            else:
+                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
+
+    return collections.OrderedDict(sorted(master_dict.items()))
 
 
 
@@ -883,7 +941,7 @@ if __name__ == '__main__':
     print('printing from the expert :',exp_svf)
     exp_svf_3 = expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feat=feat)
     
-    window = np.asarray([[0,.1,0],[.1,.5,.1],[0,.1,.1]])
+    window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
     exp_smooth = calculate_expert_svf_with_smoothing('../experiments/trajs/ac_gridworld_smooth_test',
                                                      feature_extractor=feat, 
                                                      smoothing_window=window)

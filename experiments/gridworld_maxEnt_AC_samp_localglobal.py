@@ -109,8 +109,8 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_static_world_map3/'
-    save_plot = './plots/Svf_dict_seed_'+str(args.seed)+'/'
+    trajectory_path = './trajs/ac_gridworld_rectified_loc_glob_window_3/'
+    save_plot = './plots/Svf_dict_seed_smoothing'+str(args.seed)+'/'
 
     if os.path.exists(save_plot):
         pass
