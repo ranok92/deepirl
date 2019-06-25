@@ -236,11 +236,13 @@ class GridWorld(GridWorldClockless):
         #change with each reset
         dist_g = self.goal_spawn_clearance
         if self.is_random:
-            self.obstacles = []
-            for i in range(num_obs):
 
-                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.obstacles.append(obs_pos)
+            if not self.freeze_obstacles:
+                self.obstacles = []
+                for i in range(num_obs):
+
+                    obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                    self.obstacles.append(obs_pos)
 
 
             while True:
