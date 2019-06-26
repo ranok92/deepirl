@@ -95,7 +95,7 @@ class GridWorldClockless:
             else  : This is the general representation of a particular
                     state for this  environment :
 
-                        A list of numpy arrays, where 
+                        A list of numpy arrays, where calc
                             index[0] : agent_state
                             index[1] : goal_state
                             index[2] : obs1
@@ -122,17 +122,23 @@ class GridWorldClockless:
                 self.state['obstacles'] = self.obstacles
 
         # 0: up, 1: right, 2: down, 3: left
-        self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
-                            np.asarray([0,-1]),np.asarray([0,0])]
+        #self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
+        #                    np.asarray([0,-1]),np.asarray([0,0])]
 
 
         # augmented action space:
-        #0 : up, 1:top-right 2:right and so on ... 7: top left (in a clockwise manner
-        #starting from top)
-        #self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
-        #                    np.asarray([0,1]),np.asarray([1,1]),
-        #                    np.asarray([1,0]),np.asarray([1,-1]),
-        #                    np.asarray([0,-1]),np.asarray([-1,-1])]
+        #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
+        #starting from top and doing nothing)
+        
+        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
+                            np.asarray([0,1]),np.asarray([1,1]),
+                            np.asarray([1,0]),np.asarray([1,-1]),
+                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+
+        self.action_dict = {}
+
+        for i in range(len(self.actionArray)):
+            self.action_dict[np.array2string(self.actionArray[i])] = i
         self.stepReward = stepReward
 
         # TODO: Remove the below mock environment in favor of gym.space
@@ -149,7 +155,7 @@ class GridWorldClockless:
         self.spec = MockSpec(1.0)
 
         #this flag states if control has been released
-        #if true, the state will not change with any action
+        #if true, the state will not change with any actioncd ..
 
         self.release_control = False
 
