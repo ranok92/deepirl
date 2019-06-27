@@ -6,6 +6,7 @@ import pdb
 import sys
 import math
 import os
+from gridworld_clockless import MockActionspace, MockSpec
 sys.path.insert(0, '..')
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
@@ -76,6 +77,23 @@ class GridWorldDrone(GridWorld):
         self.agent_action_flag = False
         self.obstacle_width = obs_width
         self.step_size = step_size
+
+        ############# this comes with the change in the action space##########
+        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
+                            np.asarray([0,1]),np.asarray([1,1]),
+                            np.asarray([1,0]),np.asarray([1,-1]),
+                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+
+        self.action_dict = {}
+
+        for i in range(len(self.actionArray)):
+            self.action_dict[np.array2string(self.actionArray[i])] = i
+
+        self.action_space = MockActionspace(len(self.actionArray))
+        #self.spec = MockSpec(1.0)
+
+        ######################################################################
+        self.stepReward = stepReward
         annotation_list = []
 
         if not os.path.isfile(annotation_file):
@@ -484,15 +502,21 @@ class GridWorldDrone(GridWorld):
 def record_trajectories(num_of_trajs,path):
 
 
-    step_size=1
-    feature_extractor = LocalGlobal(window_size=3, step_size=step_size, grid_size=10, fieldList=['agent_state', 'goal_state','obstacles'])
+    step_size=20
+    agent_size = 20
+    grid_size = 10
+    obs_size = 20
+    feature_extractor = LocalGlobal(window_size=7, agent_width=agent_size,
+                                    step_size=step_size, 
+                                    obs_width=obs_size,
+                                    grid_size=grid_size, fieldList=['agent_state', 'goal_state','obstacles'])
 
-    env = GridWorldDrone(display=True, is_onehot = False, agent_width=20,
-                        seed = 10, obstacles=None, obs_width=20,
-                        step_size=step_size, width=20,
+    env = GridWorldDrone(display=True, is_onehot = False, agent_width=agent_size,
+                        seed = 10, obstacles=None, obs_width=obs_size,
+                        step_size=step_size, width=grid_size,
                         show_trail=False,
                         is_random=True,
-                        annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
+                        annotation_file='./stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
                         subject=None,
                         rows = 1088, cols = 1424)
     i = 0
@@ -513,6 +537,7 @@ def record_trajectories(num_of_trajs,path):
             run_reward += reward
             if not done:
                 next_state = feature_extractor.extract_features(next_state)
+                print(next_state[-49:].reshape(7,7))
                 states.append(next_state)
 
         if run_reward > 0:

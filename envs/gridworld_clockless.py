@@ -148,10 +148,7 @@ class GridWorldClockless:
         #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
         #starting from top and doing nothing)
         '''
-        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
-                            np.asarray([0,1]),np.asarray([1,1]),
-                            np.asarray([1,0]),np.asarray([1,-1]),
-                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+
         '''
         self.action_dict = {}
 
@@ -282,7 +279,7 @@ class GridWorldClockless:
                     flag = True
 
             if not flag:
-                print('self agent :',self.agent_state)
+                #print('self agent :',self.agent_state)
                 break
 
 
