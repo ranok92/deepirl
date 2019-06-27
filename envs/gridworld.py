@@ -54,10 +54,10 @@ class GridWorld(GridWorldClockless):
                        step_size=step_size,
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
-
-        self.tickSpeed = 60
+        self.gameDisplay = None
+        self.tickSpeed = 100
         self.show_trail = show_trail
-        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+        
 
 
         if obstacles=='By hand':
@@ -116,6 +116,7 @@ class GridWorld(GridWorldClockless):
     def render(self):
 
         #render board
+        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
         self.clock.tick(self.tickSpeed)
 
         self.gameDisplay.fill(self.white)
@@ -235,7 +236,8 @@ class GridWorld(GridWorldClockless):
 
     def reset(self):
 
-        pygame.image.save(self.gameDisplay,'traced_trajectories.png')
+        if self.gameDisplay is not None:
+            pygame.image.save(self.gameDisplay,'traced_trajectories.png')
         self.pos_history = []
 
         num_obs=len(self.obstacles)
@@ -312,8 +314,8 @@ if __name__=="__main__":
                           fieldList=['agent_state','goal_state','obstacles'])
     #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
     world = GridWorld(display=True, is_onehot = False, is_random=True,
-                        seed = 0 , obstacles='./map4.jpg',step_size=20,
-                        rows = 100 , cols = 100 , width = 10, obs_width=6)
+                        seed = 0 , obstacles='./test_map.jpg',step_size=10,
+                        rows = 100 , cols = 100 , width = 10, obs_width=10)
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -326,7 +328,10 @@ if __name__=="__main__":
         for i in count(0):
             t = 0
             while t < 20:
+
                 action,flag = world.take_user_action()
+                action = np.random.randint(4)
+                print(action)
                 next_state, reward,done,_ = world.step(action)
                 #print(next_state)
                 state  = featExt.extract_features(next_state)

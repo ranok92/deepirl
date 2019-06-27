@@ -39,8 +39,9 @@ class GridWorldDrone(GridWorld):
         annotation_file = None,
         subject = None,
         omit_annotation = None, #will be used to test a policy
-        obs_width = 20,
-        step_size = 10
+        obs_width = None,
+        step_size = None,
+        agent_width = None
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -55,6 +56,9 @@ class GridWorldDrone(GridWorld):
                        step_wrapper=step_wrapper,
                        reset_wrapper=reset_wrapper,
                        show_trail = show_trail,
+                       obs_width=obs_width,
+                       agent_width=agent_width,
+                       step_size=step_size
                        )
 
 
@@ -172,13 +176,14 @@ class GridWorldDrone(GridWorld):
         self.gameDisplay.fill(self.white)
         #render obstacles
         if self.obstacles is not None:
+
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[1],obs[0],self.obstacle_width, self.obstacle_width])
+                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]-int(self.obstacle_width/2),obs[0]-int(self.obstacle_width/2),self.obstacle_width, self.obstacle_width])
         #render goal
-        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1], self.goal_state[0],self.obstacle_width, self.obstacle_width])
+        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-int(self.cellWidth/2), self.goal_state[0]-int(self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
         if self.agent_state is not None:
-            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1], self.agent_state[0], self.obstacle_width, self.obstacle_width])
+            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]-int(self.agent_width/2), self.agent_state[0]-int(self.agent_width/2), self.agent_width, self.agent_width])
         if self.show_trail:
             self.draw_trajectory()
 
@@ -253,33 +258,6 @@ class GridWorldDrone(GridWorld):
             return self.state, 0, False, None
 
 
-    def calculateReward(self):
-
-        hit = False
-        done = False
-
-        if self.obstacles is not None:
-            for obs in self.obstacles:
-                if np.linalg.norm(self.agent_state-obs)<self.step_size:
-                    hit = True
-
-        if (hit):
-            reward = -1
-            done = True
-
-        elif np.linalg.norm(self.agent_state-self.goal_state)<self.step_size:
-            reward = 1
-            done = True
-
-        else:
-
-            newdist = np.sum(np.abs(self.agent_state-self.goal_state))
-
-            reward = (self.distanceFromgoal - newdist)*self.stepReward
-
-            self.distanceFromgoal = newdist
-        
-        return reward, done
 
 
     def reset(self):
@@ -506,16 +484,17 @@ class GridWorldDrone(GridWorld):
 def record_trajectories(num_of_trajs,path):
 
 
-    feature_extractor = LocalGlobal(window_size=3, grid_size=10, fieldList=['agent_state', 'goal_state','obstacles'])
+    step_size=1
+    feature_extractor = LocalGlobal(window_size=3, step_size=step_size, grid_size=10, fieldList=['agent_state', 'goal_state','obstacles'])
 
-    env = GridWorldDrone(display=True, is_onehot = False, 
-                        seed = 10, obstacles=None, 
+    env = GridWorldDrone(display=True, is_onehot = False, agent_width=20,
+                        seed = 10, obstacles=None, obs_width=20,
+                        step_size=step_size, width=20,
                         show_trail=False,
                         is_random=True,
                         annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
                         subject=None,
-                        step_size=10                        
-                        rows = 1088, cols = 1424, width = 1)
+                        rows = 1088, cols = 1424)
     i = 0
     while i < num_of_trajs:
         actions = []
