@@ -34,9 +34,18 @@ def main():
     else:
         from envs.gridworld_clockless import GridWorldClockless as GridWorld
 
-    #featExtract = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
+
+    agent_width = 14
+    step_size = 14
+    obs_width = 4
+    grid_size = 10
+    featExtract = LocalGlobal(window_size=3, agent_width=agent_width,
+                              step_size=step_size, 
+                              obs_width=obs_width,
+                              grid_size=grid_size,
+                              fieldList = ['agent_state','goal_state','obstacles'])
     #featExtract = OneHot(grid_rows=10,grid_cols=10)
-    featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
+    #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
 
     #featExtract = SocialNav(fieldList = ['agent_state','goal_state'])
     '''
@@ -44,17 +53,17 @@ def main():
                                 np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
                                 '''
-    env = GridWorld(display=args.render, is_onehot= False,is_random=False,
-                    rows =10,
-                    cols =10,
+    env = GridWorld(display=args.render, is_onehot= False,is_random=True,
+                    rows=10, agent_width=agent_width,step_size=step_size,
+                    obs_width=obs_width,width=grid_size,
+                    cols=10,
                     seed = 7,
-                    obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
-                                np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),],
+                    obstacles = '../envs/real_map.jpg',
                                 
                     goal_state = np.asarray([5,5]))
 
     model = ActorCritic(env, feat_extractor=featExtract,  gamma=0.99,
-                        log_interval=400,max_ep_length=20 , 
+                        log_interval=400,max_ep_length=50 , 
                         max_episodes = 8000)
 
     if args.policy_path is not None:
