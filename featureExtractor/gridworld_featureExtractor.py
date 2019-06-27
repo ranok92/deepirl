@@ -59,15 +59,19 @@ class LocalGlobal():
     #structure of the features first 4 : general direction of the goal
     #                           next 3 : indicates whether the agent moved towards or away from goal
     #                           next n^2 : indicates local obstacle information
-    def __init__(self,window_size=5, grid_size = 1,  
-                agent_rad = 1, obs_rad = 1 , fieldList = []):
+    def __init__(self,window_size=5, grid_size = 1, step_size=None,
+                agent_width = 1, obs_width = 1 , fieldList = []):
 
         self.gl_size = 9
         self.rl_size = 3
         self.window_size = window_size
+        if step_size is None:
+            self.step_size = grid_size
+        else:
+            self.step_size = step_size
         self.grid_size = grid_size
-        self.agent_radius = agent_rad
-        self.obs_rad = obs_rad
+        self.agent_width = agent_width
+        self.obs_width = obs_width
         self.field_list = fieldList
         self.prev_dist = None
         #added new (26-3-19)
@@ -182,14 +186,14 @@ class LocalGlobal():
 
     def determine_index(self,diff_r, diff_c):
 
-
-        if diff_r==0 and diff_c >0: #right
+        step_size = self.grid_size
+        if abs(diff_r) < step_size and diff_c > step_size: #right
             index = 1
-        elif diff_r==0 and diff_c < 0: #left
+        elif abs(diff_r) < step_size and diff_c < 0: #left
             index = 3
-        elif diff_r > 0 and diff_c == 0: #down
+        elif diff_r > 0 and abs(diff_c) < step_size: #down
             index = 2
-        elif diff_r < 0  and diff_c ==0: #up
+        elif diff_r < 0  and abs(diff_c) < step_size: #up
             index = 0
         elif diff_r > 0 and diff_c > 0: #quad4
             index = 7
@@ -243,6 +247,7 @@ class LocalGlobal():
         state = self.get_info_from_state(state)
         window_size = self.window_size
         block_width = self.grid_size
+        step = self.step_size
         window_rows = window_cols = window_size
         row_start =  int((window_rows-1)/2)
         col_start = int((window_cols-1)/2)
@@ -280,19 +285,36 @@ class LocalGlobal():
             #new method, simulate overlap for each of the neighbouring places
             #for each of the obstacles
             obs_pos = state[i]
-            obs_rad = self.obs_rad
+            obs_width = self.obs_width
             for r in range(-row_start,row_start+1,1):
                 for c in range(-col_start,col_start+1,1):
                     #c = x and r = y
                     #pdb.set_trace()
-                    temp_pos = np.asarray([agent_pos[0] + r*block_width, 
-                                agent_pos[1] + c*block_width])
-                    if np.array_equal(temp_pos,obs_pos):
+                    temp_pos = np.asarray([agent_pos[0] + r*step, 
+                                agent_pos[1] + c*step])
+                    if self.check_overlap(temp_pos,obs_pos):
                         pos = self.block_to_arrpos(r,c)
 
                         mod_state[pos+self.gl_size+self.rl_size]=1
 
         return reset_wrapper(mod_state)
+
+    def check_overlap(self,temp_pos,obs_pos):
+        #if true, that means there is an overlap
+        boundary = None
+        if self.grid_size >= self.agent_width:
+            boundary = self.grid_size/2
+        else:
+            boundary = self.agent_width/2
+
+        distance_to_maintain = boundary+(self.obs_width/2)
+        #pdb.set_trace()
+        if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
+
+            return True
+        else:
+            return False
+
 
 
 
