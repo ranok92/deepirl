@@ -36,6 +36,9 @@ class GridWorldClockless:
         is_onehot = True,
         is_random = False,
         stepReward=0.001,
+        obs_width=None,
+        agent_width=None,
+        step_size=None,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
     ):
@@ -48,8 +51,23 @@ class GridWorldClockless:
         self.cols = cols
         self.seed = seed
         self.cellWidth = width
-        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
-        self.lowerLimit = np.asarray([0,0])
+        if obs_width is None:
+            self.obs_width=self.cellWidth
+        else:
+            self.obs_width=obs_width
+
+        if agent_width is None:
+            self.agent_width=self.cellWidth
+        else:
+            self.agent_width=agent_width
+
+        if step_size is None:
+            self.step_size=self.cellWidth
+        else:
+            self.step_size=step_size
+
+        self.upperLimit = self.cellWidth * np.asarray([self.rows-1, self.cols-1]) + self.cellWidth/2
+        self.lowerLimit = self.cellWidth/2 + np.asarray([0,0])
         self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.is_onehot = is_onehot
         self.is_random = is_random
@@ -122,19 +140,19 @@ class GridWorldClockless:
                 self.state['obstacles'] = self.obstacles
 
         # 0: up, 1: right, 2: down, 3: left
-        #self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
-        #                    np.asarray([0,-1]),np.asarray([0,0])]
+        self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
+                            np.asarray([0,-1]),np.asarray([0,0])]
 
 
         # augmented action space:
         #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
         #starting from top and doing nothing)
-        
+        '''
         self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
                             np.asarray([0,1]),np.asarray([1,1]),
                             np.asarray([1,0]),np.asarray([1,-1]),
                             np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
-
+        '''
         self.action_dict = {}
 
         for i in range(len(self.actionArray)):
@@ -160,17 +178,26 @@ class GridWorldClockless:
         self.release_control = False
 
         #distance to be maintained between the agent and the obstacles
-        self.agent_spawn_clearance = 0
+        self.agent_spawn_clearance = 1
         #distance to be maintained between the goal and the obstacles
-        self.goal_spawn_clearance = 0
+        self.goal_spawn_clearance = 1
 
         self.pos_history = []
 
 
-    def if_red(self,value):
+    def if_red(self,img,top,left):
+        counter = 0
+        thresh = self.obs_width*self.obs_width/3
+        print('top',top)
+        print('left',left)
+        for r in range(top,top+self.obs_width,1):
+            for c in range(left,left+self.obs_width,1):
+                if img[c,r][0] >180 and img[c,r][1] <20 and img[c,r][2] < 20:
+                    counter+=1
+                if counter >= thresh:
+                    return True
 
-        if value[0] >180 and value[1] <20 and value[2] < 20:
-            return True
+        return False
 
     def read_obstacles_from_image(self, file_path):
 
@@ -183,13 +210,22 @@ class GridWorldClockless:
             self.obstacles = []
             img = Image.open(file_path)
             imgval = img.load()
-            row_norm = self.rows/img.height
-            col_norm = self.cols/img.width
+            self.rows = int(img.height/self.cellWidth)
+            self.cols = int(img.width/self.cellWidth)
+            self.upperLimit = self.cellWidth * np.asarray([self.rows-1, self.cols-1]) + self.cellWidth/2
+            self.lowerLimit = self.cellWidth/2 + np.asarray([0,0])
+            #row_norm = self.rows*self.cellWidth/img.height
+            #col_norm = self.cols*self.cellWidth/img.width
 
-            for r in range(img.height):
-                for c in range(img.width):
+            for r in range(0,img.height-self.obs_width-1, self.obs_width):
+                for c in range(0,img.width-self.obs_width-1, self.obs_width):
 
-                    if self.if_red(imgval[c,r]):
+                    if self.if_red(imgval,r,c):
+                        self.obstacles.append(int(self.obs_width/2)+np.asarray([int(r),int(c)]))
+                        #pdb.set_trace()
+
+
+            '''
                         flag = False
                         new_arr = np.asarray([int(r*row_norm),int(c*col_norm)])
                         for i in range(len(self.obstacles)):
@@ -197,8 +233,9 @@ class GridWorldClockless:
                                 flag = True
                         if not flag:
 
-                            self.obstacles.append(np.asarray([int(r*row_norm),int(c*col_norm)]))
-
+                            self.obstacles.append(self.cellWidth * np.asarray([int(r*row_norm),int(c*col_norm)]))
+            '''
+        print('Total obstacles :', len(self.obstacles))
         print ("Done reading obstacles.")
 
 
@@ -221,15 +258,15 @@ class GridWorldClockless:
                 for i in range(num_obs):
 
                     obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                    self.obstacles.append(obs_pos)
+                    self.obstacles.append(self.cellWidth*obs_pos + (self.cellWidth/2))
 
 
             while True:
                 flag = False
-                self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-
+                self.goal_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.goal_state = self.goal_state + (self.cellWidth/2)
                 for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < self.cellWidth*dist_g:
 
                         flag = True
                 if not flag:
@@ -238,12 +275,14 @@ class GridWorldClockless:
         dist = self.agent_spawn_clearance
         while True:
             flag = False
-            self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            self.agent_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            self.agent_state = self.agent_state + (self.cellWidth/2)
             for i in range(num_obs):
-                if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                if np.linalg.norm(self.obstacles[i]-self.agent_state) < self.cellWidth * dist:
                     flag = True
 
             if not flag:
+                print('self agent :',self.agent_state)
                 break
 
 
@@ -279,7 +318,8 @@ class GridWorldClockless:
         #print('printing the keypress status',self.agent_action_keyboard)
         
         if not self.release_control:
-            self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
+            self.agent_state = np.maximum(np.minimum(self.agent_state+ \
+                              (self.step_size * self.actionArray[action]),self.upperLimit),self.lowerLimit)
         
         if not np.array_equal(self.pos_history[-1],self.agent_state):
             self.pos_history.append(self.agent_state)
@@ -321,6 +361,19 @@ class GridWorldClockless:
         return self.state, reward, done, None
 
 
+    def check_overlap(self,temp_pos,obs_pos,width):
+        #if true, that means there is an overlap
+
+        boundary = self.agent_width/2
+
+        distance_to_maintain = boundary+(width/2)
+        #pdb.set_trace()
+        if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
+
+            return True
+        else:
+            return False
+
 
     def calculateReward(self):
 
@@ -329,14 +382,14 @@ class GridWorldClockless:
 
         if self.obstacles is not None:
             for obs in self.obstacles:
-                if np.array_equal(self.agent_state,obs):
+                if self.check_overlap(self.agent_state, obs, self.obs_width):
                     hit = True
 
         if (hit):
             reward = -1
             done = True
 
-        elif np.array_equal(self.agent_state, self.goal_state):
+        elif self.check_overlap(self.agent_state ,self.goal_state, self.cellWidth):
             reward = 1
             done = True
 
