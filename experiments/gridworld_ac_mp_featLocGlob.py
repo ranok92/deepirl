@@ -39,7 +39,7 @@ def main():
     step_size = 14
     obs_width = 4
     grid_size = 10
-    featExtract = LocalGlobal(window_size=3, agent_width=agent_width,
+    featExtract = LocalGlobal(window_size=7, agent_width=agent_width,
                               step_size=step_size, 
                               obs_width=obs_width,
                               grid_size=grid_size,
@@ -58,7 +58,7 @@ def main():
                     obs_width=obs_width,width=grid_size,
                     cols=10,
                     seed = 7,
-                    obstacles = '../envs/real_map.jpg',
+                    obstacles = '../envs/map3.jpg',
                                 
                     goal_state = np.asarray([5,5]))
 
@@ -87,7 +87,7 @@ def main():
         env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
 
-        model.generate_trajectory(args.num_trajs, './trajs/ac_gridworld/')
+        model.generate_trajectory(args.num_trajs, './trajs/ac_loc_glob_rectified_win_7_static_map3/')
 
     if args.play_user:
         env.tickSpeed = 200

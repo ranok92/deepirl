@@ -428,7 +428,7 @@ class DeepMaxEnt():
             self.resetTraining(self.state_size,self.action_size, self.graft)
 
             #save the reward network
-            reward_network_folder = './saved-models-rewards/'+'loc_glob_simple_rectified_svf_dict_smoothing_Adam-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
+            reward_network_folder = './saved-models-rewards/'+'loc_glob_win_7_simple_rectified_svf_dict_smoothing_map_3-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
 
             pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(reward_network_folder)
@@ -458,7 +458,7 @@ class DeepMaxEnt():
             #                                    feature_extractor = self.rl.feature_extractor,
             #                                    episode_length = self.rl_max_episodes)
             #save the policy network
-            policy_network_folder = './saved-models/'+'loc_glob_simple_rectified_svf_dict_smoothing_Adam-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
+            policy_network_folder = './saved-models/'+'loc_glob_win_7_simple_rectified_svf_dict_smoothing_map3-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(policy_network_folder)
             

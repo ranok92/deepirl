@@ -65,12 +65,17 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-
+    agent_width = 14
+    step_size = 14
+    obs_width = 4
+    grid_size = 10
     env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
-                    obstacles = [np.asarray([5,5]), np.asarray([1,2]),
-                                np.asarray([6,5]), np.asarray([3,4]),
-                                np.asarray([7,3])],
+                    agent_width=agent_width,
+                    step_size=step_size,
+                    obs_width=obs_width,
+                    width=grid_size,
+                    obstacles = '../envs/map3.jpg',
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = args.seed,
@@ -81,7 +86,10 @@ def main():
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    feat_ext = LocalGlobal(window_size=3, 
+    feat_ext = LocalGlobal(window_size=7, grid_size=grid_size,
+                           agent_width=agent_width, 
+                           obs_width=obs_width,
+                           step_size=step_size,
                            fieldList = ['agent_state','goal_state','obstacles'])
     #feat_ext = FrontBackSideSimple(thresh1 = 1,
     #                                thresh2 = 2,
@@ -109,8 +117,8 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_rectified_loc_glob_window_3/'
-    save_plot = './plots/Svf_dict_seed_smoothing'+str(args.seed)+'/'
+    trajectory_path = './trajs/ac_loc_glob_rectified_win_7_static_map3/'
+    save_plot = './plots/Svf_dict_window_7_map_3_seed_'+str(args.seed)+'/'
 
     if os.path.exists(save_plot):
         pass
