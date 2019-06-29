@@ -82,7 +82,7 @@ class LocalGlobal():
         self.inv_state_dictionary = {}
         self.hash_variable = None
         self.generate_hash_variable()
-        self.generate_state_dictionary()
+        #self.generate_state_dictionary()
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space

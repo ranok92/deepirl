@@ -236,7 +236,7 @@ class ActorCritic:
                 
             print('Reward for the run :',run_reward)
 
-            if run_reward > 0: # not a bad run
+            if run_reward > 1: # not a bad run
 
                 actions_tensor = torch.tensor(actions)
                 states_tensor = torch.stack(states)
