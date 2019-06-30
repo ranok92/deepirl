@@ -36,7 +36,8 @@ class GridWorld(GridWorldClockless):
         step_size=None,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
-        show_trail = False
+        show_trail = False,
+        place_goal_manually=False
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -57,6 +58,7 @@ class GridWorld(GridWorldClockless):
         self.gameDisplay = None
         self.tickSpeed = 100
         self.show_trail = show_trail
+        self.place_goal_manually = place_goal_manually
         
 
 
@@ -112,6 +114,21 @@ class GridWorld(GridWorldClockless):
 
         return None
     
+
+    def place_goal(self):
+
+        paused = True
+        while paused:
+            for event in pygame.event.get():
+                if event.type==pygame.MOUSEBUTTONDOWN:
+                    (x,y) = pygame.mouse.get_pos()
+                    print("ere")
+                    self.goal_state[1] = x
+                    self.goal_state[0] = y
+                    paused = False
+
+
+
 
     def render(self):
 
@@ -300,6 +317,10 @@ class GridWorld(GridWorldClockless):
         pygame.display.set_caption('Your friendly grid environment')
         self.render()
 
+        if self.place_goal_manually:
+
+            self.place_goal()
+            
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
         return self.state
