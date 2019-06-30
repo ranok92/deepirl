@@ -444,7 +444,7 @@ class DeepMaxEnt():
             )
 
             #np.random.seed(11)
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=300,
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=1000,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,

@@ -831,7 +831,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                     
                     agent_state = agent_key_list[agent_iterator]
                     state_list.append(feat.recover_state_from_hash_value(agent_state))
-                    diff_list.append(0 - agent_svf_dict[aget_statessdfgent_state])
+                    diff_list.append(0 - agent_svf_dict[agent_state])
                     agent_iterator += 1
 
                 break
