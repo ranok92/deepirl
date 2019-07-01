@@ -413,7 +413,9 @@ class DeepMaxEnt():
         #generating svf from samples
 
         smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
+        print('Reading expert-svf . . ')
         expertdemo_svf = self.expert_svf_dict(smoothing_window=smoothing_window)
+        print('Done reading expert-svf.')
         #expertdemo_svf = self.expert_svf_dict()
         #expert_svf_arr  = self.expert_svf()
         lossList = []
@@ -427,7 +429,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size,self.action_size, self.graft)
+            self.resetTraining(self.state_size, self.action_size, self.graft)
 
             #save the reward network
             reward_network_folder = './saved-models-rewards/'+'loc_glob_win_7_simple_rectified_svf_dict_map_3-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
@@ -435,22 +437,25 @@ class DeepMaxEnt():
             pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(reward_network_folder)
 
-            torch.manual_seed(7)
-            np.random.seed(7)
+            #torch.manual_seed(7)
+            #np.random.seed(7)
+            print('Starting RL training. . .')
             current_agent_policy = self.rl.train_mp(
-                n_jobs=1,
+                n_jobs=4,
                 reward_net=self.reward,
                 irl=True
             )
-
+            print('Completed RL training.')
             #np.random.seed(11)
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=1000,
+            print('Starting sampling agent-svf. . .')
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=2000,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episodes,
                                                              smoothing_window=smoothing_window)
+            print('Completed agent-svf sampling.')
 
             #np.random.seed(11)
             #test_agent_svf = self.agent_svf_sampling(num_of_samples=300,
