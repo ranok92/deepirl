@@ -183,31 +183,55 @@ class LocalGlobal():
         return np.array(state_list)
 
 
-
+    '''
     def determine_index(self,diff_r, diff_c):
 
-        step_size = self.grid_size
-        if abs(diff_r) < step_size and diff_c > step_size: #right
-            index = 1
-        elif abs(diff_r) < step_size and diff_c < 0: #left
-            index = 3
-        elif diff_r > 0 and abs(diff_c) < step_size: #down
+        thresh = int((self.agent_width+self.obs_width)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
             index = 2
-        elif diff_r < 0  and abs(diff_c) < step_size: #up
-            index = 0
-        elif diff_r > 0 and diff_c > 0: #quad4
-            index = 7
-        elif diff_r < 0  and diff_c > 0: #quad1
-            index = 4
-        elif diff_r < 0 and diff_c < 0: #quad2
-            index = 5
-        elif diff_r >0 and diff_c < 0: #quad1
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
             index = 6
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 4
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 0
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 3
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 1
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 7
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
+            index = 5
         else:
             index = 8
 
         return index
+    '''
 
+    def determine_index(self, diff_r, diff_c):
+
+        thresh = int((self.agent_width+self.grid_size)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
+            index = 5
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
+            index = 3
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 7
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 1
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 8
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 2
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 0
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
+            index = 6
+        else:
+            index = 4
+
+        return index
 
     def closeness_indicator(self,state_info):
 
@@ -337,28 +361,91 @@ class LocalGlobal():
 class FrontBackSideSimple():
 
 
-    def __init__(self, thresh1 = 2, thresh2 = 4, thresh3 = 6,  
-                    agent_rad = 1, obs_rad = 1 , fieldList = []):
+    def __init__(self, thresh1=1, thresh2=2, thresh3=3, 
+                 agent_width=1, obs_width=1,
+                 step_size=1, grid_size=1, fieldList = []):
 
-            self.thresh1 = thresh1
-            self.thresh2 = thresh2
-            self.thresh3 = thresh3
+        self.thresh1 = step_size*thresh1
+        self.thresh2 = step_size*thresh2
+        self.thresh3 = step_size*thresh3
 
-            self.agent_radius = agent_rad
-            self.obs_rad = obs_rad
+        self.agent_width = agent_width
+        self.obs_width = obs_width
+        self.step_size = step_size
+        self.grid_size = grid_size
 
 
-            self.field_list = fieldList
-            self.prev_dist = None
-            #added new (26-3-19)
-            #based on the state representation, this should contain a 
-            #dictionary containing all possible states
+        self.field_list = fieldList
+        self.prev_dist = None
+        #added new (26-3-19)
+        #based on the state representation, this should contain a 
+        #dictionary containing all possible states
+       
+        self.state_dictionary = {}
+        self.state_str_arr_dict = {}
+        self.inv_state_dictionary = {}
+        self.hash_variable = None
 
-            self.state_dictionary = {}
-            self.state_str_arr_dict = {}
-            print('Loading state space dictionary. . . ')
-            self.generate_state_dictionary()
-            print('Done!')
+        self.state_rep_size = 9+3+12
+        self.generate_hash_variable()
+
+
+        print('Loading state space dictionary. . . ')
+        #self.generate_state_dictionary()
+        print('Done!')
+
+
+
+        #generates the state dictionary based on the structure of the 
+    #hand crafted state space
+    
+    #the keys in the dictionary are strings converted from 
+    #numpy arrays
+    
+
+    def generate_hash_variable(self):
+        '''
+        The hash variable basically is an array of the size of the current state. 
+        This creates an array of the following format:
+        [. . .  16 8 4 2 1] and so on.
+        '''
+        self.hash_variable = np.zeros(self.state_rep_size)
+        for i in range(self.hash_variable.shape[0]-1, -1, -1):
+    
+            self.hash_variable[i] = math.pow(2, self.hash_variable.shape[0]-1-i)
+
+        print(self.hash_variable)
+
+
+        
+
+    def recover_state_from_hash_value(self, hash_value):
+
+        size = self.state_rep_size
+        binary_str = np.binary_repr(hash_value, size)
+        state_val = np.zeros(size)
+        i = 0
+        for digit in binary_str:
+            state_val[i] = int(digit) 
+            i += 1
+
+        return state_val
+
+
+    def hash_function(self, state):
+        '''
+        This function takes in a state and returns an integer which uniquely identifies that 
+        particular state in the entire state space.
+        '''
+        if isinstance(state, torch.Tensor):
+
+            state = state.cpu().numpy()
+
+
+        return int(np.dot(self.hash_variable, state))
+
+
+
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space
@@ -417,27 +504,27 @@ class FrontBackSideSimple():
 
 
 
-    def determine_index(self,diff_r, diff_c):
+    def determine_index(self, diff_r, diff_c):
 
-
-        if diff_r==0 and diff_c >0: #right
-            index = 1
-        elif diff_r==0 and diff_c < 0: #left
-            index = 3
-        elif diff_r > 0 and diff_c == 0: #down
-            index = 2
-        elif diff_r < 0  and diff_c ==0: #up
-            index = 0
-        elif diff_r > 0 and diff_c > 0: #quad4
-            index = 7
-        elif diff_r < 0  and diff_c > 0: #quad1
-            index = 4
-        elif diff_r < 0 and diff_c < 0: #quad2
+        thresh = int((self.agent_width+self.grid_size)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
             index = 5
-        elif diff_r >0 and diff_c < 0: #quad1
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
+            index = 3
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 7
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 1
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 8
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 2
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 0
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
             index = 6
         else:
-            index = 8
+            index = 4
 
         return index
 
@@ -469,31 +556,39 @@ class FrontBackSideSimple():
 
     def get_orientation_distance(self, agent_pos, obs_pos):
 
+        thresh = int((self.agent_width+self.obs_width)/2)
         diff_r = obs_pos[0] - agent_pos[0]
         diff_c = obs_pos[1] - agent_pos[1]
         orient_bin = -1
         dist_bin = -1
         dist = abs(diff_r)+abs(diff_c)
+        dist = dist - thresh - self.step_size
         if dist <= self.thresh3:
             if dist > self.thresh2:
                 dist_bin = 2
 
-            elif dist <= self.thresh2 and dist > self.thresh1:
+            elif dist < self.thresh2 and dist >= self.thresh1:
                 dist_bin = 1
 
             else:
                 dist_bin = 0 
             #select orientation bin
-            if abs(diff_c) < abs(diff_r):
-                if diff_r > 0: #down
-                    orient_bin = 2
-                else: #top
-                    orient_bin = 0
+            if abs(diff_c) > thresh or abs(diff_r) > thresh: 
+            #atleast one has to be bigger than the thres else it is a collision
+                if abs(diff_c) < abs(diff_r):
+                    if diff_r > 0: #down
+                        orient_bin = 2
+                    else: #top
+                        orient_bin = 0
+                else:
+                    if diff_c > 0:#right
+                        orient_bin = 1
+                    else: #left
+                        orient_bin = 3
             else:
-                if diff_c > 0:#right
-                    orient_bin = 1
-                else: #left
-                    orient_bin = 3
+                print('Collision course!!')
+                #collision course
+
 
         return orient_bin, dist_bin
 
