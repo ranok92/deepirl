@@ -6,18 +6,19 @@ import pdb
 import sys
 import math
 import os
-from gridworld_clockless import MockActionspace, MockSpec
 sys.path.insert(0, '..')
+
+from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
 from itertools import count
 import utils  # NOQA: E402
-from envs.gridworld import GridWorld
+from envs.gridworld_clockless import GridWorldClockless
 
 with utils.HiddenPrints():
     import pygame
 
-class GridWorldDrone(GridWorld):
+class GridWorldDrone(GridWorldClockless):
 
     #the numbering starts from 0,0 from topleft corner and goes down and right
     #the obstacles should be a list of 2 dim numpy array stating the position of the 
@@ -40,30 +41,33 @@ class GridWorldDrone(GridWorld):
         annotation_file = None,
         subject = None,
         omit_annotation = None, #will be used to test a policy
-        obs_width = None,
-        step_size = None,
-        agent_width = None
+        obs_width = 10,
+        step_size = 10,
+        agent_width = 10
     ):
-        super().__init__(seed = seed,
-                       rows = rows,
-                       cols = cols,
-                       width = width,
-                       goal_state = goal_state,
-                       obstacles = obstacles,
-                       display = display,
-                       is_onehot = is_onehot,
-                       is_random = is_random,
-                       stepReward= stepReward,
-                       step_wrapper=step_wrapper,
-                       reset_wrapper=reset_wrapper,
-                       show_trail = show_trail,
-                       obs_width=obs_width,
-                       agent_width=agent_width,
-                       step_size=step_size
-                       )
+        super().__init__(seed=seed,
+                         rows=rows,
+                         cols=cols,
+                         width=width,
+                         goal_state = goal_state,
+                         obstacles = obstacles,
+                         display = display,
+                         is_onehot = is_onehot,
+                         is_random = is_random,
+                         stepReward= stepReward,
+                         step_wrapper=step_wrapper,
+                         reset_wrapper=reset_wrapper,
+                         obs_width=obs_width,
+                         agent_width=agent_width,
+                         step_size=step_size
+                        )
 
+        if display:
 
-        self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
+            self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
+            self.clock = pygame.time.Clock()
+            self.tickSpeed = 1
+
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
         self.current_frame = 0
@@ -77,7 +81,11 @@ class GridWorldDrone(GridWorld):
         self.agent_action_flag = False
         self.obstacle_width = obs_width
         self.step_size = step_size
+        self.show_trail = show_trail
 
+
+        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
+        self.lowerLimit = np.asarray([0,0])
         ############# this comes with the change in the action space##########
         self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
                             np.asarray([0,1]),np.asarray([1,1]),
@@ -98,7 +106,7 @@ class GridWorldDrone(GridWorld):
 
         if not os.path.isfile(annotation_file):
             print("The annotation file does not exist.")
-            return 0
+            
 
         with open(self.annotation_file) as f:
 
@@ -339,7 +347,7 @@ class GridWorldDrone(GridWorld):
 
         self.pos_history.append(self.agent_state)
 
-        print(self.state)
+        #print(self.state)
 
         pygame.display.set_caption('Your friendly grid environment')
         if self.display:
@@ -364,15 +372,15 @@ class GridWorldDrone(GridWorld):
 
                 key = pygame.key.get_pressed()
                 if key[pygame.K_UP]:
-                    return 0,True
+                    return 0, True
                 if key[pygame.K_RIGHT]:
-                    return 1,True
+                    return 1, True
                 if key[pygame.K_LEFT]:
-                    return 3,True
+                    return 3, True
                 if key[pygame.K_DOWN]:
-                    return 2,True
+                    return 2, True
 
-        return 4,False
+        return 4, False
 
 
     #taking action from user
@@ -391,10 +399,10 @@ class GridWorldDrone(GridWorld):
         x = 0.0001
         y = 0.0001
         for event in pygame.event.get():
-            if event.type==pygame.MOUSEBUTTONDOWN:
-                self.agent_action_flag=True
-            if event.type==pygame.MOUSEBUTTONUP:
-                self.agent_action_flag=False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.agent_action_flag = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.agent_action_flag = False
         if self.agent_action_flag:  
             (x,y) = pygame.mouse.get_pos()
             #print('x :',x, 'y :',y)
@@ -462,14 +470,14 @@ class GridWorldDrone(GridWorld):
         if base_position[1]==next_position[1]:
 
             gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
-            pygame.draw.line(self.gameDisplay, (0,0,0),
-                            (base_pos_pixel[1],base_pos_pixel[0]),
-                            (next_pos_pixel[1],next_pos_pixel[0]-gap))
+            pygame.draw.line(self.gameDisplay, (0, 0, 0),
+                            (base_pos_pixel[1], base_pos_pixel[0]),
+                            (next_pos_pixel[1], next_pos_pixel[0]-gap))
 
-            pygame.draw.polygon(self.gameDisplay,(0,0,0),
+            pygame.draw.polygon(self.gameDisplay, (0, 0, 0),
                 (
-                (ref_pos[1]+(arrow_width/2),ref_pos[0]),
-                (ref_pos[1]-(arrow_width/2),ref_pos[0]),
+                (ref_pos[1]+(arrow_width/2), ref_pos[0]),
+                (ref_pos[1]-(arrow_width/2), ref_pos[0]),
                 (next_pos_pixel[1],next_pos_pixel[0]-gap)   ),
                 0
                 )
@@ -502,23 +510,33 @@ class GridWorldDrone(GridWorld):
 def record_trajectories(num_of_trajs,path):
 
 
-    step_size=20
+    step_size = 20
     agent_size = 20
-    grid_size = 10
+    grid_size = 20
     obs_size = 20
-    feature_extractor = LocalGlobal(window_size=7, agent_width=agent_size,
+    window_size = 7
+    '''
+    feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
                                     step_size=step_size, 
                                     obs_width=obs_size,
-                                    grid_size=grid_size, fieldList=['agent_state', 'goal_state','obstacles'])
+                                    grid_size=grid_size, 
+                                    fieldList=['agent_state', 'goal_state', 'obstacles'])
+    '''
 
-    env = GridWorldDrone(display=True, is_onehot = False, agent_width=agent_size,
-                        seed = 10, obstacles=None, obs_width=obs_size,
-                        step_size=step_size, width=grid_size,
-                        show_trail=False,
-                        is_random=True,
-                        annotation_file='./stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
-                        subject=None,
-                        rows = 1088, cols = 1424)
+    feature_extractor = FrontBackSideSimple(thresh1=1, thresh2=2,
+                                      thresh3=5, agent_width=agent_size,
+                                      step_size=step_size, grid_size=grid_size,
+                                      fieldList=['agent_state','goal_state','obstacles'])
+
+
+    env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
+                         seed=10, obstacles=None, obs_width=obs_size,
+                         step_size=step_size, width=grid_size,
+                         show_trail=False,
+                         is_random=True,
+                         annotation_file='./stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
+                         subject=None,
+                         rows=1088, cols=1424)
     i = 0
     while i < num_of_trajs:
         actions = []
@@ -533,11 +551,12 @@ def record_trajectories(num_of_trajs,path):
             action = env.take_action_from_user()
             print(action)
             actions.append(action)
-            next_state,reward, done,_ = env.step(action)
-            run_reward += reward
+            next_state, reward, done, _ = env.step(action)
+            run_reward += reward 
             if not done:
                 next_state = feature_extractor.extract_features(next_state)
-                print(next_state[-49:].reshape(7,7))
+                #print(next_state[0:9].reshape(3,3))
+                print(next_state[12:].reshape(3,4))
                 states.append(next_state)
 
         if run_reward > 0:
@@ -552,30 +571,37 @@ def record_trajectories(num_of_trajs,path):
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(i)))
 
-            i+=1
+            i += 1
         else:
 
             print('Bad example. Discarding!')
 
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
-    '''
+    
     #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
+    '''
     feat_ext = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
-                        seed = 0, obstacles=None, 
-                        show_trail=False,
-                        is_random=True,
-                        annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
-                        subject=None,                        
-                        rows = 1088, cols = 1424, width = 20)
+                           seed = 1, obstacles=None, 
+                           show_trail=False,
+                           is_random=True,
+                           annotation_file='../envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
+                           subject=None,                        
+                           rows=1088, cols=1424, width=20)
     print ("here")
 
+    rew = 0
     world.reset()
     while world.current_frame < world.final_frame:
-        action = world.take_action_from_user()
-        world.step(action)
+        action = 2
+        next_state, reward, done, _ = world.step(action)
+        print(next_state['agent_state'])
+        rew += reward
+    print('Reward obtained :', rew)
+
     '''
-    record_trajectories(10,'./trajs/test/')
+    record_trajectories(50,'./trajs/test/')
+    
