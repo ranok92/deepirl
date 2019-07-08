@@ -31,7 +31,9 @@ parser.add_argument('--rl-log-intervals', type=int, default=10)
 parser.add_argument('--regularizer', type=float, default=0, help='The regularizer to use.')
 
 parser.add_argument('--seed', type=int, default=7, help='The seed for the run')
-
+parser.add_argument('--save-folder', type=str, default=None,
+                    help='The name of the directory to store the results in. The name will be used to \
+                    save the plots, the policy and the reward networks.')
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
@@ -52,7 +54,9 @@ def main():
     import irlmethods.irlUtils as irlUtils
     from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
     # initialize the environment
-
+    if not args.dont_save and args.save_folder is None:
+        print('Specify folder to save the results.')
+        exit()
     #**set is_onehot to false
     goal_state = np.asarray([1,5])
     '''
@@ -65,9 +69,9 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    agent_width = 14
-    step_size = 14
-    obs_width = 4
+    agent_width = 10
+    step_size = 10
+    obs_width = 10
     grid_size = 10
     env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
@@ -75,7 +79,7 @@ def main():
                     step_size=step_size,
                     obs_width=obs_width,
                     width=grid_size,
-                    obstacles = '../envs/map3.jpg',
+                    obstacles=[np.asarray([1,1]), np.asarray([1,4])],
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = args.seed,
@@ -86,7 +90,7 @@ def main():
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    feat_ext = LocalGlobal(window_size=7, grid_size=grid_size,
+    feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
@@ -117,19 +121,13 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_loc_glob_rectified_win_7_static_map3/'
-    save_plot = './plots/Svf_dict_window_7_map_3_seed_'+str(args.seed)+'/'
-
-    if os.path.exists(save_plot):
-        pass
-    else:
-        os.mkdir(save_plot)
+    trajectory_path = './trajs/ac_gridworld_loc_glob_rectified_win_3_subset_30/'
 
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer = args.regularizer,
-                           plot_save_folder=save_plot)
+                           save_folder=args.save_folder)
     print("IRL method intialized.")
     rewardNetwork = irlMethod.train()
 
