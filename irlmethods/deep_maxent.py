@@ -70,7 +70,7 @@ class DeepMaxEnt():
             iterations=10,
             log_intervals=1,
             on_server = True,
-            plot_save_folder=None,
+            save_folder=None,
             rl_max_episodes = 30,
             graft = True,
             regularizer=0.1
@@ -84,9 +84,7 @@ class DeepMaxEnt():
         self.rl_max_episodes = rl_max_episodes
         self.graft = graft
 
-        self.plot_save_folder = plot_save_folder
-
-        # TODO: These functions are replaced in the rl method already, this
+    # TODO: These functions are replaced in the rl method already, this
         # needs to be made independant somehow
         # self.env.step = utils.step_torch_state()(self.env.step)
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
@@ -110,8 +108,16 @@ class DeepMaxEnt():
         self.on_server = on_server
 
         self.regularizer = regularizer
+        #folders for saving purposes
+        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
 
-
+        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+    
+        if os.path.exists(self.plot_save_folder):
+            pass
+        else:
+            os.mkdir(self.plot_save_folder)
 
     #******parts being operated on
     def expert_svf(self):
@@ -143,18 +149,19 @@ class DeepMaxEnt():
 
     #***********
     def expert_svf_dict(self,smoothing_window=None):
+        '''
         return irlUtils.calculate_expert_svf(self.traj_path, feature_extractor= self.rl.feature_extractor)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
                                                             feature_extractor=self.rl.feature_extractor,
                                                             smoothing_window=smoothing_window)
-        '''
+        
 
     def agent_svf_sampling_dict(self,num_of_samples=10000 , env=None,
                                 policy_nn=None, reward_nn=None, smoothing_window=None,
                                 episode_length=20, feature_extractor=None):
 
-        
+        ''' 
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
                                             env=  env, policy_nn = policy_nn,
                                             reward_nn = reward_nn ,
@@ -168,7 +175,7 @@ class DeepMaxEnt():
                                                                     feature_extractor=feature_extractor,
                                                                     window=smoothing_window)
 
-        '''
+        
     #***********
 
 
@@ -432,10 +439,10 @@ class DeepMaxEnt():
             self.resetTraining(self.state_size, self.action_size, self.graft)
 
             #save the reward network
-            reward_network_folder = './saved-models-rewards/'+'loc_glob_win_7_simple_rectified_svf_dict_map_3-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
+            #reward_network_folder = './saved-models-rewards/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
 
-            pathlib.Path(reward_network_folder).mkdir(parents=True, exist_ok=True)
-            self.reward.save(reward_network_folder)
+            pathlib.Path(self.reward_network_save_folder).mkdir(parents=True, exist_ok=True)
+            self.reward.save(self.reward_network_save_folder)
 
             #torch.manual_seed(7)
             #np.random.seed(7)
@@ -448,7 +455,7 @@ class DeepMaxEnt():
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=2000,
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=100,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
@@ -465,9 +472,9 @@ class DeepMaxEnt():
             #                                    feature_extractor = self.rl.feature_extractor,
             #                                    episode_length = self.rl_max_episodes)
             #save the policy network
-            policy_network_folder = './saved-models/'+'loc_glob_win_7_simple_rectified_svf_dict_map3-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
-            pathlib.Path(policy_network_folder).mkdir(parents=True, exist_ok=True)
-            current_agent_policy.save(policy_network_folder)
+            #policy_network_folder = './saved-models/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
+            pathlib.Path(self.policy_network_save_folder).mkdir(parents=True, exist_ok=True)
+            current_agent_policy.save(self.policy_network_save_folder)
             
 
         
