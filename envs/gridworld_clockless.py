@@ -39,6 +39,7 @@ class GridWorldClockless:
         obs_width=None,
         agent_width=None,
         step_size=None,
+        consider_heading=True,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
     ):
@@ -96,6 +97,21 @@ class GridWorldClockless:
 
         self.freeze_obstacles = False
         self.agent_action_keyboard = [False for i in range(4)]
+
+        self.consider_heading = consider_heading
+
+        if self.consider_heading:
+
+            self.rel_action_table = np.asarray([[0, 1, 2, 3],
+                                                [1, 2, 3, 0],
+                                                [2, 3, 0, 1],
+                                                [3, 0, 1, 2]])
+
+
+
+
+        self.cur_heading_dir = None
+
         #does not matter if none or not.
         if isinstance(obstacles,str):
 
@@ -283,6 +299,7 @@ class GridWorldClockless:
                 break
 
 
+        self.cur_heading_dir = 0
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
         self.release_control = False
         if self.is_onehot:
@@ -315,6 +332,13 @@ class GridWorldClockless:
         #print('printing the keypress status',self.agent_action_keyboard)
         
         if not self.release_control:
+
+            if self.consider_heading and action != 4:
+
+                action = self.rel_action_table[self.cur_heading_dir,action]
+                self.state['agent_head_dir'] = action 
+                self.cur_heading_dir = action
+
             self.agent_state = np.maximum(np.minimum(self.agent_state+ \
                               (self.step_size * self.actionArray[action]),self.upperLimit),self.lowerLimit)
         
@@ -340,8 +364,7 @@ class GridWorldClockless:
             #added new
             if not self.release_control:
                 self.state['agent_state'] = self.agent_state
-                if action!=4:
-                    self.state['agent_head_dir'] = action 
+ 
 
         if self.is_onehot:
 

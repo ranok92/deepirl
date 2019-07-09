@@ -5,7 +5,12 @@ import pdb
 import sys
 import math
 sys.path.insert(0, '..')
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
+
+
+from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide
+
+
+
 
 from itertools import count
 import utils  # NOQA: E402
@@ -56,7 +61,7 @@ class GridWorld(GridWorldClockless):
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
         self.gameDisplay = None
-        self.tickSpeed = 100
+        self.tickSpeed = 1
         self.show_trail = show_trail
         self.place_goal_manually = place_goal_manually
         
@@ -157,22 +162,26 @@ class GridWorld(GridWorldClockless):
 
     #arrow keys for direction
     def take_user_action(self):
+        '''
+        takes action from user
+        '''
         self.clock.tick(self.tickSpeed)
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-
+                print('keypreseed')
+                pygame.event.wait()
                 key = pygame.key.get_pressed()
                 if key[pygame.K_UP]:
-                    return 0,True
+                    return 0, True
                 if key[pygame.K_RIGHT]:
-                    return 1,True
+                    return 1, True
                 if key[pygame.K_LEFT]:
-                    return 3,True
+                    return 3, True
                 if key[pygame.K_DOWN]:
-                    return 2,True
+                    return 2, True
 
-        return 4,False
+        return 4, False
 
 
 
@@ -298,6 +307,7 @@ class GridWorld(GridWorldClockless):
 
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
         self.release_control = False
+        self.cur_heading_dir = 0
         if self.is_onehot:
             self.state = self.onehotrep()
         else:
@@ -331,12 +341,14 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    featExt = LocalGlobal(window_size=3, agent_width= 10, obs_width=6, grid_size=10,step_size=20,
-                          fieldList=['agent_state','goal_state','obstacles'])
-    #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
-    world = GridWorld(display=True, is_onehot = False, is_random=True,
-                        seed = 0 , obstacles='./test_map.jpg',step_size=10,
-                        rows = 100 , cols = 100 , width = 10, obs_width=10)
+    #featExt = LocalGlobal(window_size=3, agent_width= 10, obs_width=6, grid_size=10,step_size=20,
+    #                      fieldList=['agent_state','goal_state','obstacles'])
+    featExt = FrontBackSide(thresh1=1, thresh2=2, thresh3=3,
+                            fieldList = ['agent_state', 'goal_state', 'obstacles', 'agent_head_dir']) 
+    world = GridWorld(display=True, is_onehot = False, is_random=False,
+                        seed = 0 , obstacles=[np.asarray([70, 90])], 
+                        step_size=10,
+                        rows = 10, cols = 10 , width = 10, obs_width=10)
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -351,17 +363,20 @@ if __name__=="__main__":
             while t < 20:
 
                 action,flag = world.take_user_action()
-                action = np.random.randint(4)
+                #action = np.random.randint(4)
                 print(action)
-                next_state, reward,done,_ = world.step(action)
-                #print(next_state)
-                state  = featExt.extract_features(next_state)
-                #print(state[-9:].reshape([3,3]))
+                #action = 2
+                next_state, reward, done, _ = world.step(action)
+                print(next_state)
+                state = featExt.extract_features(next_state)
+                print('The heading :', state[0:4])
+                print('The goal info :', state[4:13].reshape(3, 3))
+                print('THe obstacle infor :', state[16:].reshape(3, 4))
                 if flag:
-                    t+=1
+                    t += 1
                     print(world.pos_history)
                     states.append(state)
-                if t>20 or done:
+                if t > 20 or done:
                     break
 
             print("reward for the run : ", totalReward)
