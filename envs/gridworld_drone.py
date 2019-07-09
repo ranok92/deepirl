@@ -502,11 +502,12 @@ class GridWorldDrone(GridWorld):
 def record_trajectories(num_of_trajs,path):
 
 
-    step_size=20
-    agent_size = 20
-    grid_size = 10
+    step_size = 30
+    agent_size = 30
+    grid_size = 40
     obs_size = 20
-    feature_extractor = LocalGlobal(window_size=7, agent_width=agent_size,
+    window_size = 7
+    feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
                                     step_size=step_size, 
                                     obs_width=obs_size,
                                     grid_size=grid_size, fieldList=['agent_state', 'goal_state','obstacles'])
@@ -537,10 +538,10 @@ def record_trajectories(num_of_trajs,path):
             run_reward += reward
             if not done:
                 next_state = feature_extractor.extract_features(next_state)
-                print(next_state[-49:].reshape(7,7))
+                print(next_state[-window_size**2:].reshape(window_size,window_size))
                 states.append(next_state)
 
-        if run_reward > 0:
+        if run_reward > 1:
 
             actions_tensor = torch.tensor(actions)
             states_tensor = torch.stack(states)
