@@ -178,7 +178,7 @@ class ActorCritic:
                 t= 0
                 while t < self.max_ep_length:
                 
-                    action,action_flag = self.env.take_user_action()
+                    action,action_flag = self.env.take_action_from_user()
 
                     state, rewards, done, _ = self.env.step(action)
                     

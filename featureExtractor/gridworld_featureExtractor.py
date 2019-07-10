@@ -636,10 +636,12 @@ class FrontBackSideSimple():
             
         return reset_wrapper(mod_state)
 
+
+
 class FrontBackSide():
 
     def __init__(self,thresh1=1, thresh2=2,
-                 thresh3=3, agent_width=10,
+                 thresh3=3, thresh4=4, agent_width=10,
                  obs_width=10, step_size=10,
                  grid_size=1, fieldList=[]):
 

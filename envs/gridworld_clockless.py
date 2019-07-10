@@ -11,6 +11,26 @@ import utils  # NOQA: E402
 with utils.HiddenPrints():
     import pygame
 
+
+
+class Obstacles:
+
+    def __init__(self,
+                 position=None, 
+                 speed=0, 
+                 width=10,
+                 dynamic_model=None
+                 ):
+        if position is None:
+            self.position = (0,0)
+        else:
+            self.position = position
+
+        self.speed = speed
+        self.width = width
+        self.dynamics_model = None
+
+
 class MockActionspace:
     def __init__(self, n):
         self.n = n
@@ -39,7 +59,7 @@ class GridWorldClockless:
         obs_width=None,
         agent_width=None,
         step_size=None,
-        consider_heading=True,
+        consider_heading=False,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
     ):
@@ -155,28 +175,40 @@ class GridWorldClockless:
             else:
                 self.state['obstacles'] = self.obstacles
 
+
+        '''          
         # 0: up, 1: right, 2: down, 3: left
         self.actionArray = [np.asarray([-1,0]),np.asarray([0,1]),np.asarray([1,0]),
                             np.asarray([0,-1]),np.asarray([0,0])]
 
-
-        # augmented action space:
-        #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
-        #starting from top and doing nothing)
-        '''
-
-        '''
         self.action_dict = {}
 
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
-        self.stepReward = stepReward
-
-        # TODO: Remove the below mock environment in favor of gym.space
-        # creates a mock object mimicking action_space to obtain number of
-        # actions
+        
 
         self.action_space = MockActionspace(len(self.actionArray))
+        '''
+
+        # augmented action space:
+        #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
+        #starting from top and doing nothing)
+        
+        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
+                            np.asarray([0,1]),np.asarray([1,1]),
+                            np.asarray([1,0]),np.asarray([1,-1]),
+                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+
+        self.action_dict = {}
+
+        for i in range(len(self.actionArray)):
+            self.action_dict[np.array2string(self.actionArray[i])] = i
+
+        self.action_space = MockActionspace(len(self.actionArray))
+
+        #########################################
+        
+        self.stepReward = stepReward
 
         # TODO: Remove the below mock spec in favor of gym style spec
         # creates an environment spec containing useful info, notably reward

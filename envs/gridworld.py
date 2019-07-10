@@ -64,7 +64,8 @@ class GridWorld(GridWorldClockless):
         self.tickSpeed = 1
         self.show_trail = show_trail
         self.place_goal_manually = place_goal_manually
-        
+        self.agent_action_flag = False
+
 
 
         if obstacles=='By hand':
@@ -184,6 +185,52 @@ class GridWorld(GridWorldClockless):
         return 4, False
 
 
+    #taking action from user
+    def take_action_from_user(self):
+        #the user will click anywhere on the board and the agent will start moving
+        #directly towards the point being clicked. The actions taken in the process
+        #will be registered as the action performed by the expert. The agent will keep
+        #moving towards the pointer as long as the left button remains pressed. Once released
+        #the agent will remain in its position.
+        #Using the above method, the user will have to drag the agent across the board
+        #avoiding the obstacles in the process and reaching the goal.
+        #if any collision is detected or the goal is not reached the 
+        #trajectory will be discarded.
+        (a,b,c) = pygame.mouse.get_pressed()
+        
+        x = 0.0001
+        y = 0.0001
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.agent_action_flag = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.agent_action_flag = False
+        if self.agent_action_flag:  
+            (x,y) = pygame.mouse.get_pos()
+            #print('x :',x, 'y :',y)
+            x = x - self.agent_state[1]
+            y = y - self.agent_state[0]
+
+            x = int(x/self.step_size)
+            y = int(y/self.step_size)
+
+            x = int(np.sign(x))
+            y = int(np.sign(y))
+            #print(x,y)
+            sign_arr = np.array([y,x])
+            def_arr = np.array([1,1])
+            action = sign_arr*def_arr
+
+            '''
+            if np.hypot(x,y)>_max_agent_speed:
+                normalizer = _max_agent_speed/(np.hypot(x,y))
+            #print x,y
+            else:
+                normalizer = 1
+            '''
+            return self.action_dict[np.array2string(sign_arr*def_arr)], True
+
+        return self.action_dict[np.array2string(np.array([0,0]))], False
 
     def close_game(self):
 
