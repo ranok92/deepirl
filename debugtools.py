@@ -475,6 +475,82 @@ def compare_svf(expert_folder, agent_policy, feat = None):
         plt.savefig('./experiments/svf_visual/dot_prod.jpg')
    
 
+def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=False):
+    '''
+    Information it provides: 
+        1. A histogram of the direction in which the 
+    goal is with respect to the agent across all the states in all the 
+    trajectories.
+        2. A histogram of the distances in which the obstacles were wrt 
+    the agent in all the trajectories.
+        3. A histogram of the orientation in which the obstacles were wrt 
+    the agent in all the trajectories.
+        4. A histogram on the closeness indicator saying how fast the agent 
+    was moving towards the goal
+
+    **THIS METHOD IS SPECIFICALLY DESIGNED TO CATER TO THE NEEDS 
+    OF THE FEATURE EXTRACTOR FrontBackSideSimple (and FrontBackSide in future)
+    '''
+
+    #initialize the histograms
+    goal_orientation_hist = np.zeros(9)
+    obs_orientation_hist = np.zeros(4)
+    obs_dist_hist = np.zeros(4)
+    closeness_indicator_hist = np.zeros(3)
+
+    xaxis_9 = np.arange(9)
+    xaxis_4 = np.arange(4)
+    xaxis_3 = np.arange(3)
+
+    #read trajectories from the folder
+    actions = glob.glob(os.path.join(trajectory_folder, '*.acts'))
+    states = glob.glob(os.path.join(trajectory_folder, '*.states'))
+
+    counter = 0
+    for idx, state_file in enumerate(states):
+
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        for i in range(traj_np.shape[0]):
+            goal_orientation_hist += traj_np[i][0:9]
+            closeness_indicator_hist += traj_np[i][9:12]
+
+            orientation_dist_arr = traj_np[i][12:].reshape([4,4])
+            obs_dist_hist += orientation_dist_arr.sum(axis=1)
+            obs_orientation_hist += orientation_dist_arr.sum(axis=0)
+            counter += 1
+
+    #normalizing the histograms based on the number of steps and the 
+    #number of trajectories available
+    goal_orientation_hist /= counter
+    obs_orientation_hist /= counter
+    closeness_indicator_hist /= counter
+    obs_dist_hist /= counter
+
+    #plot information
+    if plot_info:
+
+        plt.figure(0)
+        plt.title('Goal orientation information.')
+        plt.bar(xaxis_9, goal_orientation_hist)
+        plt.figure(1)
+        plt.title('Closeness inidicator information')
+        plt.bar(xaxis_3, closeness_indicator_hist)
+        plt.figure(2)
+        plt.title('Orientation information')
+        plt.bar(xaxis_4, obs_orientation_hist)
+        plt.figure(3)
+        plt.title('Distance from obstacles information')
+        plt.bar(xaxis_4, obs_dist_hist)
+
+        plt.show()
+
+    return goal_orientation_hist, closeness_indicator_hist,\
+           obs_orientation_hist, obs_dist_hist
+
+
+
 
 if __name__ == '__main__':
 
@@ -492,10 +568,9 @@ if __name__ == '__main__':
                 goal_state = np.asarray([1,5]))
     
     #initialize feature extractor
-    feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
+    #feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
     #feat = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
-    #                            thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
+    feat = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles'])
     #initialize reward network
     #print(env.reset())
     '''
@@ -534,7 +609,12 @@ if __name__ == '__main__':
     
 
     visualize_rewards_from_reward_directory('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001',feat,env)
-    '''
+ 
     compare_svf('./experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
                 './experiments/saved-models/loc_glob_simple_rectified--0.05/',
                 feat=feat)
+   '''
+
+    get_trajectory_information('./experiments/trajs/ac_fbs_simple4_obs_hugger_user/', 
+                              feat, 
+                              plot_info=True)
