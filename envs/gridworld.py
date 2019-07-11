@@ -42,6 +42,7 @@ class GridWorld(GridWorldClockless):
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
         show_trail = False,
+        consider_heading=False,
         place_goal_manually=False
     ):
         super().__init__(seed = seed,
@@ -58,6 +59,7 @@ class GridWorld(GridWorldClockless):
                        obs_width=obs_width,
                        agent_width=agent_width,
                        step_size=step_size,
+                       consider_heading=consider_heading,
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
         self.gameDisplay = None
@@ -218,9 +220,12 @@ class GridWorld(GridWorldClockless):
             y = int(np.sign(y))
             #print(x,y)
             sign_arr = np.array([y,x])
+            norm = np.linalg.norm(sign_arr)
+            if norm > 0:
+                sign_arr = sign_arr / norm
             def_arr = np.array([1,1])
             action = sign_arr*def_arr
-
+            print('Action taken:',action)
             '''
             if np.hypot(x,y)>_max_agent_speed:
                 normalizer = _max_agent_speed/(np.hypot(x,y))

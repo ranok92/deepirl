@@ -360,13 +360,14 @@ class LocalGlobal():
 class FrontBackSideSimple():
 
 
-    def __init__(self, thresh1=1, thresh2=2, thresh3=3, 
+    def __init__(self, thresh1=1, thresh2=2, thresh3=3, thresh4=4, 
                  agent_width=1, obs_width=1,
                  step_size=1, grid_size=1, fieldList = []):
 
         self.thresh1 = step_size*thresh1
         self.thresh2 = step_size*thresh2
         self.thresh3 = step_size*thresh3
+        self.thresh4 = step_size*thresh4
 
         self.agent_width = agent_width
         self.obs_width = obs_width
@@ -385,7 +386,7 @@ class FrontBackSideSimple():
         self.inv_state_dictionary = {}
         self.hash_variable = None
 
-        self.state_rep_size = 9+3+12
+        self.state_rep_size = 9+3+16
         #self.generate_hash_variable()
 
 
@@ -560,20 +561,23 @@ class FrontBackSideSimple():
         diff_c = obs_pos[1] - agent_pos[1]
         orient_bin = -1
         dist_bin = -1
-        dist = abs(diff_r)+abs(diff_c)
-        dist = dist - thresh - self.step_size
-        #print(dist)
-        if dist <= self.thresh3:
-            if dist > self.thresh2:
+        dist = np.linalg.norm(np.array([abs(diff_r),abs(diff_c)]))
+        dist = dist - thresh
+        if dist <= self.thresh4:
+            if dist > self.thresh3:
+                dist_bin = 3
+
+            elif dist <= self.thresh3 and dist > self.thresh2:
                 dist_bin = 2
 
-            elif dist < self.thresh2 and dist >= self.thresh1:
+            elif dist <= self.thresh2 and dist > self.thresh1:
                 dist_bin = 1
 
             else:
+                #pdb.set_trace()
                 dist_bin = 0 
             #select orientation bin
-            if abs(diff_c) > thresh or abs(diff_r) > thresh: 
+            if abs(diff_c) >= thresh or abs(diff_r) >= thresh: 
             #atleast one has to be bigger than the thres else it is a collision
                 if abs(diff_c) < abs(diff_r):
                     if diff_r > 0: #down
@@ -589,7 +593,6 @@ class FrontBackSideSimple():
                 #print('Collision course!!')
                 #collision course
                 pass
-
         return orient_bin, dist_bin
 
     def extract_features(self, state):
@@ -597,7 +600,7 @@ class FrontBackSideSimple():
         #pdb.set_trace()
         state = self.get_info_from_state(state)
 
-        mod_state = np.zeros(9+3+12)
+        mod_state = np.zeros(9+3+16)
 
         #a = int((window_size**2-1)/2)
         

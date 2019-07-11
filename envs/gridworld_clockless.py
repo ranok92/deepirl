@@ -199,6 +199,13 @@ class GridWorldClockless:
                             np.asarray([1,0]),np.asarray([1,-1]),
                             np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
 
+        for i in range(len(self.actionArray)):
+
+            if np.linalg.norm(self.actionArray[i])>0:
+                self.actionArray[i] = self.actionArray[i] / np.linalg.norm(self.actionArray[i])
+
+        print(self.actionArray)
+
         self.action_dict = {}
 
         for i in range(len(self.actionArray)):
