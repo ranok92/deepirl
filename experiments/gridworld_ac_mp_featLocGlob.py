@@ -35,36 +35,47 @@ def main():
         from envs.gridworld_clockless import GridWorldClockless as GridWorld
 
 
-    agent_width = 14
-    step_size = 14
-    obs_width = 4
-    grid_size = 10
+    agent_width = 5
+    step_size = 5
+    obs_width = 5
+    grid_size = 5
+    '''
     featExtract = LocalGlobal(window_size=7, agent_width=agent_width,
                               step_size=step_size, 
                               obs_width=obs_width,
                               grid_size=grid_size,
                               fieldList = ['agent_state','goal_state','obstacles'])
+    '''
     #featExtract = OneHot(grid_rows=10,grid_cols=10)
     #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
 
     #featExtract = SocialNav(fieldList = ['agent_state','goal_state'])
+    feat_ext = FrontBackSideSimple(thresh1 = 1,
+                                thresh2 = 2,
+                                thresh3 = 3,
+                                thresh4=4,
+                                step_size=step_size,
+                                agent_width=agent_width,
+                                obs_width=obs_width,
+                                fieldList = ['agent_state','goal_state','obstacles'])
     '''
     np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
                                 np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
                                 '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=True,
-                    rows=10, agent_width=agent_width,step_size=step_size,
+                    rows=60, agent_width=agent_width,step_size=step_size,
                     obs_width=obs_width,width=grid_size,
-                    cols=10,
-                    seed = 7,
-                    obstacles = '../envs/map3.jpg',
+                    cols=60,
+                    seed=7,
+                    buffer_from_obs=0,
+                    obstacles = '../envs/map7.png',
                                 
                     goal_state = np.asarray([5,5]))
 
-    model = ActorCritic(env, feat_extractor=featExtract,  gamma=0.99,
-                        log_interval=400,max_ep_length=50 , 
-                        max_episodes = 8000)
+    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
+                        log_interval=100,max_ep_length=100, 
+                        max_episodes=4000)
 
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
@@ -87,7 +98,7 @@ def main():
         env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
 
-        model.generate_trajectory(args.num_trajs, './trajs/ac_loc_glob_rectified_win_7_static_map3/')
+        model.generate_trajectory(args.num_trajs, './trajs/ac_fbs_simple4_static_map7/')
 
     if args.play_user:
         env.tickSpeed = 200

@@ -79,26 +79,33 @@ def main():
                     step_size=step_size,
                     obs_width=obs_width,
                     width=grid_size,
-                    obstacles=[np.asarray([1,1]), np.asarray([1,4])],
+                    obstacles= '../envs/map7.png',
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = args.seed,
+                    consider_heading=False,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     
-    #CHANGE HERE
+    #CHANGE HEREq
     #initialize feature extractor
     #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+    '''
     feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
                            fieldList = ['agent_state','goal_state','obstacles'])
-    #feat_ext = FrontBackSideSimple(thresh1 = 1,
-    #                                thresh2 = 2,
-    #                                thresh3 = 3,
-    #                                fieldList = ['agent_state','goal_state','obstacles'])
+    '''
+    feat_ext = FrontBackSideSimple(thresh1 = 1,
+                                    thresh2 = 2,
+                                    thresh3 = 3,
+                                    thresh4=4,
+                                    step_size=step_size,
+                                    agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    fieldList = ['agent_state','goal_state','obstacles'])
     #CHANGE HERE
     #initialize loss based termination
 
@@ -121,7 +128,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_gridworld_loc_glob_rectified_win_3_subset_30/'
+    trajectory_path = './trajs/ac_fbs_simple4_static_map7/'
 
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,

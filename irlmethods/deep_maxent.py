@@ -149,19 +149,19 @@ class DeepMaxEnt():
 
     #***********
     def expert_svf_dict(self,smoothing_window=None):
-        '''
+        
         return irlUtils.calculate_expert_svf(self.traj_path, feature_extractor= self.rl.feature_extractor)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
                                                             feature_extractor=self.rl.feature_extractor,
                                                             smoothing_window=smoothing_window)
         
-
+        '''
     def agent_svf_sampling_dict(self,num_of_samples=10000 , env=None,
                                 policy_nn=None, reward_nn=None, smoothing_window=None,
                                 episode_length=20, feature_extractor=None):
 
-        ''' 
+         
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
                                             env=  env, policy_nn = policy_nn,
                                             reward_nn = reward_nn ,
@@ -175,7 +175,7 @@ class DeepMaxEnt():
                                                                     feature_extractor=feature_extractor,
                                                                     window=smoothing_window)
 
-        
+        '''
     #***********
 
 
@@ -455,7 +455,7 @@ class DeepMaxEnt():
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=100,
+            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=3000,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
