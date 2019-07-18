@@ -33,7 +33,10 @@ parser.add_argument('--regularizer', type=float, default=0, help='The regularize
 parser.add_argument('--seed', type=int, default=7, help='The seed for the run')
 parser.add_argument('--save-folder', type=str, default=None,
                     help='The name of the directory to store the results in. The name will be used to \
-                    save the plots, the policy and the reward networks.')
+                    save the plots, the policy and the reward networks.(Relative path)')
+
+parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The name of the directory in which \
+                    the expert trajectories are stored.(Relative path)')
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
@@ -128,7 +131,7 @@ def main():
 
     # initialize IRL method
     #CHANGE HERE 
-    trajectory_path = './trajs/ac_fbs_simple4_static_map7/'
+    trajectory_path = args.exp_trajectory_path
 
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
