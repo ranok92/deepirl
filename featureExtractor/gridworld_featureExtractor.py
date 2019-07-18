@@ -387,7 +387,7 @@ class FrontBackSideSimple():
         self.hash_variable = None
 
         self.state_rep_size = 9+3+16
-        #self.generate_hash_variable()
+        self.generate_hash_variable()
 
 
         print('Loading state space dictionary. . . ')
