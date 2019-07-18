@@ -43,6 +43,7 @@ class GridWorld(GridWorldClockless):
         reset_wrapper=utils.identity_wrapper,
         show_trail = False,
         consider_heading=False,
+        buffer_from_obs=0,
         place_goal_manually=False
     ):
         super().__init__(seed = seed,
@@ -60,19 +61,31 @@ class GridWorld(GridWorldClockless):
                        agent_width=agent_width,
                        step_size=step_size,
                        consider_heading=consider_heading,
+                       buffer_from_obs=buffer_from_obs,
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
         self.gameDisplay = None
-        self.tickSpeed = 1
+        self.tickSpeed = 100
         self.show_trail = show_trail
         self.place_goal_manually = place_goal_manually
         self.agent_action_flag = False
 
 
+        if isinstance(self.obstacles, int):
 
-        if obstacles=='By hand':
+            num_obs = self.obstacles
+            self.obstacles = []
+            for i in range(num_obs):
+                
+                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
 
-            self.obstacles = self.draw_obstacles_on_board()
+
+        else:
+
+            if obstacles=='By hand':
+
+                self.obstacles = self.draw_obstacles_on_board()
 
 
     def draw_obstacles_on_board(self):
@@ -397,10 +410,10 @@ if __name__=="__main__":
     #                      fieldList=['agent_state','goal_state','obstacles'])
     featExt = FrontBackSide(thresh1=1, thresh2=2, thresh3=3,
                             fieldList = ['agent_state', 'goal_state', 'obstacles', 'agent_head_dir']) 
-    world = GridWorld(display=True, is_onehot = False, is_random=False,
-                        seed = 0 , obstacles=[np.asarray([70, 90])], 
-                        step_size=10,
-                        rows = 10, cols = 10 , width = 10, obs_width=10)
+    world = GridWorld(display=True, is_onehot = False, is_random=True,
+                        seed = 0 , obstacles='map7.png', 
+                        step_size=5, buffer_from_obs=10,
+                        rows = 50, cols = 50 , width=5, obs_width=10)
     for i in range(100):
         print ("here")
         state = world.reset()
@@ -412,9 +425,9 @@ if __name__=="__main__":
         states.append(state)
         for i in count(0):
             t = 0
-            while t < 20:
+            while t < 1000:
 
-                action,flag = world.take_user_action()
+                action,flag = world.take_action_from_user()
                 #action = np.random.randint(4)
                 print(action)
                 #action = 2
@@ -428,7 +441,7 @@ if __name__=="__main__":
                     t += 1
                     print(world.pos_history)
                     states.append(state)
-                if t > 20 or done:
+                if t > 1000 or done:
                     break
 
             print("reward for the run : ", totalReward)

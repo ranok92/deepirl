@@ -60,6 +60,7 @@ class GridWorldClockless:
         agent_width=None,
         step_size=None,
         consider_heading=False,
+        buffer_from_obs=0,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
     ):
@@ -72,6 +73,7 @@ class GridWorldClockless:
         self.cols = cols
         self.seed = seed
         self.cellWidth = width
+        self.buffer_from_obs = buffer_from_obs
         if obs_width is None:
             self.obs_width=self.cellWidth
         else:
@@ -140,6 +142,17 @@ class GridWorldClockless:
         else:
 
             self.obstacles = obstacles
+
+
+        if isinstance(self.obstacles, int):
+            
+            num_obs = self.obstacles
+            self.obstacles = []
+            for i in range(num_obs):
+                
+                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
+
 
         '''
         this decides the state information based on whether 
@@ -230,9 +243,9 @@ class GridWorldClockless:
         self.release_control = False
 
         #distance to be maintained between the agent and the obstacles
-        self.agent_spawn_clearance = 1
+        self.agent_spawn_clearance = 2+self.buffer_from_obs
         #distance to be maintained between the goal and the obstacles
-        self.goal_spawn_clearance = 1
+        self.goal_spawn_clearance = 1+self.buffer_from_obs
 
         self.pos_history = []
 
@@ -420,12 +433,11 @@ class GridWorldClockless:
         return self.state, reward, done, None
 
 
-    def check_overlap(self,temp_pos,obs_pos,width):
+    def check_overlap(self,temp_pos,obs_pos,width,buffer):
         #if true, that means there is an overlap
 
         boundary = self.agent_width/2
-
-        distance_to_maintain = boundary+(width/2)
+        distance_to_maintain = boundary+(width/2)+buffer
         #pdb.set_trace()
         if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
 
@@ -441,14 +453,14 @@ class GridWorldClockless:
 
         if self.obstacles is not None:
             for obs in self.obstacles:
-                if self.check_overlap(self.agent_state, obs, self.obs_width):
+                if self.check_overlap(self.agent_state, obs, self.obs_width, self.buffer_from_obs):
                     hit = True
 
         if (hit):
             reward = -1
             done = True
 
-        elif self.check_overlap(self.agent_state ,self.goal_state, self.cellWidth):
+        elif self.check_overlap(self.agent_state ,self.goal_state, self.cellWidth, 0):
             reward = 1
             done = True
 
