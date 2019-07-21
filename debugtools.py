@@ -21,6 +21,7 @@ from utils import to_oh
 from irlmethods.irlUtils import toTorch
 
 from irlmethods.irlUtils import expert_svf, get_svf_from_sampling
+from irlmethods.irlUtils import get_states_and_freq_diff, calculate_expert_svf
 import re
 numbers = re.compile(r'(\d+)')
 
@@ -495,12 +496,13 @@ def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=F
     #initialize the histograms
     goal_orientation_hist = np.zeros(9)
     obs_orientation_hist = np.zeros(4)
-    obs_dist_hist = np.zeros(4)
+    obs_dist_hist = np.zeros(5)
     closeness_indicator_hist = np.zeros(3)
 
     xaxis_9 = np.arange(9)
     xaxis_4 = np.arange(4)
     xaxis_3 = np.arange(3)
+    xaxis_5 = np.arange(5)
 
     #read trajectories from the folder
     actions = glob.glob(os.path.join(trajectory_folder, '*.acts'))
@@ -516,8 +518,9 @@ def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=F
             goal_orientation_hist += traj_np[i][0:9]
             closeness_indicator_hist += traj_np[i][9:12]
 
-            orientation_dist_arr = traj_np[i][12:].reshape([4,4])
-            obs_dist_hist += orientation_dist_arr.sum(axis=1)
+            orientation_dist_arr = traj_np[i][12:-1].reshape([4,4])
+            obs_dist_hist[0:4] += orientation_dist_arr.sum(axis=1)
+            obs_dist_hist[4] += traj_np[i][-1] #adding the hit flag
             obs_orientation_hist += orientation_dist_arr.sum(axis=0)
             counter += 1
 
@@ -542,7 +545,7 @@ def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=F
         plt.bar(xaxis_4, obs_orientation_hist)
         plt.figure(3)
         plt.title('Distance from obstacles information')
-        plt.bar(xaxis_4, obs_dist_hist)
+        plt.bar(xaxis_5, obs_dist_hist)
 
         plt.show()
 
@@ -613,8 +616,26 @@ if __name__ == '__main__':
     compare_svf('./experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
                 './experiments/saved-models/loc_glob_simple_rectified--0.05/',
                 feat=feat)
-   '''
-
-    get_trajectory_information('./experiments/trajs/ac_fbs_simple4_obs_hugger_user/', 
+   
+    '''
+    get_trajectory_information('./experiments/trajs/ac_fbs_simple4_hit_static_map7/', 
                               feat, 
                               plot_info=True)
+    '''
+    get_trajectory_information('./experiments/trajs/ac_fbs_simple4_avoid_static_map7_irl/', 
+                              feat, 
+                              plot_info=True)
+
+    
+    #check the svf diff
+
+    traj_set_1_svf = calculate_expert_svf('./experiments/trajs/ac_fbs_simple4_hit_static_map7/',
+                                          feature_extractor=feat)
+    traj_set_2_svf = calculate_expert_svf('./experiments/trajs/ac_fbs_simple4_obs_avoid_static_map7/',
+                                          feature_extractor=feat)
+
+    pdb.set_trace()
+    states, diff_freq = get_states_and_freq_diff(traj_set_1_svf, traj_set_2_svf, feat)
+    
+    print('The freq diff :', np.linalg.norm(diff_freq,1))
+    '''

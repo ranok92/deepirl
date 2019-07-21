@@ -47,6 +47,7 @@ class RewardNet(BaseNN):
     def forward(self, x):
         x = self.body(x)
         x = self.head(x)
+        x = F.sigmoid(x)#added a sigmoid to keep the value between 0 and 1
 
         return x
 
@@ -488,7 +489,7 @@ class DeepMaxEnt():
             #*******************************
 
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
-            svf_diff_list.append(np.dot(diff_freq,diff_freq))
+            svf_diff_list.append(np.linalg.norm(diff_freq,1))
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 

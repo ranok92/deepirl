@@ -386,7 +386,7 @@ class FrontBackSideSimple():
         self.inv_state_dictionary = {}
         self.hash_variable = None
 
-        self.state_rep_size = 9+3+16
+        self.state_rep_size = 9+3+16+1
         self.generate_hash_variable()
 
 
@@ -563,6 +563,7 @@ class FrontBackSideSimple():
         dist_bin = -1
         dist = np.linalg.norm(np.array([abs(diff_r),abs(diff_c)]))
         dist = dist - thresh
+        is_hit = False
         if dist <= self.thresh4:
             if dist > self.thresh3:
                 dist_bin = 3
@@ -593,14 +594,17 @@ class FrontBackSideSimple():
                 #print('Collision course!!')
                 #collision course
                 pass
-        return orient_bin, dist_bin
+        if dist < 0:
+            is_hit = True
+                
+        return orient_bin, dist_bin, is_hit
 
     def extract_features(self, state):
 
         #pdb.set_trace()
         state = self.get_info_from_state(state)
 
-        mod_state = np.zeros(9+3+16)
+        mod_state = np.zeros(self.state_rep_size)
 
         #a = int((window_size**2-1)/2)
         
@@ -632,10 +636,12 @@ class FrontBackSideSimple():
             #new method, simulate overlap for each of the neighbouring places
             #for each of the obstacles
             obs_pos = state[i]
-            orient, dist = self.get_orientation_distance(agent_pos, obs_pos)
+            orient, dist, is_hit = self.get_orientation_distance(agent_pos, obs_pos)
             if dist >= 0 and orient >= 0:
                 mod_state[12+dist*4+orient] = 1 # clockwise starting from the inner most circle
 
+            if is_hit:
+                mod_state[-1]=1
             
         return reset_wrapper(mod_state)
 
