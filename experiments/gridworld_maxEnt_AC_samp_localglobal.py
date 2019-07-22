@@ -38,6 +38,9 @@ parser.add_argument('--save-folder', type=str, default=None,
 parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The name of the directory in which \
                     the expert trajectories are stored.(Relative path)')
 
+parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
+                     feature extractor to be used in the experiment.')
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -56,7 +59,34 @@ def main():
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
     from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
-    # initialize the environment
+
+    
+    #check for the feature extractor being used
+    #initialize feature extractor
+    if args.feat_extractor == 'Onehot':
+        feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    if args.feat_extractor == 'SocialNav':
+        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+    if args.feat_extractor == 'FrontBackSideSimple':
+        feat_ext = FrontBackSideSimple(thresh1 = 1,
+                                    thresh2 = 2,
+                                    thresh3 = 3,
+                                    thresh4=4,
+                                    step_size=step_size,
+                                    agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    fieldList = ['agent_state','goal_state','obstacles'])
+
+    if args.feat_extractor == 'LocalGlobal':
+        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+                           agent_width=agent_width, 
+                           obs_width=obs_width,
+                           step_size=step_size,
+                           fieldList = ['agent_state','goal_state','obstacles'])
+    
+
+
+    #initialize the environment
     if not args.dont_save and args.save_folder is None:
         print('Specify folder to save the results.')
         exit()
@@ -91,24 +121,7 @@ def main():
                     is_onehot = False)
     
     #CHANGE HEREq
-    #initialize feature extractor
-    #feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-    #feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    '''
-    feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
-                           agent_width=agent_width, 
-                           obs_width=obs_width,
-                           step_size=step_size,
-                           fieldList = ['agent_state','goal_state','obstacles'])
-    '''
-    feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                    thresh2 = 2,
-                                    thresh3 = 3,
-                                    thresh4=4,
-                                    step_size=step_size,
-                                    agent_width=agent_width,
-                                    obs_width=obs_width,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+
     #CHANGE HERE
     #initialize loss based termination
 
