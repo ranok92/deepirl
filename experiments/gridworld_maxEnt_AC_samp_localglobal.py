@@ -60,7 +60,10 @@ def main():
     import irlmethods.irlUtils as irlUtils
     from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
 
-    
+    agent_width = 10
+    step_size = 10
+    obs_width = 10
+    grid_size = 10
     #check for the feature extractor being used
     #initialize feature extractor
     if args.feat_extractor == 'Onehot':
@@ -102,10 +105,7 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    agent_width = 10
-    step_size = 10
-    obs_width = 10
-    grid_size = 10
+
     env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
                     agent_width=agent_width,
