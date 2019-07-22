@@ -39,7 +39,6 @@ class RewardNet(BaseNN):
             nn.Linear(state_dims, 128),
             nn.ReLU(),
         )
-
         self.head = nn.Sequential(
             nn.Linear(128, 1),
         )
@@ -47,7 +46,7 @@ class RewardNet(BaseNN):
     def forward(self, x):
         x = self.body(x)
         x = self.head(x)
-        x = F.sigmoid(x)#added a sigmoid to keep the value between 0 and 1
+        #x = F.sigmoid(x)#added a sigmoid to keep the value between 0 and 1
 
         return x
 
