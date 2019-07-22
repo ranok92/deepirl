@@ -139,7 +139,7 @@ class GridWorldDrone(GridWorld):
         self.obstacles = []
         for element in frame_info:
 
-            if element[6] != 1: #they are visible
+            if element[6] != str(1): #they are visible
                 if int(element[0]) != self.subject:
 
                     left = int(element[1])
@@ -168,7 +168,8 @@ class GridWorldDrone(GridWorld):
             for obs in self.obstacles:
                 pygame.draw.rect(self.gameDisplay, self.red, [obs[1],obs[0],self.cellWidth, self.cellWidth])
         #render goal
-        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1], self.goal_state[0],self.cellWidth, self.cellWidth])
+        if self.goal_state is not None:
+            pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1], self.goal_state[0],self.cellWidth, self.cellWidth])
         #render agent
         if self.agent_state is not None:
             pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1], self.agent_state[0], self.cellWidth, self.cellWidth])
@@ -419,9 +420,9 @@ if __name__=="__main__":
                         seed = 0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
-                        subject=10,                        
-                        rows = 1088, cols = 1424, width = 20)
+                        annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video3/annotations.txt',
+                        subject=9,                        
+                        rows = 1088, cols = 1424, width = 10)
     print ("here")
 
     world.reset()
