@@ -52,47 +52,65 @@ dtype = torch.float32
 class Policy(BaseNN):
     """Policy network"""
 
-    def __init__(self, state_dims, action_dims, body_net = None):
+    def __init__(self, state_dims, action_dims, hidden_dims=[128], 
+                 input_net=None, hidden_net=None):
         super(Policy, self).__init__()
-
-        if body_net:
-            self.graft(body_net)
+        self.hidden_layers = []
+        if input_net or hidden_net:
+            self.graft(input_net, hidden_net)
         else:
-            self.body = nn.Sequential(
-                nn.Linear(state_dims, 128),
+            self.input = nn.Sequential(
+                nn.Linear(state_dims, hidden_dims[0]),
                 nn.ReLU()
             )
+            for i in range(1, len(hidden_dims)):
+                self.hidden_layers.append(nn.Sequential(nn.Linear(hidden_dims[i-1], hidden_dims[i]),
+                                                    nn.ReLU()
+                                                    )
+                                          )
 
-        self.action_head = nn.Linear(128, action_dims)
-        self.value_head = nn.Linear(128, 1)
-
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+        self.action_head = nn.Linear(hidden_dims[-1], action_dims)
+        self.value_head = nn.Linear(hidden_dims[-1], 1)
         self.saved_actions = []
         self.rewards = []
 
     def forward(self, x):
-        x = self.body(x)
+        x = self.input(x)
+
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
 
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
 
-    def graft(self, body):
+    def graft(self, input_net, hidden_net):
         """Grafts a deep copy of another neural network's body into this
         network. Requires optimizer to be reset after this operation is
         performed.
 
         :param body: body of the neural network you want grafted.
         """
-        assert body is not None, 'NN body being grafted is None!'
+        assert input_net is not None, 'NN body being grafted is None!'
 
-        self.body = copy.deepcopy(body)
+        self.input = copy.deepcopy(input_net)
+
+        assert hidden_net is not None, 'No hidden layers to graft!'
+        self.hidden_layers = []
+        for i in range(len(hidden_net)):
+
+            self.hidden_layers.append(copy.deepcopy(hidden_net[i]))
+
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+
 
 
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0, max_ep_length=200,
+                 log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128],
                  reward_threshold_ratio=0.99 , plot_loss = False):
         """__init__
 
@@ -120,8 +138,9 @@ class ActorCritic:
 
         print("Actor Critic initialized with state size ",state_size)
         # initialize a policy if none is passed.
+        self.hidden_dims = hidden_dims
         if policy is None:
-            self.policy = Policy(state_size, env.action_space.n)
+            self.policy = Policy(state_size, env.action_space.n, self.hidden_dims)
         else:
             self.policy = policy
 
@@ -151,7 +170,6 @@ class ActorCritic:
 
         :param state: Current state in environment.
         """
-
         probs, state_value = self.policy(state)
         m = Categorical(probs)
         action = m.sample()

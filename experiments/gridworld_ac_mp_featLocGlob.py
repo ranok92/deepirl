@@ -23,6 +23,7 @@ parser.add_argument('--dont-save', action='store_true',
 parser.add_argument('--render', action='store_true', help="show the env.")
 parser.add_argument('--num-trajs', type=int, default=10)
 parser.add_argument('--view-reward', action='store_true')
+parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
 
 def main():
     
@@ -69,12 +70,12 @@ def main():
                     cols=60,
                     seed=7,
                     buffer_from_obs=0,
-                    obstacles = '../envs/map7.png',
+                    obstacles = [],
                                 
                     goal_state = np.asarray([5,5]))
 
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
-                        log_interval=100,max_ep_length=100, 
+                        log_interval=100,max_ep_length=100, hidden_dims=args.policy_net_hidden_dims,
                         max_episodes=4000)
 
     if args.policy_path is not None:

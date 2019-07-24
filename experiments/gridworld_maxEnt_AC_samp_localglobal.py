@@ -41,6 +41,9 @@ parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The n
 parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
                      feature extractor to be used in the experiment.')
 
+parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
+                     hidden layers of the reward network.')
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -135,8 +138,10 @@ def main():
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
                             termination = None,
+                            hidden_dims=args.reward_net_hidden_dims,
                             feat_extractor = feat_ext)
     print("RL method initialized.")
+    print(rlMethod.policy)
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
@@ -150,8 +155,11 @@ def main():
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer = args.regularizer,
+                           graft=True,
+                           hidden_dims = args.reward_net_hidden_dims,
                            save_folder=args.save_folder)
     print("IRL method intialized.")
+    print(irlMethod.reward)
     rewardNetwork = irlMethod.train()
 
     if not args.dont_save:

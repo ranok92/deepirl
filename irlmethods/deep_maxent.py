@@ -32,21 +32,31 @@ from rlmethods.b_actor_critic import Policy
 class RewardNet(BaseNN):
     """Reward network"""
 
-    def __init__(self, state_dims):
+    def __init__(self, state_dims, hidden_dims=[128]):
         super(RewardNet, self).__init__()
 
-        self.body = nn.Sequential(
-            nn.Linear(state_dims, 128),
+        self.input = nn.Sequential(
+            nn.Linear(state_dims, hidden_dims[0]),
             nn.ReLU(),
         )
+        self.hidden_layers = []
+        for i in range(1,len(hidden_dims)):
+            self.hidden_layers.append(nn.Sequential(
+                                                    nn.Linear(hidden_dims[i-1], hidden_dims[i]),
+                                                    nn.ReLU(),
+                                                    )
+                                      )
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.head = nn.Sequential(
-            nn.Linear(128, 1),
+            nn.Linear(hidden_dims[-1], 1),
         )
 
     def forward(self, x):
-        x = self.body(x)
+        x = self.input(x)
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
+
         x = self.head(x)
-        #x = F.sigmoid(x)#added a sigmoid to keep the value between 0 and 1
 
         return x
 
@@ -73,6 +83,7 @@ class DeepMaxEnt():
             save_folder=None,
             rl_max_episodes = 30,
             graft = True,
+            hidden_dims = [128],
             regularizer=0.1
     ):
 
@@ -93,7 +104,8 @@ class DeepMaxEnt():
         else:
             self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
-        self.reward = RewardNet(self.state_size)
+        self.reward = RewardNet(self.state_size, hidden_dims)
+        self.hidden_dims = hidden_dims
         self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-3, weight_decay=0.045)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
@@ -282,15 +294,20 @@ class DeepMaxEnt():
             i += 1
 
 
-    def resetTraining(self,inp_size,out_size, graft=True):
+    def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
 
         if graft:
-            newNN = Policy(inp_size,out_size, body_net = self.reward.body)
+            newNN = Policy(inp_size, out_size, 
+                           hidden_dims=hidden_dims,
+                           input_net=self.reward.input,
+                           hidden_net=self.reward.hidden_layers)
         else:
-            newNN = Policy(inp_size,out_size)
+            newNN = Policy(inp_size, out_size, 
+                           hidden_dims=hidden_dims)
 
         newNN.to(self.device)
         self.rl.policy = newNN
+        print(self.rl.policy)
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
 
     #############################################
@@ -436,7 +453,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size, self.action_size, self.graft)
+            self.resetTraining(self.state_size, self.action_size, self.hidden_dims, self.graft)
 
             #save the reward network
             #reward_network_folder = './saved-models-rewards/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
