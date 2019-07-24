@@ -58,16 +58,20 @@ class GridWorldDrone(GridWorld):
         self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
-        self.current_frame = 0
+        self.current_frame = 10
         self.final_frame = -1
         self.initial_frame = 999999999999 #a large number
         self.subject = subject
         self.omit_annotation = omit_annotation
         self.agent_state = None
         self.goal_state = None
-        annotation_list = []
+        self.annotation_list = []
+        self.generate_annotation_dict_universal()
 
-        if not os.path.isfile(annotation_file):
+
+
+    def generate_annotation_dict(self):
+        if not os.path.isfile(self.annotation_file):
             print("The annotation file does not exist.")
             return 0
 
@@ -75,7 +79,7 @@ class GridWorldDrone(GridWorld):
 
             for line in f:
                 line = line.strip().split(' ')
-                annotation_list.append(line)
+                self.annotation_list.append(line)
 
 
         #converting the list to a dictionary, where the keys are the frame number 
@@ -85,7 +89,7 @@ class GridWorldDrone(GridWorld):
 
         print("Loading information. . .")
         subject_final_frame = -1
-        for entry in annotation_list:
+        for entry in self.annotation_list:
 
             #checking for omission
             if self.omit_annotation is not None:
@@ -133,6 +137,87 @@ class GridWorldDrone(GridWorld):
         print('final_frame', self.final_frame)
         print('cellWidth', self.cellWidth)
     
+    def generate_annotation_dict_universal(self):
+        '''
+         frame , id, y_coord, x_coord
+        '''
+        if not os.path.isfile(self.annotation_file):
+            print("The annotation file does not exist.")
+            return 0
+
+        with open(self.annotation_file) as f:
+
+            for line in f:
+                line = line.strip().split(' ')
+                self.annotation_list.append(line)
+
+
+        #converting the list to a dictionary, where the keys are the frame number 
+        #and for each key there is a list of entries providing the annotation information
+        #for that particular frame
+        
+
+        print("Loading information. . .")
+        subject_final_frame = -1
+        for entry in self.annotation_list:
+
+            #checking for omission
+            if self.omit_annotation is not None:
+
+                if entry[1] == self.omit_annotation:
+                    continue
+
+            #checking for goal state of the given subject
+            if self.subject is not None:
+                #pdb.set_trace()
+                if float(entry[1])==self.subject:
+                    print('Here')
+                    if subject_final_frame < int(entry[0]):
+                        subject_final_frame = int(entry[0])
+                        self.goal_state = np.array(100*[float(entry[2]),float(entry[3])])
+
+            #populating the dictionary
+            if entry[0] not in self.annotation_dict: #if frame is not present in the dict
+                self.annotation_dict[entry[0]] = []
+            
+            self.annotation_dict[entry[0]].append(entry)                
+
+            if self.subject is None:
+                if self.initial_frame > int(entry[0]):
+                    self.initial_frame = int(entry[0])
+
+                if self.final_frame < int(entry[0]):
+                    self.final_frame = int(entry[0])
+            else:
+                if float(entry[1])==self.subject:
+
+                    if self.initial_frame > int(entry[0]):
+                        self.initial_frame = int(entry[0])
+
+                    if self.final_frame < int(entry[0]):
+                        self.final_frame = int(entry[0])
+
+
+      
+
+        print('Done loading information.')
+        print('initial_frame', self.initial_frame)
+        print('final_frame', self.final_frame)
+        print('cellWidth', self.cellWidth)
+
+    def get_state_from_frame_universal(self, frame_info):
+
+        self.obstacles = []
+        for element in frame_info:
+
+            if float(element[1]) != self.subject:
+
+                self.obstacles.append(np.array([float(element[2]),float(element[3])]))
+
+            else:
+
+                self.agent_state = np.array([float(element[2]),float(element[3])])
+
 
     def get_state_from_frame(self,frame_info):
 
@@ -183,9 +268,9 @@ class GridWorldDrone(GridWorld):
     def step(self):
             #print('printing the keypress status',self.agent_action_keyboard)
             
-        self.current_frame += 1
+        self.current_frame += 10
         #print('Info from curent frame :',self.current_frame)
-        self.get_state_from_frame(self.annotation_dict[str(self.current_frame)])
+        self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
         if self.subject is None:
             if not self.release_control:
                 self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
@@ -248,7 +333,7 @@ class GridWorldDrone(GridWorld):
         #change with each reset
         dist_g = self.goal_spawn_clearance
         
-        self.get_state_from_frame(self.annotation_dict[str(self.current_frame)])
+        self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
         num_obs = len(self.obstacles)
 
         #placing the obstacles
@@ -420,8 +505,8 @@ if __name__=="__main__":
                         seed = 0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video3/annotations.txt',
-                        subject=9,                        
+                        annotation_file='./crowds_zara02_0.txt',
+                        subject=1.0,                        
                         rows = 1088, cols = 1424, width = 10)
     print ("here")
 
