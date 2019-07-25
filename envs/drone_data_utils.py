@@ -36,6 +36,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts):
     x = []
     y = []
     t = []
+    interpolate_fps = 1
     ped_id = None
     min_frame = 9999999
     max_frame = -1
@@ -57,9 +58,9 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts):
     print(x)
     print(y)
     tck, u = splprep([x,y], u=t)
-    interpol_vals = splev(np.arange(min_frame, max_frame, 5), tck)
+    interpol_vals = splev(np.arange(min_frame, max_frame, interpolate_fps), tck)
 
-    t_dense = np.arange(min_frame, max_frame, 5)
+    t_dense = np.arange(min_frame, max_frame, interpolate_fps)
     x_dense = interpol_vals[0]
     y_dense = interpol_vals[1]
 
@@ -128,7 +129,9 @@ def preprocess_data(annotation_file):
 
             for info in dense_info:
                 dense_info_list.append(info)
-                f.write("%s\n" % info)
+                for val in info:
+                    f.write("%s " %val)
+                f.write("\n")
 
     return dense_info_list
 
