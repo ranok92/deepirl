@@ -171,10 +171,9 @@ class GridWorldDrone(GridWorld):
             if self.subject is not None:
                 #pdb.set_trace()
                 if float(entry[1])==self.subject:
-                    print('Here')
                     if subject_final_frame < int(entry[0]):
                         subject_final_frame = int(entry[0])
-                        self.goal_state = np.array(100*[float(entry[2]),float(entry[3])])
+                        self.goal_state = np.array([float(entry[2]),float(entry[3])])
 
             #populating the dictionary
             if entry[0] not in self.annotation_dict: #if frame is not present in the dict
@@ -268,7 +267,6 @@ class GridWorldDrone(GridWorld):
     def step(self):
             #print('printing the keypress status',self.agent_action_keyboard)
             
-        self.current_frame += 10
         #print('Info from curent frame :',self.current_frame)
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
         if self.subject is None:
@@ -312,6 +310,8 @@ class GridWorldDrone(GridWorld):
                 None
             )
         
+        self.current_frame += 5
+
         if self.subject is None:
             if done:
                 self.release_control = True
@@ -505,9 +505,9 @@ if __name__=="__main__":
                         seed = 0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='./crowds_zara02_0.txt',
-                        subject=1.0,                        
-                        rows = 1088, cols = 1424, width = 10)
+                        annotation_file='./data_zara/crowds_zara01.vsp_processed.txt',
+                        subject=2,                        
+                        rows = 576, cols = 720, width = 10)
     print ("here")
 
     world.reset()
