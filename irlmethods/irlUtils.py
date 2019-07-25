@@ -21,7 +21,7 @@ import torch.nn.functional as F
 import pdb
 from utils import to_oh
 
-
+import collections
 from scipy import signal
 import re
 #for visual
@@ -129,10 +129,14 @@ def toNumpy(torchTensor):
 def smoothing_over_state_space(state, feat, window):
     '''
     given a state this function returns a distribution over nearby states using a smoothing function0
+
+    the total number of obstacles before and after the smoothing remains the same
+    
     '''
     state_list = []
     sum_weights = 0
     global_rep = state[0:feat.gl_size+feat.rl_size]
+    #print(type(state))
     spatial_rep = feat.state_to_spatial_representation(state)
     total_obs = int(np.sum(spatial_rep))
     conv = signal.convolve2d(spatial_rep, window, 'same')
@@ -233,50 +237,6 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
     return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
 
-#will remove this once onehot becomes a feature extractor class
-#but till then this stays 
-def expert_svf_onehot(traj_path, ncols=10, nrows=10):
-
-    actions = glob.glob(os.path.join(traj_path, '*.acts'))
-    states = glob.glob(os.path.join(traj_path, '*.states'))
-
-    # histogram to accumulate state visitations
-    svf = np.zeros((1,ncols*nrows))
-
-    for idx, state_file in enumerate(states):
-
-        # traj_svf stores the state hist
-        traj_hist = np.zeros((1,ncols*nrows))
-
-        #load up a trajectory and convert it to numpy
-        torch_traj = torch.load(state_file, map_location=DEVICE)
-        traj_np = torch_traj.numpy()
-
-        #iterating through each of the states 
-        #in the trajectory
-        for i in range(traj_np.shape[0]):
-
-        	#this is for onehot
-
-        	#convert state to state index
-        	state_index = np.where(traj_np[i]==1)[0][0]
-
-        	# +1 for that index in the trajectory histogram
-        	traj_hist[0,state_index]+=1
-
-
-        # normalize each trajectory
-        traj_hist/=np.sum(traj_hist)
-
-        # accumulate frequencies through time
-
-        svf += traj_hist
-
-    svf /= len(states)
-
-    return svf
-
-
 #This is a more general function and should work with any
 #state representation provided the state dictionary
 #corresponding to that state representation is provided
@@ -327,6 +287,105 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     svf /= len(states)
 
     return svf
+
+
+def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
+    '''
+    Does the state visitation frequency calculation without creating a dictionary or storing the 
+    entire state space.
+
+    returns a dictionary where the keys are only the states that the expert has seen
+    and the coressponding value is its visitation.
+    '''
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+
+    # histogram to accumulate state visitations
+    svf = {}
+
+    for idx, state_file in enumerate(states):
+
+
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+            #this is for onehot
+            state_hash = feature_extractor.hash_function(traj_np[i])
+            if state_hash not in svf.keys():
+                svf[state_hash] = 1*math.pow(gamma,i)
+            else:
+                svf[state_hash] += 1*math.pow(gamma,i)
+
+    #normalize the svf
+    total_visitation = 0
+    for state in svf.keys():
+
+        total_visitation += svf[state]
+
+    for state in svf.keys():
+
+        svf[state] /= total_visitation
+
+    return collections.OrderedDict(sorted(svf.items()))
+
+
+def calculate_expert_svf_with_smoothing(traj_path, 
+                                        smoothing_window=None, 
+                                        feature_extractor=None, 
+                                        gamma=0.99):
+
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
+
+    # histogram to accumulate state visitations
+    svf = {}
+
+    for idx, state_file in enumerate(states):
+
+
+        #load up a trajectory and convert it to numpy
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        #iterating through each of the states 
+        #in the trajectory
+        for i in range(traj_np.shape[0]):
+
+            #print(traj_np[i])
+            #print('The state :', traj_np[i][-9:].reshape([3,3]))
+            smoothened_list = smoothing_over_state_space(traj_np[i], feature_extractor, smoothing_window)
+            #print('The smooth-list :')
+            #for j in smoothened_list:
+                #print(j[0][-9:].reshape([3, 3]),j[1])
+
+            #input('press 1')
+            for val in smoothened_list:
+                #val is a list of size 2: val[0] : the state vector val[1] = 
+                state_hash = feature_extractor.hash_function(val[0])
+                if state_hash not in svf.keys():
+                    svf[state_hash] = val[1]*math.pow(gamma,i)
+                else:
+                    svf[state_hash] += val[1]*math.pow(gamma,i)
+
+    #normalize the svf
+    total_visitation = 0
+    for state in svf.keys():
+
+        total_visitation += svf[state]
+
+    for state in svf.keys():
+
+        svf[state] /= total_visitation
+
+    return collections.OrderedDict(sorted(svf.items()))
+
+
+
 
 
 #function for sanity check for the states generated in the trajectories in the traj_path 
@@ -410,7 +469,10 @@ def select_action(policy,state):
     probs, state_value = policy(state)
     m = Categorical(probs)
     action = m.sample()
-    return action.item()
+    #return action.item()
+    val, ind = torch.max(probs,0)
+    return ind
+
 
 #should calculate the SVF of a policy network by running the agent a number of times
 #on the given environment. Once the trajectories are obtained, each of the trajectories 
@@ -418,173 +480,376 @@ def select_action(policy,state):
 #trajectories played)
 
 def get_svf_from_sampling(no_of_samples = 1000, env = None ,
-						 policy_nn = None , reward_nn = None,
-						 episode_length = 20, feature_extractor = None, gamma=.99):
-	
-
-	num_states = 100
-	#initialize the variable to store the svfs
-	if feature_extractor is None:
-		svf_policy = np.zeros((num_states, no_of_samples)) #as the possible states are 100
-	else:
-		#kept for later
-		num_states = len(feature_extractor.state_dictionary.keys())
-		svf_policy = np.zeros((num_states, no_of_samples))
+                                                 policy_nn = None , reward_nn = None,
+                                                 episode_length = 20, feature_extractor = None, gamma=.99):
 
 
-	rewards = np.zeros(no_of_samples)
-	approx_Z = 0 #this should be the sum of all the rewards obtained
-	eps = 0.00001 # so that the reward is never 0.
-
-	#start_state contains the distribution of the start state
-	#as of now the code focuses on starting from all possible states uniformly
-
-	start_state = np.zeros(num_states)
-	'''
-	need a non decreasing function that is always positive.
-	get the range of rewards obtained and normalize it?
-	
-	The state space changes with the feature_extractor being used. 
-
-	**Feature_extractor should have a member dictionary containing
-	all possible states.
-
-	The default feature for the environment for now is onehot.
-
-	'''
-
-	xaxis = np.arange(num_states)
-	for i in range(no_of_samples):
-		run_reward = 0
-
-		#for debugging purpose, shows the histogram of the start states 
-		'''
-		if i%50==0:
-			plt.bar(xaxis,start_state)
-			plt.draw()
-			plt.pause(.001)
-		'''
-		#to make sure the start state is uniform among all possible states
-
-		#the continues to restart unless the starting points are somewhat uniformly
-		#distributed
-
-		#unfortunately this only works for onehot representations 
-		# for more generic features this needs to go
-		'''
-		while True:
-
-			state = env.reset()
-			if feature_extractor is not None:
-				state = feature_extractor.extract_features(state)
-
-			if 'torch' in state.type():
-				state_np = state.cpu().numpy()
-			else:
-				state_np = state
-			#from the one_hot state representation get the state
-			#to get the index of the state
-
-			#keeping this to make it work with the default case of onehot
-			#**will be removed in the future
-			if feature_extractor is None:
-				state_index = np.where(state_np==1)[0][0]
-			else:
-				#feature_extractor wraps the state in torch tensor so convert that back
-
-				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
-			if start_state[state_index] > (no_of_samples/num_states)+2:
-				pass
-			else:
-				start_state[state_index]+=1
-				break
-		'''
-		#*******basically the same block as above without the 
-		#constrain of making the starting point uniform 
-		#because this will not be possible for all feature extractors
-		state = env.reset()
-
-		if feature_extractor is not None:
-			state = feature_extractor.extract_features(state)
-
-		if 'torch' in state.type():
-			state_np = state.cpu().numpy()
-		else:
-			state_np= state
-		if feature_extractor is None:
-			#onehot
-			state_index = np.where(state_np==1)[0][0]
-		else:
-			#feature_extractor wraps the state in torch tensor so convert that back
-			state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
-
-		start_state[state_index]+=1
-		#********************** till here************
-
-		#np.where(state_np==1)[0][0] returns the state index
-		#from the state representation
-
-		svf_policy[state_index,i] = 1 #marks the visitation for 
-												   #the state for the run
-		
-		for t in range(episode_length):
-			action = select_action(policy_nn,state)
-			state, reward, done,_ = env.step(action)
-			#feature_extractor wraps the state in torch tensor so convert that back
-
-			
-			#get the state index
-			if feature_extractor is None:
-				state_index = np.where(state_np==1)[0][0]
-			else:
-				state = feature_extractor.extract_features(state)
-				if 'torch' in state.type():
-					state_np= state.cpu().numpy()
-				else:
-					state_np = state
-
-				state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+    num_states = 100
+    #initialize the variable to store the svfs
+    if feature_extractor is None:
+        svf_policy = np.zeros((num_states, no_of_samples)) #as the possible states are 100
+    else:
+        #kept for later
+        num_states = len(feature_extractor.state_dictionary.keys())
+        svf_policy = np.zeros((num_states, no_of_samples))
 
 
-			svf_policy[state_index,i] += 1*math.pow(gamma,t) #marks the visitation for 
-												   #the state for the run
-			
-	
-			if reward_nn is not None:
-				reward  = reward_nn(state)
+    rewards = np.zeros(no_of_samples)
+    approx_Z = 0 #this should be the sum of all the rewards obtained
+    eps = 0.000001 # so that the reward is never 0.
 
-			run_reward+=reward
+    #start_state contains the distribution of the start state
+    #as of now the code focuses on starting from all possible states uniformly
 
-			if done:
-				pass
-				
+    start_state = np.zeros(num_states)
+    '''
+    need a non decreasing function that is always positive.
+    get the range of rewards obtained and normalize it?
+      The state space changes with the feature_extractor being used. 
 
-			if t >= episode_length:
-				rewards[i]=run_reward
-				break
+    **Feature_extractor should have a member dictionary containing
+    all possible states.
 
-	#normalize the rewards to get the weights
-	#dont want to go exp, thus so much hassle
-	#print('Rewards untouched :',rewards)
-	rewards = rewards - np.min(rewards)+eps
-	#print('Rewards :',rewards)
-	total_reward = sum(rewards)
-	weights = rewards/total_reward
-	#print('The weights :',weights)
-	#normalize the visitation histograms so that for each run the 
-	#sum of all the visited states becomes 1
+    The default feature for the environment for now is onehot.
+
+    '''
+
+    xaxis = np.arange(num_states)
+    for i in range(no_of_samples):
+
+        run_reward = 0
+        state = env.reset()
+
+        if feature_extractor is not None:
+                state = feature_extractor.extract_features(state)
+
+        if 'torch' in state.type():
+                state_np = state.cpu().numpy()
+        else:
+            state_np= state
+        if feature_extractor is None:
+            #onehot
+            state_index = np.where(state_np==1)[0][0]
+        else:
+            #feature_extractor wraps the state in torch tensor so convert that back
+            state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+
+        start_state[state_index]+=1
+        #********************** till here************
+
+        #np.where(state_np==1)[0][0] returns the state index
+        #from the state representation
+
+        svf_policy[state_index,i] = 1 #marks the visitation for 
+                                                                                           #the state for the run
+
+        for t in range(episode_length):
+            action = select_action(policy_nn,state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+
+            #get the state index
+            if feature_extractor is None:
+                state_index = np.where(state_np==1)[0][0]
+            else:
+                state = feature_extractor.extract_features(state)
+                if 'torch' in state.type():
+                    state_np= state.cpu().numpy()
+                else:
+                    state_np = state
+
+                state_index = feature_extractor.state_dictionary[np.array2string(state_np)]
+
+
+            svf_policy[state_index,i] += 1*math.pow(gamma,t) #marks the visitation for 
+                                                                                       #the state for the run
+
+
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+        rewards[i]=run_reward
+    #normalize the rewards to get the weights
+    #dont want to go exp, thus so much hassle
+    #print('Rewards untouched :',rewards)
+    #rewards = rewards - np.min(rewards)+eps
+    rewards = np.exp(rewards)
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+    #print('Weights from state_dict :',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
+    #normalize the visitation histograms so that for each run the 
+    #sum of all the visited states becomes 1
 
 
 
 
-	norm_factor = np.sum(svf_policy,axis=0)
+    norm_factor = np.sum(svf_policy,axis=0)
 
-	svf_policy = np.divide(svf_policy, norm_factor)
+    svf_policy = np.divide(svf_policy, norm_factor)
 
-	svf_policy = np.matmul(svf_policy,weights)
+    svf_policy = np.matmul(svf_policy,weights)
 
-	return svf_policy
+    return svf_policy
 
+
+
+def calculate_svf_from_sampling(no_of_samples=1000, env=None,
+                                policy_nn=None, reward_nn=None,
+                                episode_length=20, feature_extractor=None,
+                                gamma=0.99):
+    
+    '''
+    calculating the state visitation frequency from sampling. This function
+    returns a dictionary, where the keys consists of only the states that has been
+    visited and their corresponding values are the visitation frequency
+    '''
+    eps = 0.000001
+    if feature_extractor is None:
+        print('Featrue extractor missing. Exiting.')
+        return None
+
+    rewards = np.zeros(no_of_samples)
+    norm_factor = np.zeros(no_of_samples)
+
+    svf_dict_list = []
+    for i in range(no_of_samples):
+        run_reward = 0
+        current_svf_dict = {}
+        state = env.reset()
+        #print('agent position:', state['agent_state'])
+        state = feature_extractor.extract_features(state)
+        current_svf_dict[feature_extractor.hash_function(state)] = 1
+
+        for t in range(episode_length):
+
+            action = select_action(policy_nn, state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+            
+            #get the state index
+
+            state = feature_extractor.extract_features(state)
+            if feature_extractor.hash_function(state) not in current_svf_dict.keys():
+                current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t)
+            else:
+                current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
+                                                  
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+        rewards[i] = run_reward
+        svf_dict_list.append(current_svf_dict)
+
+    #rewards = rewards - np.min(rewards)+eps
+    #changing it to the more generic exp
+    #print('rewards non exp', rewards)
+    rewards = np.exp(rewards)
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+    #print('weights from svf_dict:',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
+    #merge the different dictionaries to a master dictionary and adjust the visitation 
+    #frequencies according to the weights calculated
+
+    for i in range(len(svf_dict_list)):
+
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            norm_factor[i] += dictionary[key]
+
+    master_dict = {}
+    #print ('The norm factor :', norm_factor)
+    for i in range(len(svf_dict_list)):
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            if key not in master_dict:
+                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
+            else:
+                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
+
+    return collections.OrderedDict(sorted(master_dict.items()))
+
+
+
+def calculate_svf_from_sampling_using_smoothing(no_of_samples=1000, env=None,
+                                                policy_nn=None, reward_nn=None,
+                                                episode_length=20, feature_extractor=None,
+                                                gamma=0.99, window=None):
+    
+    '''
+    calculating the state visitation frequency from sampling. This function
+    returns a dictionary, where the keys consists of only the states that has been
+    visited and their corresponding values are the visitation frequency
+    '''
+    eps = 0.000001
+    if feature_extractor is None:
+        print('Featrue extractor missing. Exiting.')
+        return None
+
+    rewards = np.zeros(no_of_samples)
+    norm_factor = np.zeros(no_of_samples)
+
+    svf_dict_list = []
+    for i in range(no_of_samples):
+        run_reward = 0
+        current_svf_dict = {}
+        state = env.reset()
+        #print('agent position:', state['agent_state'])
+        state = feature_extractor.extract_features(state)
+
+        state_np = state.cpu().numpy()
+        state_list = smoothing_over_state_space(state_np, feature_extractor, window)
+
+        for item in state_list:
+            #item = [ state , weight ]
+            current_svf_dict[feature_extractor.hash_function(item[0])] = item[1]
+
+        for t in range(episode_length):
+
+            action = select_action(policy_nn, state)
+            state, reward, done,_ = env.step(action)
+            #feature_extractor wraps the state in torch tensor so convert that back
+
+            
+            #get the state index
+
+            state = feature_extractor.extract_features(state)
+            state_np = state.cpu().numpy()
+            state_list = smoothing_over_state_space(state_np, feature_extractor, window)
+            for item in state_list:
+                if feature_extractor.hash_function(item[0]) not in current_svf_dict.keys():
+                    current_svf_dict[feature_extractor.hash_function(item[0])] = item[1]*math.pow(gamma,t)
+                else:
+                    current_svf_dict[feature_extractor.hash_function(item[0])] += item[1]*math.pow(gamma,t) 
+                                                  
+            if reward_nn is not None:
+                reward  = reward_nn(state)
+
+            run_reward+=reward
+
+        rewards[i] = run_reward
+        svf_dict_list.append(current_svf_dict)
+
+    #rewards = rewards - np.min(rewards)+eps
+    #changing it to the more generic exp
+    #print('rewards non exp', rewards)
+    rewards = np.exp(rewards)
+    #print('Rewards :',rewards)
+    total_reward = sum(rewards)
+    weights = rewards/total_reward
+    #print('weights from svf_dict:',weights)
+    #plt.plot(weights)
+    #plt.draw()
+    #plt.pause(0.001)
+    #merge the different dictionaries to a master dictionary and adjust the visitation 
+    #frequencies according to the weights calculated
+
+    for i in range(len(svf_dict_list)):
+
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            norm_factor[i] += dictionary[key]
+
+    master_dict = {}
+    #print ('The norm factor :', norm_factor)
+    for i in range(len(svf_dict_list)):
+        dictionary = svf_dict_list[i]
+        for key in dictionary:
+
+            if key not in master_dict:
+                master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
+            else:
+                master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
+
+    return collections.OrderedDict(sorted(master_dict.items()))
+
+
+
+
+def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
+    '''
+    takes in the svf dictionaries for the expert and the agent
+    and returns two ordered lists containing the states visited and the 
+    difference in their visitation frequency.
+    '''
+    state_list = []
+    diff_list = []
+    expert_iterator = 0
+    agent_iterator = 0
+    
+    expert_key_list = list(expert_svf_dict.keys())
+    agent_key_list = list(agent_svf_dict.keys())
+
+    while True:
+
+
+        exp_state = expert_key_list[expert_iterator]
+        agent_state = agent_key_list[agent_iterator]
+        if exp_state == agent_state:
+
+            state_list.append(feat.recover_state_from_hash_value(exp_state))
+            diff_list.append(expert_svf_dict[exp_state]-agent_svf_dict[agent_state])
+
+            expert_iterator += 1
+            agent_iterator += 1
+
+        elif exp_state > agent_state:
+
+            state_list.append(feat.recover_state_from_hash_value(agent_state))
+            diff_list.append(0 - agent_svf_dict[agent_state])
+
+            agent_iterator += 1
+
+        elif agent_state > exp_state:
+
+            state_list.append(feat.recover_state_from_hash_value(exp_state))
+            diff_list.append(expert_svf_dict[exp_state] - 0)
+
+            expert_iterator += 1
+
+        if expert_iterator >= len(expert_key_list) or agent_iterator >= len(agent_key_list):
+
+            if expert_iterator >= len(expert_key_list):
+
+                while agent_iterator < len(agent_key_list):
+                    
+                    agent_state = agent_key_list[agent_iterator]
+                    state_list.append(feat.recover_state_from_hash_value(agent_state))
+                    diff_list.append(0 - agent_svf_dict[agent_state])
+                    agent_iterator += 1
+
+                break
+
+            if agent_iterator >= len(agent_key_list):
+
+                while expert_iterator < len(expert_key_list):
+                    
+                    exp_state = expert_key_list[expert_iterator]
+                    state_list.append(feat.recover_state_from_hash_value(exp_state))
+                    diff_list.append(expert_svf_dict[exp_state] - 0)
+                    expert_iterator += 1
+
+                break
+
+    return state_list , diff_list
+
+        
 
 
 
@@ -599,28 +864,184 @@ if __name__ == '__main__':
     # 						   thresh3 = 3,
     #						   fieldList = ['agent_state','goal_state'])
     #feat = OneHot(grid_rows=10,grid_cols=10)
+    np.random.seed(0)
     feat = LocalGlobal(window_size=3, fieldList=['agent_state','goal_state','obstacles'])
-    env = GridWorld(display=False, reset_wrapper=reset_wrapper,
+    env = GridWorld(display=False, reset_wrapper=reset_wrapper, is_random = False,
     				step_wrapper=step_wrapper,
-    				obstacles=[np.array([3,2]), np.array([3,4])],
+    				obstacles=[np.array([2,3])],
     				goal_state=np.array([5,5]),
     				is_onehot=False)
 
+    
+    state_list = []
+    
 
     state = feat.extract_features(env.reset())
-    state = state.cpu().numpy()
+    state = np.array([0., 1. ,0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+
     print(state)
+    print('The state :',state[-9:].reshape([3,3]))    
     window = np.array([[0,.1,0],[.1,.6,.1],[0,.1,0]])
     v = smoothing_over_state_space(state,feat,window)
+    
+    print('The smooth list :')
+    for item in v:
+        loc_info = item[0][-9:].reshape([3,3])
+        print(loc_info, item[1])
+    input("Press a key to continue . . .")
+    
+    dir_path = '../experiments/trajs/ac_gridworld/'
 
-    print(v)
-    '''
+    
+    
     state_space = feat.extract_features(env.reset()).shape[0]
     policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/socialNav_g5_5_no_obs.pt')
+    policy.load('../experiments/saved-models/loc_glob_win_3.pt')
     policy.eval()
     policy.to(DEVICE)
-'''
+
+    #calculating the SVF for policy
+    '''
+    np.random.seed(0)
+    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
+                                     policy_nn=policy, reward_nn=None,
+                                     episode_length=20, feature_extractor=feat,
+                                     gamma=0.99)
+
+
+    np.random.seed(0)
+    svf_3 = get_svf_from_sampling(no_of_samples=100, env=env,
+                                     policy_nn=policy, reward_nn=None,
+                                     episode_length=20, feature_extractor=feat,
+                                     gamma=0.99)
+    plt.show()
+
+    s = 0
+    counter = 0
+    for i in range(svf_3.shape[0]):
+        if svf_3[i]!=0:
+            counter += 1
+            print(i,svf_3[i])
+            s+=svf_3[i]
+
+    print('HITS :',counter,len(svf.keys()))
+    print('svf from svf_dict :',svf)
+    for key in svf.keys():
+
+        index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
+        print(index,' ',svf[key],' ',svf_3[index])
+
+
+    '''
+    #calculating the svf for experts
+    
+    exp_svf = calculate_expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feature_extractor=feat)
+
+
+    print('printing from the expert :',exp_svf)
+    exp_svf_3 = expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feat=feat)
+    
+    window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
+    exp_smooth = calculate_expert_svf_with_smoothing('../experiments/trajs/ac_gridworld_smooth_test',
+                                                     feature_extractor=feat, 
+                                                     smoothing_window=window)
+
+    #for key in exp_svf.keys():
+
+        #index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
+        #print(index,' ',exp_svf[key],' ',exp_svf_3[0][index] , ' - ',exp_svf[key]-exp_svf_3[0][index]  )
+
+
+    stl1 = []
+    stl_smooth = []
+    comb_dict = {}
+
+    d1 = 0
+    d2 = 0
+    
+    d1key_list = exp_svf.keys()
+    d2key_list = exp_smooth.keys()
+    comb_dict = {}
+    for key in exp_svf.keys():
+
+        state = feat.recover_state_from_hash_value(key)
+        print(key)
+        print(state)
+        print(state[-9:].reshape([3,3]), exp_svf[key])
+        if key not in comb_dict.keys():
+            comb_dict[key] = 0
+
+
+    print ('Normal :', len(d1key_list))
+    print ('Smooth :', len(d2key_list))
+    input('Press')
+    print('############################')
+    for key in exp_smooth.keys():
+
+        print(key)
+        state = feat.recover_state_from_hash_value(key)
+        print(state)
+        print(state[-9:].reshape([3,3]), exp_smooth[key])
+        if key not in comb_dict.keys():
+            comb_dict[key] = 0
+
+    comb_dict = collections.OrderedDict(sorted(comb_dict.items()))
+
+    for key in exp_svf.keys():
+        comb_dict[key] = exp_svf[key]
+
+    for key in comb_dict.keys():
+        
+        stl1.append(comb_dict[key])
+        comb_dict[key] = 0
+    
+
+    for key in exp_smooth.keys():
+        comb_dict[key] = exp_smooth[key]
+
+    for key in comb_dict.keys():
+        #state = feat.recover_state_from_hash_value(key)
+        #print(state[-9:].reshape([3,3]), comb_dict[key])
+        stl_smooth.append(comb_dict[key])
+        comb_dict[key] = 0
+
+    plt.figure(0)
+    plt.plot(stl1,'r')
+    plt.draw()
+    plt.figure(1)
+    plt.plot(stl_smooth,'b')
+    plt.show()
+
+    input('Press key to continue')
+    #calculating the difference
+
+    states_visited , diff = get_states_and_freq_diff(exp_svf, svf, feat)
+
+    diff_3 = exp_svf_3 - svf_3
+    i = 0
+    for state in states_visited:
+
+        print('The difference from state_dict :', diff_3[0][feat.state_dictionary[np.array2string(state)]], ' ',diff[i] )
+        i+=1
+
+    '''
+    np.random.seed(0)
+    svf_2 = get_svf_from_sampling(no_of_samples=100, env=env,
+                                  policy_nn=policy, reward_nn=None,
+                                  episode_length=20, feature_extractor=feat,
+                                  gamma=0.99)
+
+
+
+    for i in range(svf_2.shape[0]):
+
+        if svf_2[i] > 0:
+            print(svf_2[i])
+    '''
+    #states, diff = get_states_and_freq_diff(svf,exp_svf,feat)
+    #for i in range(len(states)):
+    #    print('State :',states[i], ' : ', diff[i])
+
 
     #debug_custom_path('../experiments/trajs/ac_gridworld_user_avoid',
     # 					'distance',state_dict = feat.state_dictionary)
@@ -695,3 +1116,4 @@ if __name__ == '__main__':
     #mat = createStateTransitionMatix(rows=5,cols=5)
 	'''
 
+    

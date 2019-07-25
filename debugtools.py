@@ -410,8 +410,9 @@ def compare_svf(expert_folder, agent_policy, feat = None):
     dot_product_loss = []
 
     environment = GridWorld(display=False, reset_wrapper=reset_wrapper,
-                            step_wrapper=step_wrapper,
-                            obstacles=[],
+                            step_wrapper=step_wrapper, is_random=True,
+                            obstacles=[np.array([1, 2]), np.array([2, 3]),
+                                       np.array([2, 2]), np.array([4, 4])],
                             goal_state=np.array([5, 5]),
                             is_onehot=False)
     state_space = feat.extract_features(environment.reset()).shape[0]
@@ -460,12 +461,12 @@ def compare_svf(expert_folder, agent_policy, feat = None):
             policy.to(DEVICE)
 
             agent_file_name = name.split('/')[-1].split('.')[0]
-            agent_svf = get_svf_from_sampling(no_of_samples=1000, env=environment,
+            agent_svf = get_svf_from_sampling(no_of_samples=100, env=environment,
                                               policy_nn=policy, reward_nn=None,
                                               episode_length=20, feature_extractor=feat,
                                               gamma=.99)
 
-            dot_product_loss.append(np.dot(expert,agent_svf))
+            dot_product_loss.append(np.dot(expert-agent_svf, expert-agent_svf))
             plt.plot(agent_svf)
             plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
             plt.clf()

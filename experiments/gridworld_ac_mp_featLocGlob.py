@@ -34,9 +34,18 @@ def main():
     else:
         from envs.gridworld_clockless import GridWorldClockless as GridWorld
 
-    #featExtract = LocalGlobal(window_size=3, fieldList = ['agent_state','goal_state','obstacles'])
+
+    agent_width = 14
+    step_size = 14
+    obs_width = 4
+    grid_size = 10
+    featExtract = LocalGlobal(window_size=7, agent_width=agent_width,
+                              step_size=step_size, 
+                              obs_width=obs_width,
+                              grid_size=grid_size,
+                              fieldList = ['agent_state','goal_state','obstacles'])
     #featExtract = OneHot(grid_rows=10,grid_cols=10)
-    featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
+    #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
 
     #featExtract = SocialNav(fieldList = ['agent_state','goal_state'])
     '''
@@ -45,16 +54,16 @@ def main():
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
                                 '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=True,
-                    rows =10,
-                    cols =10,
+                    rows=10, agent_width=agent_width,step_size=step_size,
+                    obs_width=obs_width,width=grid_size,
+                    cols=10,
                     seed = 7,
-                    obstacles = [np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
-                                np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),],
+                    obstacles = '../envs/map3.jpg',
                                 
                     goal_state = np.asarray([5,5]))
 
     model = ActorCritic(env, feat_extractor=featExtract,  gamma=0.99,
-                        log_interval=400,max_ep_length=20 , 
+                        log_interval=400,max_ep_length=50 , 
                         max_episodes = 8000)
 
     if args.policy_path is not None:
@@ -78,7 +87,7 @@ def main():
         env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
 
-        model.generate_trajectory(args.num_trajs, './trajs/ac_gridworld/')
+        model.generate_trajectory(args.num_trajs, './trajs/ac_loc_glob_rectified_win_7_static_map3/')
 
     if args.play_user:
         env.tickSpeed = 200

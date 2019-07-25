@@ -7,10 +7,10 @@ sys.path.insert(0, '..')
 import math
 import pdb
 import itertools
+import torch
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
-
-
+import os
 '''
     Creating a new class?? Keeps these POINTS in mind.
     
@@ -58,15 +58,19 @@ class LocalGlobal():
     #structure of the features first 4 : general direction of the goal
     #                           next 3 : indicates whether the agent moved towards or away from goal
     #                           next n^2 : indicates local obstacle information
-    def __init__(self,window_size=5, grid_size = 1,  
-                agent_rad = 1, obs_rad = 1 , fieldList = []):
+    def __init__(self,window_size=5, grid_size = 1, step_size=None,
+                agent_width = 1, obs_width = 1 , fieldList = []):
 
         self.gl_size = 9
         self.rl_size = 3
         self.window_size = window_size
+        if step_size is None:
+            self.step_size = grid_size
+        else:
+            self.step_size = step_size
         self.grid_size = grid_size
-        self.agent_radius = agent_rad
-        self.obs_rad = obs_rad
+        self.agent_width = agent_width
+        self.obs_width = obs_width
         self.field_list = fieldList
         self.prev_dist = None
         #added new (26-3-19)
@@ -74,9 +78,10 @@ class LocalGlobal():
         #dictionary containing all possible states
         self.state_dictionary = {}
         self.state_str_arr_dict = {}
-
-        self.hash_variable = self.generate_hash_variable()
-        self.generate_state_dictionary()
+        self.inv_state_dictionary = {}
+        self.hash_variable = None
+        self.generate_hash_variable()
+        #self.generate_state_dictionary()
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space
@@ -86,14 +91,46 @@ class LocalGlobal():
     
 
     def generate_hash_variable(self):
-
+        '''
+        The hash variable basically is an array of the size of the current state. 
+        This creates an array of the following format:
+        [. . .  16 8 4 2 1] and so on.
+        '''
         self.hash_variable = np.zeros(self.gl_size+self.rl_size+self.window_size**2)
-        print(self.hash_variable.shape[0])
         for i in range(self.hash_variable.shape[0]-1,-1,-1):
-            print(i)
+    
             self.hash_variable[i] = math.pow(2,self.hash_variable.shape[0]-1-i)
+
         print(self.hash_variable)
 
+        os.system('pause')
+
+        
+
+    def recover_state_from_hash_value(self, hash_value):
+
+        size = self.gl_size+self.rl_size+self.window_size**2
+        binary_str = np.binary_repr(hash_value, size)
+        state_val = np.zeros(size)
+        i = 0
+        for digit in binary_str:
+            state_val[i] = int(digit) 
+            i += 1
+
+        return state_val
+
+
+    def hash_function(self,state):
+        '''
+        This function takes in a state and returns an integer which uniquely identifies that 
+        particular state in the entire state space.
+        '''
+        if isinstance(state, torch.Tensor):
+
+            state = state.cpu().numpy()
+
+
+        return int(np.dot(self.hash_variable,state))
 
 
     def generate_state_dictionary(self):
@@ -126,6 +163,8 @@ class LocalGlobal():
 
                         self.state_dictionary[np.array2string(state)] = indexval
                         self.state_str_arr_dict[np.array2string(state)] = state
+                        self.inv_state_dictionary[indexval] = state
+
                         indexval = len(self.state_dictionary.keys())
 
 
@@ -143,31 +182,55 @@ class LocalGlobal():
         return np.array(state_list)
 
 
-
+    '''
     def determine_index(self,diff_r, diff_c):
 
-
-        if diff_r==0 and diff_c >0: #right
-            index = 1
-        elif diff_r==0 and diff_c < 0: #left
-            index = 3
-        elif diff_r > 0 and diff_c == 0: #down
+        thresh = int((self.agent_width+self.obs_width)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
             index = 2
-        elif diff_r < 0  and diff_c ==0: #up
-            index = 0
-        elif diff_r > 0 and diff_c > 0: #quad4
-            index = 7
-        elif diff_r < 0  and diff_c > 0: #quad1
-            index = 4
-        elif diff_r < 0 and diff_c < 0: #quad2
-            index = 5
-        elif diff_r >0 and diff_c < 0: #quad1
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
             index = 6
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 4
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 0
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 3
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 1
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 7
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
+            index = 5
         else:
             index = 8
 
         return index
+    '''
 
+    def determine_index(self, diff_r, diff_c):
+
+        thresh = int((self.agent_width+self.grid_size)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
+            index = 5
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
+            index = 3
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 7
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 1
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 8
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 2
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 0
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
+            index = 6
+        else:
+            index = 4
+
+        return index
 
     def closeness_indicator(self,state_info):
 
@@ -207,6 +270,7 @@ class LocalGlobal():
         state = self.get_info_from_state(state)
         window_size = self.window_size
         block_width = self.grid_size
+        step = self.step_size
         window_rows = window_cols = window_size
         row_start =  int((window_rows-1)/2)
         col_start = int((window_cols-1)/2)
@@ -244,19 +308,36 @@ class LocalGlobal():
             #new method, simulate overlap for each of the neighbouring places
             #for each of the obstacles
             obs_pos = state[i]
-            obs_rad = self.obs_rad
+            obs_width = self.obs_width
             for r in range(-row_start,row_start+1,1):
                 for c in range(-col_start,col_start+1,1):
                     #c = x and r = y
                     #pdb.set_trace()
-                    temp_pos = np.asarray([agent_pos[0] + r*block_width, 
-                                agent_pos[1] + c*block_width])
-                    if np.array_equal(temp_pos,obs_pos):
+                    temp_pos = np.asarray([agent_pos[0] + r*step, 
+                                agent_pos[1] + c*step])
+                    if self.check_overlap(temp_pos,obs_pos):
                         pos = self.block_to_arrpos(r,c)
 
                         mod_state[pos+self.gl_size+self.rl_size]=1
 
         return reset_wrapper(mod_state)
+
+    def check_overlap(self,temp_pos,obs_pos):
+        #if true, that means there is an overlap
+        boundary = None
+        if self.grid_size >= self.agent_width:
+            boundary = self.grid_size/2
+        else:
+            boundary = self.agent_width/2
+
+        distance_to_maintain = boundary+(self.obs_width/2)
+        #pdb.set_trace()
+        if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
+
+            return True
+        else:
+            return False
+
 
 
 
@@ -279,28 +360,91 @@ class LocalGlobal():
 class FrontBackSideSimple():
 
 
-    def __init__(self, thresh1 = 2, thresh2 = 4, thresh3 = 6,  
-                    agent_rad = 1, obs_rad = 1 , fieldList = []):
+    def __init__(self, thresh1=1, thresh2=2, thresh3=3, 
+                 agent_width=1, obs_width=1,
+                 step_size=1, grid_size=1, fieldList = []):
 
-            self.thresh1 = thresh1
-            self.thresh2 = thresh2
-            self.thresh3 = thresh3
+        self.thresh1 = step_size*thresh1
+        self.thresh2 = step_size*thresh2
+        self.thresh3 = step_size*thresh3
 
-            self.agent_radius = agent_rad
-            self.obs_rad = obs_rad
+        self.agent_width = agent_width
+        self.obs_width = obs_width
+        self.step_size = step_size
+        self.grid_size = grid_size
 
 
-            self.field_list = fieldList
-            self.prev_dist = None
-            #added new (26-3-19)
-            #based on the state representation, this should contain a 
-            #dictionary containing all possible states
+        self.field_list = fieldList
+        self.prev_dist = None
+        #added new (26-3-19)
+        #based on the state representation, this should contain a 
+        #dictionary containing all possible states
+       
+        self.state_dictionary = {}
+        self.state_str_arr_dict = {}
+        self.inv_state_dictionary = {}
+        self.hash_variable = None
 
-            self.state_dictionary = {}
-            self.state_str_arr_dict = {}
-            print('Loading state space dictionary. . . ')
-            self.generate_state_dictionary()
-            print('Done!')
+        self.state_rep_size = 9+3+12
+        self.generate_hash_variable()
+
+
+        print('Loading state space dictionary. . . ')
+        #self.generate_state_dictionary()
+        print('Done!')
+
+
+
+        #generates the state dictionary based on the structure of the 
+    #hand crafted state space
+    
+    #the keys in the dictionary are strings converted from 
+    #numpy arrays
+    
+
+    def generate_hash_variable(self):
+        '''
+        The hash variable basically is an array of the size of the current state. 
+        This creates an array of the following format:
+        [. . .  16 8 4 2 1] and so on.
+        '''
+        self.hash_variable = np.zeros(self.state_rep_size)
+        for i in range(self.hash_variable.shape[0]-1, -1, -1):
+    
+            self.hash_variable[i] = math.pow(2, self.hash_variable.shape[0]-1-i)
+
+        print(self.hash_variable)
+
+
+        
+
+    def recover_state_from_hash_value(self, hash_value):
+
+        size = self.state_rep_size
+        binary_str = np.binary_repr(hash_value, size)
+        state_val = np.zeros(size)
+        i = 0
+        for digit in binary_str:
+            state_val[i] = int(digit) 
+            i += 1
+
+        return state_val
+
+
+    def hash_function(self, state):
+        '''
+        This function takes in a state and returns an integer which uniquely identifies that 
+        particular state in the entire state space.
+        '''
+        if isinstance(state, torch.Tensor):
+
+            state = state.cpu().numpy()
+
+
+        return int(np.dot(self.hash_variable, state))
+
+
+
 
     #generates the state dictionary based on the structure of the 
     #hand crafted state space
@@ -359,27 +503,27 @@ class FrontBackSideSimple():
 
 
 
-    def determine_index(self,diff_r, diff_c):
+    def determine_index(self, diff_r, diff_c):
 
-
-        if diff_r==0 and diff_c >0: #right
-            index = 1
-        elif diff_r==0 and diff_c < 0: #left
-            index = 3
-        elif diff_r > 0 and diff_c == 0: #down
-            index = 2
-        elif diff_r < 0  and diff_c ==0: #up
-            index = 0
-        elif diff_r > 0 and diff_c > 0: #quad4
-            index = 7
-        elif diff_r < 0  and diff_c > 0: #quad1
-            index = 4
-        elif diff_r < 0 and diff_c < 0: #quad2
+        thresh = int((self.agent_width+self.grid_size)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
             index = 5
-        elif diff_r >0 and diff_c < 0: #quad1
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
+            index = 3
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 7
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 1
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 8
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 2
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 0
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
             index = 6
         else:
-            index = 8
+            index = 4
 
         return index
 
@@ -411,35 +555,44 @@ class FrontBackSideSimple():
 
     def get_orientation_distance(self, agent_pos, obs_pos):
 
+        thresh = int((self.agent_width+self.obs_width)/2)
         diff_r = obs_pos[0] - agent_pos[0]
         diff_c = obs_pos[1] - agent_pos[1]
         orient_bin = -1
         dist_bin = -1
         dist = abs(diff_r)+abs(diff_c)
+        dist = dist - thresh - self.step_size
+        #print(dist)
         if dist <= self.thresh3:
             if dist > self.thresh2:
                 dist_bin = 2
 
-            elif dist <= self.thresh2 and dist > self.thresh1:
+            elif dist < self.thresh2 and dist >= self.thresh1:
                 dist_bin = 1
 
             else:
                 dist_bin = 0 
             #select orientation bin
-            if abs(diff_c) < abs(diff_r):
-                if diff_r > 0: #down
-                    orient_bin = 2
-                else: #top
-                    orient_bin = 0
+            if abs(diff_c) > thresh or abs(diff_r) > thresh: 
+            #atleast one has to be bigger than the thres else it is a collision
+                if abs(diff_c) < abs(diff_r):
+                    if diff_r > 0: #down
+                        orient_bin = 2
+                    else: #top
+                        orient_bin = 0
+                else:
+                    if diff_c > 0:#right
+                        orient_bin = 1
+                    else: #left
+                        orient_bin = 3
             else:
-                if diff_c > 0:#right
-                    orient_bin = 1
-                else: #left
-                    orient_bin = 3
+                #print('Collision course!!')
+                #collision course
+                pass
 
         return orient_bin, dist_bin
 
-    def extract_features(self,state):
+    def extract_features(self, state):
 
         #pdb.set_trace()
         state = self.get_info_from_state(state)
@@ -464,7 +617,6 @@ class FrontBackSideSimple():
         '''
         index = self.determine_index(diff_r,diff_c)
         mod_state[index] = 1
-
         feat = self.closeness_indicator(state)
 
         mod_state[9:12] = feat
@@ -484,17 +636,28 @@ class FrontBackSideSimple():
             
         return reset_wrapper(mod_state)
 
+
+
 class FrontBackSide():
 
-    def __init__(self,window_size=5,grid_size=1,fieldList = []):
+    def __init__(self,thresh1=1, thresh2=2,
+                 thresh3=3, thresh4=4, agent_width=10,
+                 obs_width=10, step_size=10,
+                 grid_size=1, fieldList=[]):
 
         #heading direction 0 default top, 1 right ,2 down and 3 left
-        self.heading_direction=0 #no need for previous heading as the
+        self.heading_direction = 0 #no need for previous heading as the
         #coordinates provided as the state are always assumed as top facing
-        self.window_size = window_size
-        self.sensor_rad = (int)(window_size/2)
+        self.thresh1 = thresh1 * step_size
+        self.thresh2 = thresh2 * step_size
+        self.thresh3 = thresh3 * step_size
+        self.agent_width = agent_width
+        self.obs_width = obs_width
+        self.step_size = step_size
         self.grid_size = grid_size
         self.field_list = fieldList
+        self.prev_dist = None
+        self.state_rep_size = 4+9+3+12 #heading, goal_location , proximity indicator, obs_rep
         #the entire table is not needed, only the first row
         #but I am still keeping this if necessary in future
         '''
@@ -510,13 +673,15 @@ class FrontBackSide():
 
         '''
 
-
+        #this is for a [row, col] format in the agent location
         self.rel_pos_transform_table = np.asarray([
-                                                [[1,1],[-1,1],[-1,-1],[1,-1]],
-                                                [[-1,1],[1,1],[1,-1],[-1,-1]],
-                                                [[-1,-1],[1,-1],[1,1],[-1,1]],
-                                                [[1,-1],[-1,-1],[-1,1],[1,1]]
+                                                [[1, 1], [-1, 1], [-1, -1], [1, -1]],
+                                                [[-1, 1], [1, 1], [1, -1], [-1, -1]],
+                                                [[-1, -1], [1, -1], [1, 1], [-1, 1]],
+                                                [[1, -1], [-1, -1], [-1, 1], [1, 1]]
                                                 ])
+
+
 
         self.swap_coord_table = np.asarray([[0,1,0,1],
                                            [1,0,1,0],
@@ -558,15 +723,24 @@ class FrontBackSide():
 
 
     #reads the list of fields from the state to create its features
-    def get_info_from_state(self,state):
+    def get_info_from_state(self, state):
         
+        #all the spatial information that comes from the environment are of
+        #the form (y,x) i.e. (rows,cols)
         state_list = []
+        #print('raw state info :', state)
         for field in self.field_list:
-            if type(state[field]) is list:
-                for val in state[field]:
-                    state_list.append(val)
+            
+            if field == 'agent_head_dir':
+                
+                self.heading_direction = state[field]
+            
             else:
-                state_list.append(state[field])
+                if type(state[field]) is list:
+                    for val in state[field]:
+                        state_list.append(val)
+                else:
+                    state_list.append(state[field])
 
         
 
@@ -575,123 +749,187 @@ class FrontBackSide():
 
     #given the current state returns the relative position of 
     #the goal and all of the obstacles
-    def get_relative_coords(self,state):
+    def get_relative_coords(self, state):
         
         rel_positions = np.zeros((state.shape[0],state.shape[1]))
         agent_pos = state[0]
         for i in range(state.shape[0]):
-            rel_positions[i,:] = state[i,:]-agent_pos
 
+            #print('Orig :', state[i, :]) 
+            rel_positions[i,:] = state[i,:] - agent_pos
+            #print('Rel :', rel_positions[i, :])
         return rel_positions
 
     #update the relative coordinates based on the current heading
     #and the action taken
-    def update_relative_coords(self, rel_positions,action):
+    def update_relative_coords(self, rel_positions, action):
 
         #using the action and the current heading, decide the final heading
         #quick reminder 0 - move front 1 - move right 2 - move down 3 - move left
-        if action==4:
-            multiplying_factor = self.rel_pos_transform_table[0,self.heading_direction]
-            swap = self.swap_coord_table[0,self.heading_direction]
+        
+        #print('Heading direction :' , self.heading_direction)
+        if action == 4:
+            multiplying_factor = self.rel_pos_transform_table[0, self.heading_direction]
+            swap = self.swap_coord_table[0, self.heading_direction]
         else:
-            multiplying_factor = self.rel_pos_transform_table[0,action]
+            multiplying_factor = self.rel_pos_transform_table[0, action]
             self.heading_direction = action
-            swap = self.swap_coord_table[0,action]
-
+            swap = self.swap_coord_table[0, action]
+        #print('Rel_position :', rel_positions)
         for i in range(rel_positions.shape[0]):
 
-            if swap==1: 
+            
+            if swap == 1: 
                 #swap the rows and columns
-                rel_positions[i,0],rel_positions[i,1] = rel_positions[i,1],rel_positions[i,0]
+                rel_positions[i, 0], rel_positions[i, 1] = rel_positions[i, 1], rel_positions[i, 0]
 
-            rel_positions[i,0] = rel_positions[i,0]*multiplying_factor[0]
-            rel_positions[i,1] = rel_positions[i,1]*multiplying_factor[1]
-        
+            rel_positions[i, 0] = rel_positions[i, 0]*multiplying_factor[0]
+            rel_positions[i, 1] = rel_positions[i, 1]*multiplying_factor[1]
+        #print('Rel_position updated :', rel_positions)
+
         return rel_positions
 
-    def get_goal_pos(self,rel_pos):
 
-        goal_pos = np.zeros(4)
-        r = rel_pos[1,0]
-        c = rel_pos[1,1]
-        if abs(r)>abs(c):
-            #front or back
-            if r>0:
-                #back
-                goal_pos[2]=1
+
+    def determine_index(self, diff_r, diff_c):
+        '''determines the direction in which the goal is present'''
+        thresh = int((self.agent_width+self.grid_size)/2)
+        if abs(diff_r) < thresh and diff_c > thresh: #right
+            index = 5
+        elif abs(diff_r) < thresh and diff_c < thresh: #left
+            index = 3
+        elif diff_r > thresh and abs(diff_c) < thresh: #down
+            index = 7
+        elif diff_r < thresh  and abs(diff_c) < thresh: #up
+            index = 1
+        elif diff_r > thresh and diff_c > thresh: #quad4
+            index = 8
+        elif diff_r < 0 and abs(diff_r) > thresh  and diff_c > thresh: #quad1
+            index = 2
+        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+            index = 0
+        elif diff_r > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad3
+            index = 6
+        else:
+            index = 4
+
+        return index
+
+
+    def closeness_indicator(self, state_info):
+        '''determines if the agent moved closer or farther away from the goal'''
+        agent_pos = state_info[0, :]
+        goal_pos = state_info[1, :]
+        feature = np.zeros(3)
+        current_dist = np.linalg.norm(agent_pos-goal_pos)
+
+        if self.prev_dist is None or self.prev_dist == current_dist:
+
+            feature[1] = 1
+            self.prev_dist = current_dist
+            return feature
+
+        if self.prev_dist > current_dist:
+
+            feature[0] = 1
+
+        if self.prev_dist < current_dist:
+
+            feature[2] = 1
+
+        self.prev_dist = current_dist
+
+        return feature
+
+    def get_orientation_distance(self, agent_pos, obs_pos):
+        '''returns the orientation bin and the distance bin of the obstacle
+           in comparison to the agent'''
+        thresh = int((self.agent_width+self.obs_width)/2)
+        diff_r = obs_pos[0] - agent_pos[0]
+        diff_c = obs_pos[1] - agent_pos[1]
+        orient_bin = -1
+        dist_bin = -1
+        dist = abs(diff_r)+abs(diff_c)
+        dist = dist - thresh - self.step_size
+        #print(dist)
+        if dist <= self.thresh3:
+            if dist >= self.thresh2:
+                dist_bin = 2
+
+            elif dist < self.thresh2 and dist >= self.thresh1:
+                dist_bin = 1
+
             else:
-                #front
-                goal_pos[0]=1
-        if abs(r)<=abs(c):
-            #left or right
-            if c<0:
-                #left
-                goal_pos[3]=1
-            if c>0:
-                #right
-                goal_pos[1]=1
-        return goal_pos
+                dist_bin = 0 
+            #select orientation bin
+            if abs(diff_c) > thresh or abs(diff_r) > thresh: 
+            #atleast one has to be bigger than the thres else it is a collision
+                if abs(diff_c) < abs(diff_r):
+                    if diff_r > 0: #down
+                        orient_bin = 2
+                    else: #top
+                        orient_bin = 0
+                else:
+                    if diff_c > 0:#right
+                        orient_bin = 1
+                    else: #left
+                        orient_bin = 3
+            else:
+                #print('Collision course!!')
+                #collision course
+                pass
 
-    #given the correct local_representation returns the state representation
-    def rel_coord_to_local_rep(self,rel_pos):
-        '''
-        convention for local representation same as always:
-        0 : front, 1 : right ,2 : back , 3 : left 
-        '''
-        goal_pos = np.zeros(4)
-        local_rep = np.zeros(4)
-        window_size = self.window_size
-        block_width = self.grid_size
-        window_rows = window_cols = window_size
-        row_start =  int((window_rows-1)/2)
-        col_start = int((window_cols-1)/2)
-        #check if they are within the window range and if so do your magic
-        #account for the goal
-        goal_pos = self.get_goal_pos(rel_pos)
+        #print('dist :',dist_bin)
+        #print('orient bin', orient_bin)
+        return orient_bin, dist_bin
 
-        #account for the obstacles
-        for i in range(2,rel_pos.shape[0]):
-            #if i==1, this means we are dealing with the goal rather than
-            #the obstacles so, that gets added in the goal_pos array
-            #rather than the local_rep array, which is just for the obstacles
-            if np.all(rel_pos[i,:]>=-self.sensor_rad) and np.all(rel_pos[i,:]<=self.sensor_rad):
-
-                #this value is within range, place it in the right position
-                r = rel_pos[i,0]
-                c = rel_pos[i,1]
-                if abs(r)>abs(c):
-                    #front or back
-                    if r>0:
-                        #back
-                        local_rep[2]=1
-
-                    else:
-                        #front
-                        local_rep[0]=1
-                if abs(r)<=abs(c):
-                    #left or right
-                    if c<0:
-                        #left
-                        local_rep[3]=1
-                    if c>0:
-                        #right
-                        local_rep[1]=1
-
-        return np.concatenate((goal_pos,local_rep),axis=0)
-
-
-    def extract_features(self,state):
-        action = state['agent_head_dir']
+    def extract_features(self, state):
+        '''exctract the features'''
+        #pdb.set_trace()
         state = self.get_info_from_state(state)
-        
-        if action!=4:
-            pass
-            #pdb.set_trace()
-        rel_coords = self.get_relative_coords(state)
-        updated_coords = self.update_relative_coords(rel_coords,action)
-        features = self.rel_coord_to_local_rep(updated_coords)
 
-        return reset_wrapper(features)
+        rel_positions = self.get_relative_coords(state)
+        state = self.update_relative_coords(rel_positions, self.heading_direction)
+        #print('Rel state info:', state)
+        mod_state = np.zeros(4+9+3+12)
+
+        #a = int((window_size**2-1)/2)
+        mod_state[self.heading_direction] = 1
+        agent_pos = state[0]
+        goal_pos = state[1]
+        diff_r = goal_pos[0] - agent_pos[0]
+        diff_c = goal_pos[1] - agent_pos[1]
+        '''
+        if diff_x >= 0 and diff_y >= 0:
+            mod_state[1] = 1
+        elif diff_x < 0  and diff_y >= 0:
+            mod_state[0] = 1
+        elif diff_x < 0 and diff_y < 0:
+            mod_state[3] = 1
+        else:
+            mod_state[2] = 1
+        '''
+        index = self.determine_index(diff_r, diff_c)
+        mod_state[4+index] = 1
+
+        feat = self.closeness_indicator(state)
+
+        mod_state[13:16] = feat
+
+        for i in range(2, len(state)):
+
+            #as of now this just measures the distance from the center of the obstacle
+            #this distance has to be measured from the circumferance of the obstacle
+
+            #new method, simulate overlap for each of the neighbouring places
+            #for each of the obstacles
+            obs_pos = state[i]
+            orient, dist = self.get_orientation_distance(agent_pos, obs_pos)
+            if dist >= 0 and orient >= 0:
+                mod_state[16+dist*4+orient] = 1 # clockwise starting from the inner most circle
+
+            
+        return reset_wrapper(mod_state)
 
 
 class OneHot():
@@ -857,10 +1095,12 @@ class SocialNav():
 if __name__=='__main__':
 
     #f = SocialNav(fieldList = ['agent_state','goal_state'])
-    f = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
-    #f = FrontBackSideSimple(fieldList = ['agent_state', 'goal_state','obstacles'])
+    #f = LocalGlobal(window_size=7, fieldList=['agent_state', 'goal_state','obstacles'])
+    f = FrontBackSide(fieldList = ['agent_state', 'goal_state','obstacles'])
     #print(f.state_dictionary)
     print(f.hash_variable)
+    i = f.hash_variable
+    print(f.recover_state_from_hash_value(i))
     k = np.zeros(24)
 
     key = np.array2string(k)

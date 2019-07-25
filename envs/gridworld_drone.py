@@ -37,7 +37,10 @@ class GridWorldDrone(GridWorld):
         show_trail = False,
         annotation_file = None,
         subject = None,
-        omit_annotation = None #will be used to test a policy
+        omit_annotation = None, #will be used to test a policy
+        obs_width = 10,
+        step_size = 10,
+        agent_width = 10
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -52,10 +55,17 @@ class GridWorldDrone(GridWorld):
                        step_wrapper=step_wrapper,
                        reset_wrapper=reset_wrapper,
                        show_trail = show_trail,
+                       obs_width=obs_width,
+                       agent_width=agent_width,
+                       step_size=step_size
                        )
+        if display:
+
+            self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
+            self.clock = pygame.time.Clock()
+            self.tickSpeed = 1
 
 
-        self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
         self.current_frame = 10
@@ -63,14 +73,42 @@ class GridWorldDrone(GridWorld):
         self.initial_frame = 999999999999 #a large number
         self.subject = subject
         self.omit_annotation = omit_annotation
+        self.max_obstacles = None
         self.agent_state = None
         self.goal_state = None
+        self.agent_action_flag = False
+        self.obstacle_width = obs_width
+        self.step_size = step_size
+        self.show_trail = show_trail
         self.annotation_list = []
+
+
+        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
+        self.lowerLimit = np.asarray([0,0])
+        ############# this comes with the change in the action space##########
+        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
+                            np.asarray([0,1]),np.asarray([1,1]),
+                            np.asarray([1,0]),np.asarray([1,-1]),
+                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+
+        self.action_dict = {}
+
+        for i in range(len(self.actionArray)):
+            self.action_dict[np.array2string(self.actionArray[i])] = i
+
+        self.action_space = MockActionspace(len(self.actionArray))
+        #self.spec = MockSpec(1.0)
+
+        ######################################################################
+        self.stepReward = stepReward
         self.generate_annotation_dict_universal()
 
 
 
     def generate_annotation_dict(self):
+        '''
+        Reads information from the stanford drone dataset 
+        '''
         if not os.path.isfile(self.annotation_file):
             print("The annotation file does not exist.")
             return 0
@@ -139,6 +177,7 @@ class GridWorldDrone(GridWorld):
     
     def generate_annotation_dict_universal(self):
         '''
+        Reads information from files with the following format
          frame , id, y_coord, x_coord
         '''
         if not os.path.isfile(self.annotation_file):
@@ -205,7 +244,9 @@ class GridWorldDrone(GridWorld):
         print('cellWidth', self.cellWidth)
 
     def get_state_from_frame_universal(self, frame_info):
-
+        '''
+        For processed datasets
+        '''
         self.obstacles = []
         for element in frame_info:
 
@@ -219,7 +260,9 @@ class GridWorldDrone(GridWorld):
 
 
     def get_state_from_frame(self,frame_info):
-
+        '''
+        For stanford dataset
+        '''
         self.obstacles = []
         for element in frame_info:
 
@@ -264,18 +307,29 @@ class GridWorldDrone(GridWorld):
         return 0
 
 
-    def step(self):
+    def step(self, action=None):
             #print('printing the keypress status',self.agent_action_keyboard)
             
         #print('Info from curent frame :',self.current_frame)
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+
         if self.subject is None:
             if not self.release_control:
-                self.agent_state = np.maximum(np.minimum(self.agent_state+self.actionArray[action],self.upperLimit),self.lowerLimit)
-            
+
+                if action is not None:
+                    if isinstance(action,int):
+                        self.agent_state = np.maximum(np.minimum(self.agent_state+ \
+                                           self.step_size*self.actionArray[action],self.upperLimit),self.lowerLimit)
+                    else:
+                        self.agent_state = np.maximum(np.minimum(self.agent_state+ \
+                                           self.step_size*action,self.upperLimit),self.lowerLimit)
+
+                    #print("Agent :",self.agent_state)
+                
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
             reward, done = self.calculateReward()
+
 
         #if you are done ie hit an obstacle or the goal
         #you leave control of the agent and you are forced to
@@ -296,7 +350,7 @@ class GridWorldDrone(GridWorld):
             if self.subject is None:
                 if not self.release_control:
                     self.state['agent_state'] = self.agent_state
-                    if action!=4:
+                    if action!=8:
                         self.state['agent_head_dir'] = action
 
                     self.state['obstacles'] = self.obstacles 
@@ -341,9 +395,9 @@ class GridWorldDrone(GridWorld):
 
 
         #only for the goal and the agent when the subject is not specified speicfically.
-        '''
-        if self.is_random:
-
+        
+        if self.subject is None:
+            
             #placing the goal
             while True:
                 flag = False
@@ -356,18 +410,18 @@ class GridWorldDrone(GridWorld):
                 if not flag:
                     break
 
-        dist = self.agent_spawn_clearance
-        while True:
-            flag = False
-            self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-            for i in range(num_obs):
-                if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
-                    flag = True
+            dist = self.agent_spawn_clearance
+            while True:
+                flag = False
+                self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                for i in range(num_obs):
+                    if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                        flag = True
 
-            if not flag:
-                break
+                if not flag:
+                    break
 
-        '''
+        
         self.release_control = False
         if self.is_onehot:
             self.state = self.onehotrep()
@@ -417,6 +471,52 @@ class GridWorldDrone(GridWorld):
 
         return 4,False
 
+    #taking action from user
+    def take_action_from_user(self):
+        #the user will click anywhere on the board and the agent will start moving
+        #directly towards the point being clicked. The actions taken in the process
+        #will be registered as the action performed by the expert. The agent will keep
+        #moving towards the pointer as long as the left button remains pressed. Once released
+        #the agent will remain in its position.
+        #Using the above method, the user will have to drag the agent across the board
+        #avoiding the obstacles in the process and reaching the goal.
+        #if any collision is detected or the goal is not reached the 
+        #trajectory will be discarded.
+        (a,b,c) = pygame.mouse.get_pressed()
+        
+        x = 0.0001
+        y = 0.0001
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.agent_action_flag = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.agent_action_flag = False
+        if self.agent_action_flag:  
+            (x,y) = pygame.mouse.get_pos()
+            #print('x :',x, 'y :',y)
+            x = x - self.agent_state[1]
+            y = y - self.agent_state[0]
+
+            x = int(x/self.step_size)
+            y = int(y/self.step_size)
+
+            x = int(np.sign(x))
+            y = int(np.sign(y))
+            #print(x,y)
+            sign_arr = np.array([y,x])
+            def_arr = np.array([1,1])
+            action = sign_arr*def_arr
+
+            '''
+            if np.hypot(x,y)>_max_agent_speed:
+                normalizer = _max_agent_speed/(np.hypot(x,y))
+            #print x,y
+            else:
+                normalizer = 1
+            '''
+            return self.action_dict[np.array2string(sign_arr*def_arr)]
+
+        return self.action_dict[np.array2string(np.array([0,0]))]
 
 
     def close_game(self):
@@ -513,4 +613,3 @@ if __name__=="__main__":
     world.reset()
     while world.current_frame < world.final_frame:
         world.step()
-

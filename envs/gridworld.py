@@ -5,7 +5,12 @@ import pdb
 import sys
 import math
 sys.path.insert(0, '..')
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
+
+
+from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide
+
+
+
 
 from itertools import count
 import utils  # NOQA: E402
@@ -31,9 +36,13 @@ class GridWorld(GridWorldClockless):
         is_onehot = True,
         is_random = False,
         stepReward=0.001,
+        obs_width=None,
+        agent_width=None,
+        step_size=None,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
-        show_trail = False
+        show_trail = False,
+        place_goal_manually=False
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -46,12 +55,17 @@ class GridWorld(GridWorldClockless):
                        is_random = is_random,
                        stepReward= stepReward,
                        step_wrapper=step_wrapper,
+                       obs_width=obs_width,
+                       agent_width=agent_width,
+                       step_size=step_size,
                        reset_wrapper=reset_wrapper)
         self.clock = pygame.time.Clock()
-
-        self.tickSpeed = 60
+        self.gameDisplay = None
+        self.tickSpeed = 1
         self.show_trail = show_trail
-        #self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+
+        self.place_goal_manually = place_goal_manually
+        self.agent_action_flag = False
 
 
         if obstacles=='By hand':
@@ -107,9 +121,25 @@ class GridWorld(GridWorldClockless):
         return None
     
 
+    def place_goal(self):
+
+        paused = True
+        while paused:
+            for event in pygame.event.get():
+                if event.type==pygame.MOUSEBUTTONDOWN:
+                    (x,y) = pygame.mouse.get_pos()
+                    print("ere")
+                    self.goal_state[1] = x
+                    self.goal_state[0] = y
+                    paused = False
+
+
+
+
     def render(self):
 
         #render board
+        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
         self.clock.tick(self.tickSpeed)
 
         self.gameDisplay.fill(self.white)
@@ -117,38 +147,90 @@ class GridWorld(GridWorldClockless):
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]*self.cellWidth,obs[0]*self.cellWidth,self.cellWidth, self.cellWidth])
+                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]-(self.obs_width/2),obs[0]-(self.obs_width/2),self.obs_width, self.obs_width])
             
         #render goal
-        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]*self.cellWidth, self.goal_state[0]*self.cellWidth,self.cellWidth, self.cellWidth])
+        pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-(self.cellWidth/2), self.goal_state[0]-(self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
-        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]*self.cellWidth, self.agent_state[0]*self.cellWidth, self.cellWidth, self.cellWidth])
+        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]-(self.agent_width/2), self.agent_state[0]-(self.agent_width/2), self.agent_width, self.agent_width])
         if self.show_trail:
             self.draw_trajectory()
 
         pygame.display.update()
         return 0
 
+
+
     #arrow keys for direction
     def take_user_action(self):
+        '''
+        takes action from user
+        '''
         self.clock.tick(self.tickSpeed)
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-
+                print('keypreseed')
+                pygame.event.wait()
                 key = pygame.key.get_pressed()
                 if key[pygame.K_UP]:
-                    return 0,True
+                    return 0, True
                 if key[pygame.K_RIGHT]:
-                    return 1,True
+                    return 1, True
                 if key[pygame.K_LEFT]:
-                    return 3,True
+                    return 3, True
                 if key[pygame.K_DOWN]:
-                    return 2,True
+                    return 2, True
 
-        return 4,False
+        return 4, False
 
 
+    #taking action from user
+    def take_action_from_user(self):
+        #the user will click anywhere on the board and the agent will start moving
+        #directly towards the point being clicked. The actions taken in the process
+        #will be registered as the action performed by the expert. The agent will keep
+        #moving towards the pointer as long as the left button remains pressed. Once released
+        #the agent will remain in its position.
+        #Using the above method, the user will have to drag the agent across the board
+        #avoiding the obstacles in the process and reaching the goal.
+        #if any collision is detected or the goal is not reached the 
+        #trajectory will be discarded.
+        (a,b,c) = pygame.mouse.get_pressed()
+        
+        x = 0.0001
+        y = 0.0001
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.agent_action_flag = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.agent_action_flag = False
+        if self.agent_action_flag:  
+            (x,y) = pygame.mouse.get_pos()
+            #print('x :',x, 'y :',y)
+            x = x - self.agent_state[1]
+            y = y - self.agent_state[0]
+
+            x = int(x/self.step_size)
+            y = int(y/self.step_size)
+
+            x = int(np.sign(x))
+            y = int(np.sign(y))
+            #print(x,y)
+            sign_arr = np.array([y,x])
+            def_arr = np.array([1,1])
+            action = sign_arr*def_arr
+
+            '''
+            if np.hypot(x,y)>_max_agent_speed:
+                normalizer = _max_agent_speed/(np.hypot(x,y))
+            #print x,y
+            else:
+                normalizer = 1
+            '''
+            return self.action_dict[np.array2string(sign_arr*def_arr)], True
+
+        return self.action_dict[np.array2string(np.array([0,0]))], False
 
     def close_game(self):
 
@@ -227,7 +309,8 @@ class GridWorld(GridWorldClockless):
 
     def reset(self):
 
-        pygame.image.save(self.gameDisplay,'traced_trajectories.png')
+        if self.gameDisplay is not None:
+            pygame.image.save(self.gameDisplay,'traced_trajectories.png')
         self.pos_history = []
 
         num_obs=len(self.obstacles)
@@ -236,19 +319,21 @@ class GridWorld(GridWorldClockless):
         #change with each reset
         dist_g = self.goal_spawn_clearance
         if self.is_random:
-            self.obstacles = []
-            for i in range(num_obs):
 
-                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.obstacles.append(obs_pos)
+            if not self.freeze_obstacles:
+                self.obstacles = []
+                for i in range(num_obs):
+
+                    obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                    self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
 
 
             while True:
                 flag = False
-                self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-
+                self.goal_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                self.goal_state = self.goal_state + (self.cellWidth/2)
                 for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < self.cellWidth * dist_g:
 
                         flag = True
                 if not flag:
@@ -257,9 +342,10 @@ class GridWorld(GridWorldClockless):
         dist = self.agent_spawn_clearance
         while True:
             flag = False
-            self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            self.agent_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+            self.agent_state = self.agent_state + (self.cellWidth/2)
             for i in range(num_obs):
-                if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                if np.linalg.norm(self.obstacles[i]-self.agent_state) < self.cellWidth * dist:
                     flag = True
 
             if not flag:
@@ -268,6 +354,7 @@ class GridWorld(GridWorldClockless):
 
         self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
         self.release_control = False
+        self.cur_heading_dir = 0
         if self.is_onehot:
             self.state = self.onehotrep()
         else:
@@ -287,6 +374,10 @@ class GridWorld(GridWorldClockless):
         pygame.display.set_caption('Your friendly grid environment')
         self.render()
 
+        if self.place_goal_manually:
+
+            self.place_goal()
+            
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
         return self.state
@@ -316,16 +407,24 @@ if __name__=="__main__":
         for i in count(0):
             t = 0
             while t < 20:
+
                 action,flag = world.take_user_action()
-                next_state, reward,done,_ = world.step(action)
-                state  = feat_ext.extract_features(next_state)
-                print('Hashed values :', feat_ext.hash_function(state))
-                print('Rehashed_value :', feat_ext.hash_function(feat_ext.recover_state_from_hash_value(feat_ext.hash_function(state))))
+                #action = np.random.randint(4)
+                print(action)
+                #action = 2
+                next_state, reward, done, _ = world.step(action)
+                print(next_state)
+                state = featExt.extract_features(next_state)
+                print('The heading :', state[0:4])
+                print('The goal info :', state[4:13].reshape(3, 3))
+                print('THe obstacle infor :', state[16:].reshape(3, 4))
+                
                 if flag:
-                    t+=1
-                    #print(world.pos_history)
+
+                    t += 1
+                    print(world.pos_history)
                     states.append(state)
-                if t>20 or done:
+                if t > 20 or done:
                     break
 
             print("reward for the run : ", totalReward)

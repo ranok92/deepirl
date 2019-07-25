@@ -178,7 +178,7 @@ class ActorCritic:
                 t= 0
                 while t < self.max_ep_length:
                 
-                    action,action_flag = self.env.take_user_action()
+                    action,action_flag = self.env.take_action_from_user()
 
                     state, rewards, done, _ = self.env.step(action)
                     
@@ -236,7 +236,7 @@ class ActorCritic:
                 
             print('Reward for the run :',run_reward)
 
-            if run_reward > 0: # not a bad run
+            if run_reward > 1: # not a bad run
 
                 actions_tensor = torch.tensor(actions)
                 states_tensor = torch.stack(states)
