@@ -1,4 +1,6 @@
 import numpy as np 
+import torch
+
 
 import sys
 sys.path.insert(0, '..')
@@ -110,7 +112,11 @@ def read_data_from_file(annotation_file):
 
 
 def preprocess_data(annotation_file):
+    '''
 
+    given a annotation file containing spline control points converts that 
+    to a frame-by-frame representation and writes that on a txt file with a easy to read format
+    '''
 
     file_n = annotation_file+'_processed'+'.txt'
 
@@ -138,49 +144,63 @@ def preprocess_data(annotation_file):
 
 
 
-def extract_trajectory(annotation_file, feature_extractor):
+def extract_trajectory(annotation_file, feature_extractor, folder_to_save):
+
+
+    if not os.path.exists(folder_to_save):
+        os.mkdir(folder_to_save)
 
     subject_list = extract_subjects_from_file(annotation_file)
-    trajectory_dict = []
+    print(subject_list)
     for sub in subject_list:
+        trajectory_info = []
         print('Starting for subject :',sub)
-        world = GridWorldDrone(display=False, is_onehot = False, 
-                        seed = 0, obstacles=None, 
+        world = GridWorldDrone(display=True, is_onehot=False, 
+                        seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file= annotation_file,
+                        annotation_file=annotation_file,
                         subject=sub,                        
-                        rows=1088, cols=1424, width=20)
+                        rows=576, cols=720,
+                        width=10)
 
         world.reset()
 
         while world.current_frame < world.final_frame:
             state,_,_,_ = world.step()
-
+            pdb.set_trace()
             state = feature_extactor.extract_features(state)
+            state = torch.tensor(state)
+            trajectory_info.append(state)
+        state_tensors = torch.stack(trajectory_info)
+        torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
+
+
+
 
 def extract_subjects_from_file(annotation_file):
 
     sub_list = []
     if not os.path.isfile(annotation_file):
-        print("The annotation file does not exist.")
+        print("The annotation file does not exist!!")
         return 0
 
     with open(annotation_file) as f:
 
         for line in f:
             line = line.strip().split(' ')
-            sub_list.append(int(line[0]))
+            sub_list.append(int(line[1]))
 
     return set(sub_list)
 
-'''
-file_name = '/home/thalassa/akonar/Study/deepirl/envs/stanford_drone_subset/annotations/bookstore/video0/annotations.txt'
-feature_extactor = LocalGlobal(window_size=3, grid_size=20, fieldList = ['agent_state','goal_state','obstacles'])
+
+file_name = './data_zara/crowds_zara01.vsp_processed.txt'
+feature_extactor = LocalGlobal(window_size=7, grid_size=20, agent_rad=20, obs_rad=20,
+                               fieldList = ['agent_state','goal_state','obstacles'])
 
 
 print(extract_subjects_from_file(file_name))
-extract_trajectory(file_name,feature_extactor)
+extract_trajectory(file_name,feature_extactor,'temp')
 '''
 data = [
         [279.000000, -123.000000, 0, 87.397438], 
@@ -194,3 +214,4 @@ data = [
         [-346.000000, -190.000000, 265, 88.602821]] 
 
 intval = preprocess_data('./data_zara/crowds_zara01.vsp')
+'''
