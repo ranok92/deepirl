@@ -9,8 +9,25 @@ from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,Fr
 from scipy.interpolate import splev, splprep
 
 import os
+import pdb
 
 
+'''
+information regarding datasets and annotations:
+ZARA DATASET:
+    Video size : 720 × 576
+    fps = 25
+    Annotations are done considering the enter of the frame as origin.
+
+
+UNIVERSITY STUDENTS:
+    
+    Video size : 720 × 576
+    fps = 25
+    Annotations are done considering the enter of the frame as origin.
+
+
+'''
 
 def get_dense_trajectory_from_control_points(list_of_ctrl_pts):
     #given the control points returns a dense array of all the in between points
@@ -27,23 +44,22 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts):
 
         #point_list = point.split(',')
         point_list = point
-        x.append(float(point_list[0]))
-        y.append(float(point_list[1]))
-        cur_frame = int(point_list[2])
+        x.append(float(point_list[3]))
+        y.append(float(point_list[2]))
+        cur_frame = int(point_list[0])
         if cur_frame < min_frame:
             min_frame = cur_frame
         if cur_frame > max_frame:
             max_frame = cur_frame
-        t.append(int(point_list[2]))
-        ped_id = 1
+        t.append(int(point_list[0]))
+        ped_id = point_list[1]
 
     print(x)
     print(y)
-    print(t)
     tck, u = splprep([x,y], u=t)
-    interpol_vals = splev(np.arange(min_frame, max_frame, 1), tck)
+    interpol_vals = splev(np.arange(min_frame, max_frame, 5), tck)
 
-    t_dense = np.arange(min_frame, max_frame, 10)
+    t_dense = np.arange(min_frame, max_frame, 5)
     x_dense = interpol_vals[0]
     y_dense = interpol_vals[1]
 
@@ -51,15 +67,70 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts):
 
         dense_val.append([t_dense[i], ped_id, y_dense[i], x_dense[i]])
 
-    print(dense_val)
     return dense_val
 
 
 
+def read_data_from_file(annotation_file):
+    '''
+
+    given a file_name read the f and convert that into a list.
+    
+    The current format :
+    x, y, frame_id, gaze_direction 
+    
+    Final format:
+    frame_number, ped_id, y_coord, x_coord
+    
+    '''
+    frame_x = 720
+    frame_y = 576  
+    diff_x = frame_x/2
+    diff_y = frame_y/2  
+    ped_id = -1
+    processed_dict = {}
+    if not os.path.isfile(annotation_file):
+        print("The file does not exist!")
+        return 0
+
+    with open(annotation_file) as f:
+
+        for line in f:
+            prob_point_info = line.split(' - ')[0]
+            if len(prob_point_info.split(' '))==4:
+                point_info = prob_point_info.split(' ')
+                processed_dict[ped_id].append([point_info[2], ped_id, float(point_info[1])+diff_y, float(point_info[0])+diff_x])
+            else:
+                ped_id += 1
+                processed_dict[ped_id] = []
+
+    return processed_dict
 
 
 
+def preprocess_data(annotation_file):
 
+
+    file_n = annotation_file+'_processed'+'.txt'
+
+    extracted_dict = read_data_from_file(annotation_file)
+    dense_info_list = []
+    for ped in extracted_dict.keys():
+            
+        #for i in range(len(extracted_dict[ped])):
+        #    print(extracted_dict[ped][i])
+
+        dense_info = get_dense_trajectory_from_control_points(extracted_dict[ped])
+
+        #for i in range(len(dense_info)):
+        #    print(dense_info[i])
+        with open(file_n, 'a') as f:
+
+            for info in dense_info:
+                dense_info_list.append(info)
+                f.write("%s\n" % info)
+
+    return dense_info_list
 
 
 
@@ -119,4 +190,4 @@ data = [
         [-224.000000, -175.000000, 209, 93.814072], 
         [-346.000000, -190.000000, 265, 88.602821]] 
 
-intval = get_dense_trajectory_from_control_points(data)
+intval = preprocess_data('./data_zara/crowds_zara01.vsp')
