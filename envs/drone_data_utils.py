@@ -110,10 +110,39 @@ def read_data_from_file(annotation_file):
     return processed_dict
 
 
-
-def preprocess_data(annotation_file):
+def preprocess_data_from_stanford_drone_dataset(annotation_file):
     '''
+    Final format:
+    frame_number, ped_id, y_coord, x_coord
+    '''
+    file_n = annotation_file+'_processed'+'.txt'
 
+    if not os.path.isfile(annotation_file):
+        print("The file does not exist!")
+        return 0
+
+    with open(annotation_file) as f:
+
+        for line in f:
+            line_list = line.strip().split(' ')
+
+            with open(file_n,'a') as fnew:
+                if line_list[6]!=str(1):
+                    fnew.write("%s "%line_list[5]) #the frame number
+                    fnew.write("%s "%line_list[0]) #the ped id
+                    y_coord = (int(line_list[2])+int(line_list[4]))/2
+                    #pdb.set_trace()
+                    x_coord = (int(line_list[1])+int(line_list[3]))/2
+                    fnew.write("%d "%y_coord) #the y_coord
+                    fnew.write("%d "%x_coord) #the x-coord
+                    fnew.write("\n")
+
+
+    return 0
+
+
+def preprocess_data_from_control_points(annotation_file):
+    '''
     given a annotation file containing spline control points converts that 
     to a frame-by-frame representation and writes that on a txt file with a easy to read format
     '''
@@ -161,14 +190,14 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save):
                         is_random=False,
                         annotation_file=annotation_file,
                         subject=sub,                        
-                        rows=576, cols=720,
+                        rows=1088, cols=1420,
                         width=20)
 
         world.reset()
 
         while world.current_frame < world.final_frame:
             state,_,_,_ = world.step()
-            pdb.set_trace()
+            #pdb.set_trace()
             state = feature_extactor.extract_features(state)
             state = torch.tensor(state)
             trajectory_info.append(state)
@@ -269,8 +298,7 @@ def record_trajectories(num_of_trajs,path):
 
 
 
-
-file_name = './data_zara/crowds_zara01.vsp_processed.txt'
+file_name = './annotations.txt_processed.txt'
 feature_extactor = LocalGlobal(window_size=7, grid_size=20, agent_width=20, obs_width=20,
                                fieldList = ['agent_state','goal_state','obstacles'])
 
@@ -290,4 +318,7 @@ data = [
         [-346.000000, -190.000000, 265, 88.602821]] 
 
 intval = preprocess_data('./data_zara/crowds_zara01.vsp')
+
+
+preprocess_data_from_stanford_drone_dataset('annotations.txt')
 '''
