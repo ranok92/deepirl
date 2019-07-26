@@ -24,6 +24,10 @@ parser.add_argument('--render', action='store_true', help="show the env.")
 parser.add_argument('--num-trajs', type=int, default=10)
 parser.add_argument('--view-reward', action='store_true')
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
+parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
+                     feature extractor to be used in the experiment.')
+
+
 
 def main():
     
@@ -36,29 +40,36 @@ def main():
         from envs.gridworld_clockless import GridWorldClockless as GridWorld
 
 
-    agent_width = 5
-    step_size = 5
-    obs_width = 5
-    grid_size = 5
-    '''
-    featExtract = LocalGlobal(window_size=7, agent_width=agent_width,
-                              step_size=step_size, 
-                              obs_width=obs_width,
-                              grid_size=grid_size,
-                              fieldList = ['agent_state','goal_state','obstacles'])
-    '''
-    #featExtract = OneHot(grid_rows=10,grid_cols=10)
-    #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
+    agent_width = 10
+    step_size = 10
+    obs_width = 10
+    grid_size = 10
 
-    #featExtract = SocialNav(fieldList = ['agent_state','goal_state'])
-    feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                thresh2 = 2,
-                                thresh3 = 3,
-                                thresh4=4,
-                                step_size=step_size,
-                                agent_width=agent_width,
-                                obs_width=obs_width,
-                                fieldList = ['agent_state','goal_state','obstacles'])
+
+    if args.feat_extractor == 'Onehot':
+        feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    if args.feat_extractor == 'SocialNav':
+        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+    if args.feat_extractor == 'FrontBackSideSimple':
+        feat_ext = FrontBackSideSimple(thresh1 = 1,
+                                    thresh2 = 2,
+                                    thresh3 = 3,
+                                    thresh4=4,
+                                    step_size=step_size,
+                                    agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    fieldList = ['agent_state','goal_state','obstacles'])
+
+    if args.feat_extractor == 'LocalGlobal':
+        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+                           agent_width=agent_width, 
+                           obs_width=obs_width,
+                           step_size=step_size,
+                           fieldList = ['agent_state','goal_state','obstacles'])
+    
+
+
+
     '''
     np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
                                 np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),
@@ -70,14 +81,16 @@ def main():
                     cols=60,
                     seed=7,
                     buffer_from_obs=0,
-                    obstacles = [],
+                    obstacles='../envs/real_map.jpg',
                                 
-                    goal_state = np.asarray([5,5]))
+                    goal_state=np.asarray([5,5]))
 
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
                         log_interval=100,max_ep_length=100, hidden_dims=args.policy_net_hidden_dims,
                         max_episodes=4000)
 
+    print(model.policy)
+    print(args.policy_net_hidden_dims)
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
         
