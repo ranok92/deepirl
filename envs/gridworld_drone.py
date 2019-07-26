@@ -6,6 +6,8 @@ import sys
 import math
 import os
 sys.path.insert(0, '..')
+
+from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
 from itertools import count
@@ -257,6 +259,10 @@ class GridWorldDrone(GridWorld):
             else:
 
                 self.agent_state = np.array([float(element[2]),float(element[3])])
+                self.state['agent_state'] = self.agent_state
+
+
+        self.state['obstacles'] = self.obstacles 
 
 
     def get_state_from_frame(self,frame_info):
@@ -353,7 +359,6 @@ class GridWorldDrone(GridWorld):
                     if action!=8:
                         self.state['agent_head_dir'] = action
 
-                    self.state['obstacles'] = self.obstacles 
 
         if self.is_onehot:
 

@@ -162,7 +162,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save):
                         annotation_file=annotation_file,
                         subject=sub,                        
                         rows=576, cols=720,
-                        width=10)
+                        width=20)
 
         world.reset()
 
@@ -194,8 +194,84 @@ def extract_subjects_from_file(annotation_file):
     return set(sub_list)
 
 
+def record_trajectories(num_of_trajs,path):
+    '''
+    Let user play in an environment simulated from the data taken from a dataset
+    '''
+    step_size = 20
+    agent_size = 20
+    grid_size = 20
+    obs_size = 20
+    window_size = 7
+    '''
+    feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
+                                    step_size=step_size, 
+                                    obs_width=obs_size,
+                                    grid_size=grid_size, 
+                                    fieldList=['agent_state', 'goal_state', 'obstacles'])
+    '''
+
+    feature_extractor = FrontBackSideSimple(thresh1=1, thresh2=2,
+                                      thresh3=5, agent_width=agent_size,
+                                      step_size=step_size, grid_size=grid_size,
+                                      fieldList=['agent_state','goal_state','obstacles'])
+
+
+    env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
+                         seed=10, obstacles=None, obs_width=obs_size,
+                         step_size=step_size, width=grid_size,
+                         show_trail=False,
+                         is_random=True,
+                         annotation_file='./stanford_drone_subset/annotations/bookstore/video0/annotations.txt',
+                         subject=None,
+                         rows=1088, cols=1424)
+    i = 0
+    while i < num_of_trajs:
+        actions = []
+        states = []
+        state = env.reset()
+        states = [feature_extractor.extract_features(state)]
+
+        done = False
+        run_reward = 0
+        while not done:
+
+            action = env.take_action_from_user()
+            print(action)
+            actions.append(action)
+            next_state, reward, done, _ = env.step(action)
+            run_reward += reward 
+            if not done:
+                next_state = feature_extractor.extract_features(next_state)
+                #for variants of localglobal
+                #print(next_state[-window_size**2:].reshape(window_size,window_size))
+                #print(next_state[0:9].reshape(3,3))
+                #for fbs simple
+                print(next_state[12:].reshape(3,4))
+                states.append(next_state)
+
+        if run_reward > 1:
+
+            actions_tensor = torch.tensor(actions)
+            states_tensor = torch.stack(states)
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+            torch.save(actions_tensor,
+                       os.path.join(path, 'traj%s.acts' % str(i)))
+
+            torch.save(states_tensor,
+                       os.path.join(path, 'traj%s.states' % str(i)))
+
+            i += 1
+        else:
+
+            print('Bad example. Discarding!')
+
+
+
+
 file_name = './data_zara/crowds_zara01.vsp_processed.txt'
-feature_extactor = LocalGlobal(window_size=7, grid_size=20, agent_rad=20, obs_rad=20,
+feature_extactor = LocalGlobal(window_size=7, grid_size=20, agent_width=20, obs_width=20,
                                fieldList = ['agent_state','goal_state','obstacles'])
 
 
