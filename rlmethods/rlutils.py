@@ -101,6 +101,10 @@ class ReplayBuffer():
         """
         return random.sample(self.buffer, n)
 
+    def is_full(self):
+        """returns true if replay buffer is full."""
+        return len(self) == self.buffer.maxlen
+
 
 if __name__ == '__main__':
 
