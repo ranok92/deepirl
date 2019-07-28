@@ -84,6 +84,9 @@ class ReplayBuffer():
     def __init__(self, max_length):
         self.buffer = collections.deque(maxlen=max_length)
 
+    def __len__(self):
+        return len(self.buffer)
+
     def push(self, sars):
         """Push (s_t,a_t,r,s_(t+1)) transition tuple to replay buffer.
 
