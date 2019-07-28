@@ -44,6 +44,9 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the reward network.')
 
+parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
+
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -155,6 +158,7 @@ def main():
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer = args.regularizer,
+                           learning_rate = args.lr,
                            graft=True,
                            hidden_dims = args.reward_net_hidden_dims,
                            save_folder=args.save_folder)
