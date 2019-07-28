@@ -122,10 +122,14 @@ class DeepMaxEnt():
 
         self.regularizer = regularizer
         #folders for saving purposes
-        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+\
+                                '-seed-'+str(self.env.seed)+'-lr-'+str(learning_rate)+'/'
 
-        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
-        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+\
+                                          str(self.regularizer)+'-seed-'+str(self.env.seed)+'-lr-'+\
+                                          str(learning_rate)+'/'
+        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+                                          str(self.env.seed)+'-lr-'+str(learning_rate)+'/'
     
         if os.path.exists(self.plot_save_folder):
             pass
