@@ -136,6 +136,8 @@ disable=print-statement,
         comprehension-escape,
         invalid-name,
         old-style-class,
+        wrong-import-position,
+        arguments-differ,
 
 
 # Enable the message, report, category or checker with the given id(s). You can
