@@ -24,25 +24,26 @@ class GridWorldDrone(GridWorld):
     #obstacle
     def __init__(
         self,
-        seed = 7,
-        rows = 10,
-        cols = 10,
-        width = 10,
-        goal_state = None,
-        obstacles = None,
-        display = True,
-        is_onehot = True,
-        is_random = False,
+        seed=7,
+        rows=10,
+        cols=10,
+        width=10,
+        goal_state=None,
+        obstacles=None,
+        display=True,
+        is_onehot=True,
+        is_random=False,
         stepReward=0.001,
         step_wrapper=utils.identity_wrapper,
         reset_wrapper=utils.identity_wrapper,
-        show_trail = False,
-        annotation_file = None,
-        subject = None,
-        omit_annotation = None, #will be used to test a policy
-        obs_width = 10,
-        step_size = 10,
-        agent_width = 10
+        show_trail=False,
+        annotation_file=None,
+        subject=None,
+        obs_width=10,
+        step_size=10,
+        agent_width=10,
+        show_comparison=False,
+        tick_speed=30
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -65,16 +66,22 @@ class GridWorldDrone(GridWorld):
 
             self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
             self.clock = pygame.time.Clock()
-            self.tickSpeed = 1
+            pygame.font.init()
+            self.env_font = pygame.font.SysFont('Comic Sans MS',20)
+            self.tickSpeed = tick_speed
+            self.show_comparison = show_comparison
+            self.ghost = None
+            self.ghost_state =None
+
 
 
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
+        self.pedestrian_dict = {}
         self.current_frame = 10
         self.final_frame = -1
         self.initial_frame = 999999999999 #a large number
         self.subject = subject
-        self.omit_annotation = omit_annotation
         self.max_obstacles = None
         self.agent_state = None
         self.goal_state = None
@@ -83,7 +90,7 @@ class GridWorldDrone(GridWorld):
         self.step_size = step_size
         self.show_trail = show_trail
         self.annotation_list = []
-
+        self.skip_list = [] #dont consider these pedestrians as obstacles
 
         self.upperLimit = np.asarray([self.rows-1, self.cols-1])
         self.lowerLimit = np.asarray([0,0])
@@ -103,13 +110,15 @@ class GridWorldDrone(GridWorld):
 
         ######################################################################
         self.stepReward = stepReward
+        self.generate_annotation_list()
+        self.generate_pedestrian_dict()
         self.generate_annotation_dict_universal()
 
 
 
-    def generate_annotation_dict(self):
+    def generate_annotation_list(self):
         '''
-        Reads information from the stanford drone dataset 
+        Reads lines from an annotation file and creates a list
         '''
         if not os.path.isfile(self.annotation_file):
             print("The annotation file does not exist.")
@@ -122,10 +131,13 @@ class GridWorldDrone(GridWorld):
                 self.annotation_list.append(line)
 
 
+
+    def generate_annotation_dict(self):
+
         #converting the list to a dictionary, where the keys are the frame number 
         #and for each key there is a list of entries providing the annotation information
         #for that particular frame
-        
+        #for stanford dataset format
 
         print("Loading information. . .")
         subject_final_frame = -1
@@ -177,22 +189,30 @@ class GridWorldDrone(GridWorld):
         print('final_frame', self.final_frame)
         print('cellWidth', self.cellWidth)
     
+
+    def generate_pedestrian_dict(self):
+        '''
+        Unlike the annotation dict, where the frames are the keys and the information is stored
+        based on each frame. Here the information is stored based on the pedestrians i.e. each pedestrian
+        corresponds to a key in the dictionary and the corresponding to that key is a list consisting of the 
+        trajectory information of that particular pedestrian
+        '''
+        #the entries are of the format : frame_no, id, y_coord, x_coord
+        for entry in self.annotation_list:
+
+            if entry[1] not in self.pedestrian_dict.keys():
+                self.pedestrian_dict[str(entry[1])] = []
+
+            self.pedestrian_dict[str(entry[1])].append(entry)
+        #pdb.set_trace()
+
+
+
     def generate_annotation_dict_universal(self):
         '''
-        Reads information from files with the following format
+        Reads information from files with the following (general) format
          frame , id, y_coord, x_coord
         '''
-        if not os.path.isfile(self.annotation_file):
-            print("The annotation file does not exist.")
-            return 0
-
-        with open(self.annotation_file) as f:
-
-            for line in f:
-                line = line.strip().split(' ')
-                self.annotation_list.append(line)
-
-
         #converting the list to a dictionary, where the keys are the frame number 
         #and for each key there is a list of entries providing the annotation information
         #for that particular frame
@@ -200,14 +220,9 @@ class GridWorldDrone(GridWorld):
 
         print("Loading information. . .")
         subject_final_frame = -1
+        if self.subject is not None:
+            self.skip_list.append(int(self.subject))
         for entry in self.annotation_list:
-
-            #checking for omission
-            if self.omit_annotation is not None:
-
-                if entry[1] == self.omit_annotation:
-                    continue
-
             #checking for goal state of the given subject
             if self.subject is not None:
                 #pdb.set_trace()
@@ -236,14 +251,14 @@ class GridWorldDrone(GridWorld):
 
                     if self.final_frame < int(entry[0]):
                         self.final_frame = int(entry[0])
-
-
       
 
         print('Done loading information.')
         print('initial_frame', self.initial_frame)
         print('final_frame', self.final_frame)
         print('cellWidth', self.cellWidth)
+
+
 
     def get_state_from_frame_universal(self, frame_info):
         '''
@@ -252,14 +267,17 @@ class GridWorldDrone(GridWorld):
         self.obstacles = []
         for element in frame_info:
 
-            if float(element[1]) != self.subject:
+            if float(element[1]) not in self.skip_list:
 
                 self.obstacles.append(np.array([float(element[2]),float(element[3])]))
 
-            else:
+            if float(element[1]) == self.subject:
 
                 self.agent_state = np.array([float(element[2]),float(element[3])])
                 self.state['agent_state'] = self.agent_state
+            if float(element[1]) == self.ghost:
+
+                self.ghost_state = np.array([float(element[2]),float(element[3])])
 
 
         self.state['obstacles'] = self.obstacles 
@@ -299,13 +317,20 @@ class GridWorldDrone(GridWorld):
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[1],obs[0],self.cellWidth, self.cellWidth])
+                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]-(self.obs_width/2),obs[0]-(self.obs_width/2), \
+                                self.obs_width, self.obs_width])
         #render goal
         if self.goal_state is not None:
-            pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1], self.goal_state[0],self.cellWidth, self.cellWidth])
+            pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-(self.cellWidth/2), self.goal_state[0]- \
+                             (self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
         if self.agent_state is not None:
-            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1], self.agent_state[0], self.cellWidth, self.cellWidth])
+            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]-(self.agent_width/2), self.agent_state[0]- \
+                            (self.agent_width/2), self.agent_width, self.agent_width])
+        if self.ghost_state is not None:
+            pygame.draw.rect(self.gameDisplay, (220,220,220),[self.ghost_state[1]-(self.agent_width/2), self.ghost_state[0]- \
+                            (self.agent_width/2), self.agent_width, self.agent_width], 1)
+
         if self.show_trail:
             self.draw_trajectory()
 
@@ -316,8 +341,10 @@ class GridWorldDrone(GridWorld):
     def step(self, action=None):
             #print('printing the keypress status',self.agent_action_keyboard)
             
-        #print('Info from curent frame :',self.current_frame)
-        self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+        print('Info from curent frame :',self.current_frame)
+
+        if str(self.current_frame) in self.annotation_dict.keys():
+            self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
         if self.subject is None:
             if not self.release_control:
@@ -369,7 +396,7 @@ class GridWorldDrone(GridWorld):
                 None
             )
         
-        self.current_frame += 5
+        self.current_frame += 1
 
         if self.subject is None:
             if done:
@@ -454,6 +481,52 @@ class GridWorldDrone(GridWorld):
 
 
         #pygame.image.save(self.gameDisplay,'traced_trajectories')
+
+    def reset_and_replace(self):
+
+        no_of_peds = len(self.pedestrian_dict.keys())
+        cur_ped = np.random.randint(no_of_peds)
+
+        #cur_ped = 20
+        if self.show_comparison:
+            self.ghost = cur_ped
+        self.skip_list = []
+        self.skip_list.append(cur_ped)
+        self.current_frame = int(self.pedestrian_dict[str(cur_ped)][0][0]) #frame from the first entry of the list
+        print('Current frame', self.current_frame)
+        self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
+                                      float(self.pedestrian_dict[str(cur_ped)][0][3])])
+
+        self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
+                                      float(self.pedestrian_dict[str(cur_ped)][-1][3])])
+
+        self.release_control = False
+
+
+        if self.is_onehot:
+
+            self.state = self.onehotrep()
+        else:
+            self.state = {}
+            self.state['agent_state'] = self.agent_state
+            self.state['agent_head_dir'] = 0 #starts heading towards top
+            self.state['goal_state'] = self.goal_state
+
+            self.state['release_control'] = self.release_control
+            #if self.obstacles is not None:
+            self.state['obstacles'] = self.obstacles
+
+        self.pos_history.append(self.agent_state)
+
+ 
+        pygame.display.set_caption('Your friendly grid environment')
+        if self.display:
+            self.render()
+
+        if self.is_onehot:
+            self.state = self.reset_wrapper(self.state)
+        return self.state
+
 
 
 
@@ -607,14 +680,24 @@ if __name__=="__main__":
     #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
     feat_ext = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
-                        seed = 0, obstacles=None, 
+                        seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='./data_zara/crowds_zara01.vsp_processed.txt',
-                        subject=2,                        
-                        rows = 576, cols = 720, width = 10)
+                        annotation_file='./expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt',
+                        subject=None,
+                        tick_speed=90, 
+                        obs_width=10,
+                        step_size=10,
+                        agent_width=30,
+                        show_comparison=True,                       
+                        rows=576, cols=720, width=20)
     print ("here")
-
-    world.reset()
-    while world.current_frame < world.final_frame:
-        world.step()
+    done = False
+    for i in range(20):
+        world.reset_and_replace()
+        done = False
+        while world.current_frame < world.final_frame and not done:
+            _, reward , done, _ = world.step()
+            print(world.agent_state)
+            print (reward, done)
+ 
