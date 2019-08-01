@@ -77,7 +77,7 @@ def main():
     grid_size = 10
     env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
-                    obstacles = args.annotation_file,
+                    annotation_file='../envs/expert_datasets/university_students/annotation/processed/students003_processed.txt',
                     agent_width=agent_width,
                     step_size=step_size,
                     obs_width=obs_width,
@@ -92,7 +92,7 @@ def main():
     #initialize feature extractor
 
 
-    feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+    feat_ext = LocalGlobal(window_size=5, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
@@ -115,7 +115,7 @@ def main():
     # initialize IRL method
     #CHANGE HERE 
 
-    trajectory_path = './trajs/ac_gridworld_loc_glob_rectified_win_3_subset_30/'
+    trajectory_path = '/home/thalassa/akonar/Study/deepirl/envs/expert_datasets/university_students/annotation/traj_info/students003_processed/'
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,

@@ -636,6 +636,34 @@ class FrontBackSideSimple():
             
         return reset_wrapper(mod_state)
 
+class DroneFeature1():
+
+    def __init__(self, agent_width=10,
+                 obs_width=10, step_size=10, grid_size=10, 
+                 field_list=[]):
+
+        self.agent_width = agent_width
+        self.obs_width = obs_width
+        self.step_size = step_size
+        self.grid_size = grid_size
+        self.field_list = fieldList
+        self.prev_frame_info = None
+        self.state_rep_size = None
+
+
+        self.state_dictionary = {}
+        self.state_str_arr_dict = {}
+        self.inv_state_dictionary = {}
+        self.hash_variable = None
+
+        self.state_rep_size = 9+3+12
+        self.generate_hash_variable()
+
+
+        print('Loading state space dictionary. . . ')
+        #self.generate_state_dictionary()
+        print('Done!')
+
 
 
 class FrontBackSide():

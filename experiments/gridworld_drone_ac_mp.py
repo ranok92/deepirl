@@ -33,7 +33,7 @@ def main():
 
 
     agent_width = 10
-    step_size = 4
+    step_size = 2
     obs_width = 10
     grid_size = 10
     featExtract = LocalGlobal(window_size=5, agent_width=agent_width,
@@ -61,22 +61,22 @@ def main():
     '''
 
 
-    env = GridWorldDrone(display=False, is_onehot = False, 
-                        seed=0, obstacles=None, 
+    env = GridWorldDrone(display=args.render, is_onehot = False, 
+                        seed=999, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt',
                         subject=None,
                         tick_speed=90, 
                         obs_width=10,
-                        step_size=2,
-                        agent_width=10,
+                        step_size=step_size,
+                        agent_width=agent_width,
                         show_comparison=True,                       
-                        rows=576, cols=720, width=20)
+                        rows=576, cols=720, width=grid_size)
 
     model = ActorCritic(env, feat_extractor=featExtract,  gamma=0.99,
-                        log_interval=400,max_ep_length=200 , 
-                        max_episodes = 8000)
+                        log_interval=50,max_ep_length=500 , 
+                        max_episodes = 2000)
 
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
@@ -96,7 +96,7 @@ def main():
             model.policy.save('./saved-models/')
 
     if args.play:
-        env.tickSpeed = 15
+        #env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
 
         model.generate_trajectory(args.num_trajs, './trajs/ac_loc_glob_rectified_win_3_static_map3/')
