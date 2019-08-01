@@ -59,12 +59,14 @@ class GridWorld(GridWorldClockless):
                        agent_width=agent_width,
                        step_size=step_size,
                        reset_wrapper=reset_wrapper)
-        self.clock = pygame.time.Clock()
-        self.gameDisplay = None
-        self.tickSpeed = 1
-        self.show_trail = show_trail
 
-        self.place_goal_manually = place_goal_manually
+        if display:
+            self.clock = pygame.time.Clock()
+            self.gameDisplay = None
+            self.tickSpeed = 1
+            self.show_trail = show_trail
+
+            self.place_goal_manually = place_goal_manually
         self.agent_action_flag = False
 
 

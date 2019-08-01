@@ -70,10 +70,9 @@ class GridWorldDrone(GridWorld):
             self.env_font = pygame.font.SysFont('Comic Sans MS',20)
             self.tickSpeed = tick_speed
             self.show_comparison = show_comparison
-            self.ghost = None
-            self.ghost_state =None
 
-
+        self.ghost = None
+        self.ghost_state =None
 
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
@@ -341,7 +340,7 @@ class GridWorldDrone(GridWorld):
     def step(self, action=None):
             #print('printing the keypress status',self.agent_action_keyboard)
             
-        print('Info from curent frame :',self.current_frame)
+        #print('Info from curent frame :',self.current_frame)
 
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
@@ -410,7 +409,18 @@ class GridWorldDrone(GridWorld):
 
 
     def reset(self):
+        '''
+        Resets the environment, starting the obstacles from the start.
+        If subject is specified, then the initial frame and final frame is set
+        to the time frame when the subject is in the scene.
 
+        If no subject is specified then the initial frame is set to the overall 
+        initial frame and goes till the last frame available in the annotation file.
+
+        Also, the agent and goal positions are initialized at random.
+
+        Pro tip: Use this function while training the agent. 
+        '''
         #pygame.image.save(self.gameDisplay,'traced_trajectories.png')
 
         self.current_frame = self.initial_frame
@@ -442,6 +452,7 @@ class GridWorldDrone(GridWorld):
                 if not flag:
                     break
 
+            #placing the agent
             dist = self.agent_spawn_clearance
             while True:
                 flag = False
@@ -483,7 +494,11 @@ class GridWorldDrone(GridWorld):
         #pygame.image.save(self.gameDisplay,'traced_trajectories')
 
     def reset_and_replace(self):
-
+        '''
+        Resets the environment and replaces one of the existing pedestrians
+        from the video feed in the environment with the agent. 
+        Pro tip: Use this for testing the result.
+        '''
         no_of_peds = len(self.pedestrian_dict.keys())
         cur_ped = np.random.randint(no_of_peds)
 
