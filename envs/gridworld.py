@@ -63,13 +63,15 @@ class GridWorld(GridWorldClockless):
                        consider_heading=consider_heading,
                        buffer_from_obs=buffer_from_obs,
                        reset_wrapper=reset_wrapper)
-        self.clock = pygame.time.Clock()
-        self.gameDisplay = None
-        self.tickSpeed = 100
-        self.show_trail = show_trail
-        self.place_goal_manually = place_goal_manually
-        self.agent_action_flag = False
 
+
+        if display:
+            self.clock = pygame.time.Clock()
+            self.gameDisplay = None
+            self.tickSpeed = 1
+            self.show_trail = show_trail
+            self.place_goal_manually = place_goal_manually
+        self.agent_action_flag = False
 
         if isinstance(self.obstacles, int):
 
@@ -414,10 +416,11 @@ if __name__=="__main__":
                         seed = 0 , obstacles='map7.png', 
                         step_size=5, buffer_from_obs=10,
                         rows = 50, cols = 50 , width=5, obs_width=10)
+
     for i in range(100):
         print ("here")
         state = world.reset()
-        state = featExt.extract_features(state)
+        state = feat_ext.extract_features(state)
         totalReward = 0
         done = False
 
@@ -437,7 +440,9 @@ if __name__=="__main__":
                 print('The heading :', state[0:4])
                 print('The goal info :', state[4:13].reshape(3, 3))
                 print('THe obstacle infor :', state[16:].reshape(3, 4))
+                
                 if flag:
+
                     t += 1
                     print(world.pos_history)
                     states.append(state)

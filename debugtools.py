@@ -230,7 +230,7 @@ def plot_reward_across_policy_models(foldername,
         reward_expert = []
         for policy_file in sorted(model_names,key=numericalSort):
 
-
+            print('asdfasfsa',policy_file)
 
             reward_per_model = get_rewards_for_model(policy_file,env = env,
                                 feature_extractor = feature_extractor,
@@ -594,12 +594,15 @@ if __name__ == '__main__':
         plt.colorbar()
         plt.show()
    
-    
-    
-    plot_reward_across_policy_models("./experiments/saved-models/Run-info-fbs-simple-reg0.0005-extended/",
-                                expert = './experiments/saved-models/Run-info-fbs-simple-reg0.001/1.pt',
-
     '''
+    
+    plot_reward_across_policy_models("./experiments/saved-models/local_global_simple_win_3-0.0seed_98/",
+                                expert='./experiments/saved-models/loc_glob_win_3.pt',
+                                feature_extractor=feat,
+                                iterations_per_model=40,
+                                seed_list=[98,10,20,30])
+
+
     #fbs_keep_left/30.pt
 
     '''
@@ -638,4 +641,3 @@ if __name__ == '__main__':
     states, diff_freq = get_states_and_freq_diff(traj_set_1_svf, traj_set_2_svf, feat)
     
     print('The freq diff :', np.linalg.norm(diff_freq,1))
-    '''

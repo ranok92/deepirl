@@ -69,6 +69,7 @@ class GridWorldClockless:
         np.random.seed(seed)
         pygame.init()
         #pygame.key.set_repeat(1,200)
+        self.seed = seed
         self.rows = rows
         self.cols = cols
         self.seed = seed
