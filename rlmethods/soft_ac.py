@@ -30,9 +30,16 @@ class QNetwork(RectangleNN):
 class PolicyNetwork(RectangleNN):
     """Policy network for soft actor critic."""
 
-    def __init__(self, num_layers, hidden_layer_width, out_layer_width):
+    def __init__(
+            self,
+            num_layers,
+            num_inputs,
+            hidden_layer_width,
+            out_layer_width
+    ):
         super().__init__(num_layers, hidden_layer_width, F.relu)
 
+        self.input = nn.Linear(num_inputs, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, out_layer_width)
 
     def forward(self, x):
@@ -42,6 +49,10 @@ class PolicyNetwork(RectangleNN):
         return x
 
     def action_distribution(self, state):
+        """Returns a pytorch distribution object based on policy output.
+
+        :param state: Input state vector.
+        """
         probs = self.forward(state)
         dist = torch.distributions.Categorical(probs)
 
@@ -59,12 +70,20 @@ class SoftActorCritic:
         self.q_net = QNetwork(2, 512)
 
     def select_action(self, state):
+        """Generate an action based on state vector using current policy.
+
+        :param state: Current state vector.
+        """
         dist = self.policy.action_distribution(state)
         action = dist.sample()
 
         return action
 
     def populate_buffer(self):
+        """
+        Fill in entire replay buffer with state action pairs using current
+        policy.
+        """
         state = self.env.reset()
 
         while not self.replay_buffer.is_full():
