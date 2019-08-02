@@ -349,12 +349,16 @@ class GridWorldDrone(GridWorld):
             if not self.release_control:
 
                 if action is not None:
-                    if isinstance(action,int):
+                    if isinstance(action, int):
+                        #print('its int', action)
                         self.agent_state = np.maximum(np.minimum(self.agent_state+ \
                                            self.step_size*self.actionArray[action],self.upperLimit),self.lowerLimit)
                     else:
-                        self.agent_state = np.maximum(np.minimum(self.agent_state+ \
-                                           self.step_size*action,self.upperLimit),self.lowerLimit)
+                        #if the action is a torch
+                        if len(action.shape)==1 and a.shape[0]==1: #check if it the tensor has a single value
+                            if isinstance(action.item(), int):
+                                self.agent_state = np.maximum(np.minimum(self.agent_state+ \
+                                                          self.step_size*action,self.upperLimit),self.lowerLimit)
 
                     #print("Agent :",self.agent_state)
                 

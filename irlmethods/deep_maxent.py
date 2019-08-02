@@ -107,7 +107,7 @@ class DeepMaxEnt():
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
         self.hidden_dims = hidden_dims
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0)
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 

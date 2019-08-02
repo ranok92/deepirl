@@ -630,6 +630,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         for t in range(episode_length):
 
             action = select_action(policy_nn, state)
+            #print(action)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
 
