@@ -37,7 +37,7 @@ class SimpleGridworld:
         self.obstacles_map = obstacles_map
 
         # actions space mappings:
-        # {0,1,2,3,4} = {left, up, down, right, stay}
+        # {0,1,2,3,4} = {up,left,down,right,stay}
         self.action_space = IterableDiscrete(5)
         self.action_dict = {
             0: np.array((-1, 0)),
