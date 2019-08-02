@@ -17,19 +17,23 @@ class SimpleGridworld:
 
     def __init__(
             self,
-            height,
-            width,
+            size,
             obstacles_map,
             player_pos,
             goal_pos,
     ):
+        """__init__
 
-        # size parameters
-        self.height = height
-        self.width = width
+        :param size: a tuple of the form (rows, columns).
+        :param obstacles_map: array-like of (row, column) coordinates of all
+        obstacles.
+        :param player_pos: (row, column) coordinate of player starting
+        position.
+        :param goal_pos: (row, column) coordinate of goal.
+        """
 
         # top left of grid is 0,0 as per image standards
-        self.grid = np.array(height, width)
+        self.grid = np.zeros(size)
 
         # actions space mappings:
         # {0,1,2,3,4} = {left, up, down, right, stay}
@@ -46,7 +50,18 @@ class SimpleGridworld:
         self.player_pos = player_pos
         self.goal_pos = goal_pos
 
+    def reset(self):
+        # reset grid
+        self.grid.fill(0)
+
+
     def reward_function(self, state, action, next_state):
+        """Generate a reward based on inputs.
+
+        :param state: Current state (s_t)
+        :param action: Action a_t taken at state s_t.
+        :param next_state: State resulting from performing a_t at s_t.
+        """
         if self.goal_pos == next_state:
             return np.array([1])
 
@@ -64,11 +79,14 @@ class SimpleGridworld:
         state = self.player_pos
 
         next_state = state + action_vector
-        next_state = next_state.clip([0, 0], [self.width, self.height])
+        next_state = next_state.clip(
+            [[0], [0]],
+            [[self.grid.shape[0]], [self.grid.shape[1]]]
+        )
         self.player_pos = next_state
 
         # reward function r(s_t, a_t, s_t+1)
-        reward = reward_function(self, )
+        reward = self.reward_function(state, action, next_state)
 
         done = (self.player_pos == self.goal_pos)
 
