@@ -2,6 +2,7 @@
 
 import numpy as np
 from gym.spaces import Discrete
+import pdb
 
 
 class IterableDiscrete(Discrete):
@@ -19,7 +20,6 @@ class SimpleGridworld:
             self,
             size,
             obstacles_map,
-            player_pos,
             goal_pos,
     ):
         """__init__
@@ -34,6 +34,7 @@ class SimpleGridworld:
 
         # top left of grid is 0,0 as per image standards
         self.grid = np.zeros(size)
+        self.obstacles_map = obstacles_map
 
         # actions space mappings:
         # {0,1,2,3,4} = {left, up, down, right, stay}
@@ -47,13 +48,26 @@ class SimpleGridworld:
         }
 
         self.obstacles = obstacles_map
-        self.player_pos = player_pos
         self.goal_pos = goal_pos
+        self.player_pos = goal_pos
 
     def reset(self):
         # reset grid
         self.grid.fill(0)
 
+        # fill obstacles (2 = obstacle)
+        self.grid[self.obstacles_map.T[0], self.obstacles_map.T[1]] = 2
+
+        # set goal
+        assert self.grid[tuple(self.goal_pos)] != 2, "Goal is an obstacle."
+        self.grid[tuple(self.goal_pos)] = 6
+
+        # generate player location
+        validity_condition = np.logical_or(self.grid != 2, self.grid != 6)
+        valid_spots = np.argwhere(validity_condition)
+        self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
+
+        return self.player_pos
 
     def reward_function(self, state, action, next_state):
         """Generate a reward based on inputs.
@@ -62,7 +76,7 @@ class SimpleGridworld:
         :param action: Action a_t taken at state s_t.
         :param next_state: State resulting from performing a_t at s_t.
         """
-        if self.goal_pos == next_state:
+        if (self.goal_pos == next_state).all():
             return np.array([1])
 
         return np.array([0])
@@ -80,14 +94,14 @@ class SimpleGridworld:
 
         next_state = state + action_vector
         next_state = next_state.clip(
-            [[0], [0]],
-            [[self.grid.shape[0]], [self.grid.shape[1]]]
+            [0, 0],
+            [self.grid.shape[0], self.grid.shape[1]]
         )
         self.player_pos = next_state
 
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
-        done = (self.player_pos == self.goal_pos)
+        done = (self.player_pos == self.goal_pos).all()
 
         return self.player_pos, reward, done, False
