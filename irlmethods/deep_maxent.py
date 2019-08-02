@@ -84,7 +84,8 @@ class DeepMaxEnt():
             rl_max_episodes = 30,
             graft = True,
             hidden_dims = [128],
-            regularizer=0.1
+            regularizer=0.1,
+            learning_rate=1e-3
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -106,8 +107,7 @@ class DeepMaxEnt():
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
         self.hidden_dims = hidden_dims
-
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-3, weight_decay=0.045)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
@@ -122,10 +122,14 @@ class DeepMaxEnt():
 
         self.regularizer = regularizer
         #folders for saving purposes
-        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+\
+                                '-seed-'+str(self.env.seed)+'-lr-'+str(learning_rate)+'/'
 
-        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
-        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+\
+                                          str(self.regularizer)+'-seed-'+str(self.env.seed)+'-lr-'+\
+                                          str(learning_rate)+'/'
+        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+                                          str(self.env.seed)+'-lr-'+str(learning_rate)+'/'
     
         if os.path.exists(self.plot_save_folder):
             pass
