@@ -95,7 +95,7 @@ class SimpleGridworld:
         next_state = state + action_vector
         next_state = next_state.clip(
             [0, 0],
-            [self.grid.shape[0], self.grid.shape[1]]
+            [self.grid.shape[0]-1, self.grid.shape[1]-1]
         )
         self.player_pos = next_state
 
