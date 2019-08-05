@@ -24,6 +24,13 @@ parser.add_argument('--render', action='store_true', help="show the env.")
 parser.add_argument('--num-trajs', type=int, default=10)
 parser.add_argument('--view-reward', action='store_true')
 
+parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
+parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
+                     feature extractor to be used in the experiment.')
+
+
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt', 
+                    help='The location of the annotation file to be used to run the environment.')
 def main():
     
     args = parser.parse_args()
@@ -36,11 +43,30 @@ def main():
     step_size = 2
     obs_width = 10
     grid_size = 10
-    featExtract = LocalGlobal(window_size=5, agent_width=agent_width,
-                              step_size=step_size, 
-                              obs_width=obs_width,
-                              grid_size=grid_size,
-                              fieldList = ['agent_state','goal_state','obstacles'])
+
+
+    if args.feat_extractor == 'Onehot':
+        feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
+    if args.feat_extractor == 'SocialNav':
+        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+    if args.feat_extractor == 'FrontBackSideSimple':
+        feat_ext = FrontBackSideSimple(thresh1 = 1,
+                                    thresh2 = 2,
+                                    thresh3 = 3,
+                                    thresh4=4,
+                                    step_size=step_size,
+                                    agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    fieldList = ['agent_state','goal_state','obstacles'])
+
+    if args.feat_extractor == 'LocalGlobal':
+        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+                           agent_width=agent_width, 
+                           obs_width=obs_width,
+                           step_size=step_size,
+                           fieldList = ['agent_state','goal_state','obstacles'])
+    
+
     #featExtract = OneHot(grid_rows=10,grid_cols=10)
     #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
 
@@ -65,7 +91,7 @@ def main():
                         seed=999, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='../envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt',
+                        annotation_file=args.annotation_file,
                         subject=None,
                         tick_speed=90, 
                         obs_width=10,

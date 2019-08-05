@@ -46,6 +46,11 @@ parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[1
 
 parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
                     be used to run the environment.')
+
+
+parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
+
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -118,7 +123,7 @@ def main():
     '''
 
     env = GridWorld(display=args.render, is_random = True,
-                    rows = 10, cols = 10,
+                    rows = 576, cols = 720,
                     agent_width=agent_width,
                     step_size=step_size,
                     obs_width=obs_width,
@@ -157,7 +162,8 @@ def main():
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
-                           regularizer = args.regularizer,
+                           regularizer=args.regularizer,
+                           learning_rate=args.lr,
                            graft=True,
                            hidden_dims = args.reward_net_hidden_dims,
                            save_folder=args.save_folder)
