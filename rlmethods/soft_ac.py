@@ -48,7 +48,7 @@ class QNetwork(RectangleNN):
         self.head = nn.Linear(hidden_layer_width, 1)
 
     def forward(self, x):
-        x = self.in_layer(x)
+        x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
         x = self.head(x)
 
@@ -71,7 +71,7 @@ class PolicyNetwork(RectangleNN):
         self.head = nn.Linear(hidden_layer_width, out_layer_width)
 
     def forward(self, x):
-        x = self.in_layer(x)
+        x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
         x = F.softmax(self.head(x), dim=-1)
 
@@ -100,12 +100,15 @@ class SoftActorCritic:
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
 
         # NNs
-        self.policy = PolicyNetwork(2, state_size, 512, 4).to(DEVICE)
+        self.policy = PolicyNetwork(2, state_size, 512, action_size).to(DEVICE)
         self.q_net = QNetwork(state_size + action_size, 2, 512).to(DEVICE)
         self.avg_q_net = QNetwork(state_size + action_size, 2, 512).to(DEVICE)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
+
+        # initialize temperature
+        self.alpha = torch.tensor([1]).to(DEVICE)
 
     def select_action(self, state):
         """Generate an action based on state vector using current policy.
