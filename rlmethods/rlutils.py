@@ -99,7 +99,19 @@ class ReplayBuffer():
 
         :param n: number of samples returned.
         """
-        return random.sample(self.buffer, n)
+        sample_batch = random.sample(self.buffer, n)
+        inverted_batch = list(map(list, zip(*sample_batch)))
+        sample_states = np.array(inverted_batch[0])
+        sample_actions = np.array(inverted_batch[1])
+        sample_rewards = np.array(inverted_batch[2])
+        sample_next_states = np.array(inverted_batch[3])
+
+        return (
+            sample_states,
+            sample_actions,
+            sample_rewards,
+            sample_next_states
+        )
 
     def is_full(self):
         """returns true if replay buffer is full."""
