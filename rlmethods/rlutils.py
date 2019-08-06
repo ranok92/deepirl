@@ -105,12 +105,14 @@ class ReplayBuffer():
         sample_actions = np.array(inverted_batch[1])
         sample_rewards = np.array(inverted_batch[2])
         sample_next_states = np.array(inverted_batch[3])
+        dones = np.array(np.array(inverted_batch[4]))
 
         return (
             sample_states,
             sample_actions,
             sample_rewards,
-            sample_next_states
+            sample_next_states,
+            dones
         )
 
     def is_full(self):
