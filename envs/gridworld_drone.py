@@ -135,13 +135,11 @@ class GridWorldDrone(GridWorld):
         #print('Printing information :')
         #print('Pedestrian dictionary :', self.pedestrian_dict)
         #print('Pedestrian starting and ending points :')
+            for ped in self.pedestrian_dict.keys():
 
+                print('Ped :', ped, 'Starting point :', self.ped_start_pos[ped], ', Ending point :', self.ped_goal_pos[ped])
+            print('Pedestrian ending point :', self.ped_goal_pos)
         ################## remove this block ###################
-        for ped in self.pedestrian_dict.keys():
-
-            print('Ped :', ped, 'Starting point :', self.ped_start_pos[ped], ', Ending point :', self.ped_goal_pos[ped])
-        print('Pedestrian ending point :', self.ped_goal_pos)
-
     def generate_annotation_list(self):
         '''
         Reads lines from an annotation file and creates a list
