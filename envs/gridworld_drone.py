@@ -43,7 +43,9 @@ class GridWorldDrone(GridWorld):
         step_size=10,
         agent_width=10,
         show_comparison=False,
-        tick_speed=30
+        tick_speed=30,
+        train_exact=False #this option trains the agent for the exact scenarios as seen by the expert
+                          #Not an ideal thing to train on. Introduced as a debugging measure.
     ):
         super().__init__(seed = seed,
                        rows = rows,
@@ -113,7 +115,32 @@ class GridWorldDrone(GridWorld):
         self.generate_pedestrian_dict()
         self.generate_annotation_dict_universal()
 
+        ########### debugging ##############
 
+        self.train_exact = train_exact
+
+        self.ped_start_pos = {} # a dictionary that will store the starting positions of all the pedestrians
+        self.ped_goal_pos = {} # a dictionary that will store the goal positions of all the pedestrians
+
+        if self.train_exact:
+
+            for ped in self.pedestrian_dict.keys():
+
+                self.ped_start_pos[ped] = np.asarray([float(self.pedestrian_dict[ped][0][2]), 
+                                                      float(self.pedestrian_dict[ped][0][3])])
+
+                self.ped_goal_pos[ped] = np.asarray([float(self.pedestrian_dict[ped][-1][2]),
+                                                     float(self.pedestrian_dict[ped][-1][3])])
+
+        #print('Printing information :')
+        #print('Pedestrian dictionary :', self.pedestrian_dict)
+        #print('Pedestrian starting and ending points :')
+
+        ################## remove this block ###################
+        for ped in self.pedestrian_dict.keys():
+
+            print('Ped :', ped, 'Starting point :', self.ped_start_pos[ped], ', Ending point :', self.ped_goal_pos[ped])
+        print('Pedestrian ending point :', self.ped_goal_pos)
 
     def generate_annotation_list(self):
         '''
@@ -426,73 +453,79 @@ class GridWorldDrone(GridWorld):
         Pro tip: Use this function while training the agent. 
         '''
         #pygame.image.save(self.gameDisplay,'traced_trajectories.png')
+        #########for debugging purposes###########
+        if self.train_exact:
 
-        self.current_frame = self.initial_frame
-        self.pos_history = []
-        #if this flag is true, the position of the obstacles and the goal 
-        #change with each reset
-        dist_g = self.goal_spawn_clearance
-        
-        self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
-        num_obs = len(self.obstacles)
+            self.reset_and_replace()
 
-        #placing the obstacles
-
-
-
-        #only for the goal and the agent when the subject is not specified speicfically.
-        
-        if self.subject is None:
-            
-            #placing the goal
-            while True:
-                flag = False
-                self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-
-                for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
-
-                        flag = True
-                if not flag:
-                    break
-
-            #placing the agent
-            dist = self.agent_spawn_clearance
-            while True:
-                flag = False
-                self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
-                        flag = True
-
-                if not flag:
-                    break
-
-        
-        self.release_control = False
-        if self.is_onehot:
-            self.state = self.onehotrep()
         else:
 
-            self.state = {}
-            self.state['agent_state'] = self.agent_state
-            self.state['agent_head_dir'] = 0 #starts heading towards top
-            self.state['goal_state'] = self.goal_state
+            self.current_frame = self.initial_frame
+            self.pos_history = []
+            #if this flag is true, the position of the obstacles and the goal 
+            #change with each reset
+            dist_g = self.goal_spawn_clearance
+            
+            self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+            num_obs = len(self.obstacles)
 
-            self.state['release_control'] = self.release_control
-            #if self.obstacles is not None:
-            self.state['obstacles'] = self.obstacles
+            #placing the obstacles
 
-        self.pos_history.append(self.agent_state)
 
- 
-        pygame.display.set_caption('Your friendly grid environment')
-        if self.display:
-            self.render()
 
-        if self.is_onehot:
-            self.state = self.reset_wrapper(self.state)
-        return self.state
+            #only for the goal and the agent when the subject is not specified speicfically.
+            
+            if self.subject is None:
+                
+                #placing the goal
+                while True:
+                    flag = False
+                    self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+
+                    for i in range(num_obs):
+                        if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+
+                            flag = True
+                    if not flag:
+                        break
+
+                #placing the agent
+                dist = self.agent_spawn_clearance
+                while True:
+                    flag = False
+                    self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                    for i in range(num_obs):
+                        if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                            flag = True
+
+                    if not flag:
+                        break
+
+            
+            self.release_control = False
+            if self.is_onehot:
+                self.state = self.onehotrep()
+            else:
+
+                self.state = {}
+                self.state['agent_state'] = self.agent_state
+                self.state['agent_head_dir'] = 0 #starts heading towards top
+                self.state['goal_state'] = self.goal_state
+
+                self.state['release_control'] = self.release_control
+                #if self.obstacles is not None:
+                self.state['obstacles'] = self.obstacles
+
+            self.pos_history.append(self.agent_state)
+
+     
+            pygame.display.set_caption('Your friendly grid environment')
+            if self.display:
+                self.render()
+
+            if self.is_onehot:
+                self.state = self.reset_wrapper(self.state)
+            return self.state
 
 
         #pygame.image.save(self.gameDisplay,'traced_trajectories')
@@ -538,8 +571,9 @@ class GridWorldDrone(GridWorld):
         self.pos_history.append(self.agent_state)
 
  
-        pygame.display.set_caption('Your friendly grid environment')
+        
         if self.display:
+            pygame.display.set_caption('Your friendly grid environment')
             self.render()
 
         if self.is_onehot:
@@ -702,21 +736,23 @@ if __name__=="__main__":
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='./expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt',
+                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students001_processed.txt',
                         subject=None,
                         tick_speed=90, 
                         obs_width=10,
                         step_size=10,
-                        agent_width=30,
-                        show_comparison=True,                       
+                        agent_width=10,
+                        show_comparison=False,
+                        train_exact=True,                       
                         rows=576, cols=720, width=20)
     print ("here")
+    
     done = False
     for i in range(20):
-        world.reset_and_replace()
+        world.reset()
         done = False
         while world.current_frame < world.final_frame and not done:
             _, reward , done, _ = world.step()
             print(world.agent_state)
             print (reward, done)
- 
+    

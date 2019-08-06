@@ -38,6 +38,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames):
     x = []
     y = []
     t = []
+    k = 3
     interpolate_fps = frames
     ped_id = None
     min_frame = 9999999
@@ -59,18 +60,24 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames):
             t.append(int(point_list[0]))
             ped_id = point_list[1]
 
-        print(x)
-        print(y)
-        tck, u = splprep([x,y], u=t)
-        interpol_vals = splev(np.arange(min_frame, max_frame, interpolate_fps), tck)
+        #print('x :',x)
+        #print('y :',y)
+        #print('t :',t)
 
-        t_dense = np.arange(min_frame, max_frame, interpolate_fps)
-        x_dense = interpol_vals[0]
-        y_dense = interpol_vals[1]
+        if len(x) > k: #condition needed to be satisfied for proper interpolation
+            tck, u = splprep([x,y], u=t, k=k)
+            interpol_vals = splev(np.arange(min_frame, max_frame, interpolate_fps), tck)
 
-        for i in range(t_dense.shape[0]):
+            t_dense = np.arange(min_frame, max_frame, interpolate_fps)
+            x_dense = interpol_vals[0]
+            y_dense = interpol_vals[1]
 
-            dense_val.append([t_dense[i], ped_id, y_dense[i], x_dense[i]])
+            for i in range(t_dense.shape[0]):
+
+                dense_val.append([t_dense[i], ped_id, y_dense[i], x_dense[i]])
+        else:
+            print('Discarding set of control points due to lack of control points.')
+            return None
 
     return dense_val
 
@@ -168,46 +175,48 @@ def preprocess_data_from_control_points(annotation_file, frame):
             
         #for i in range(len(extracted_dict[ped])):
         #    print(extracted_dict[ped][i])
-
         dense_info = get_dense_trajectory_from_control_points(extracted_dict[ped], frame)
 
         #for i in range(len(dense_info)):
         #    print(dense_info[i])
         with open(file_n, 'a') as f:
-
-            for info in dense_info:
-                dense_info_list.append(info)
-                for val in info:
-                    f.write("%s " %val)
-                f.write("\n")
+            if dense_info is not None:
+                for info in dense_info:
+                    dense_info_list.append(info)
+                    for val in info:
+                        f.write("%s " %val)
+                    f.write("\n")
 
     return dense_info_list
 
 
 
 
-def extract_trajectory(annotation_file, feature_extractor, folder_to_save, show_states=False):
+def extract_trajectory(annotation_file, feature_extractor, folder_to_save, display=False, show_states=False):
 
 
     if not os.path.exists(folder_to_save):
         os.makedirs(folder_to_save)
 
+    tick_speed = 30
     subject_list = extract_subjects_from_file(annotation_file)
     print(subject_list)
-    disp = False
+    disp = display
     for sub in subject_list:
         trajectory_info = []
         print('Starting for subject :',sub)
         if show_states:
             disp=True
+            tick_speed=5
         world = GridWorldDrone(display=disp, is_onehot=False, 
-                        seed=0, obstacles=None, 
+                        seed=10, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file=annotation_file,
-                        subject=sub,                        
-                        rows=575, cols=720,
-                        width=20)
+                        subject=sub,      
+                        tick_speed=tick_speed,                  
+                        rows=576, cols=720,
+                        width=10)
 
         world.reset()
 
@@ -222,6 +231,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, show_
                 general_dir = state[0:9].reshape(3,3)
                 print('General direction :\n', general_dir)
                 local_info = state[12:]
+                print('Proximity information :\n', state[9:12])
                 if local_info.shape==16: #fbs simple
                     local_info_arr = local_info.reshape(4, 4)
                 else: #localglobal
@@ -324,27 +334,26 @@ def record_trajectories(num_of_trajs,path):
 
             print('Bad example. Discarding!')
 
-
+'''
 folder_name = './expert_datasets/'
 dataset_name = 'university_students/annotation/'
-file_n = 'processed/students001_processed.txt'
+file_n = 'processed/students003_processed_5.txt'
 
 
 feature_extractor = 'LocalGlobal_win5/'
-to_save = 'traj_info/students001_processed/'
+to_save = 'traj_info/students003_processed_2/'
 file_name = folder_name + dataset_name + file_n
 
 folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
-feature_extactor = LocalGlobal(window_size=5, grid_size=20, agent_width=20, obs_width=20,
+feature_extactor = LocalGlobal(window_size=5, grid_size=10, agent_width=10, obs_width=10,
                                fieldList = ['agent_state','goal_state','obstacles'])
 
 
-#print(extract_subjects_from_file(file_name))
-#extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=False)
-record_trajectories(10, './test/')
+print(extract_subjects_from_file(file_name))
+extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=True, display=True)
+#record_trajectories(10, './test/')
 
 
-'''
 data = [
         [279.000000, -123.000000, 0, 87.397438], 
         [218.000000, -123.000000, 25, 90.000000], 
@@ -355,10 +364,10 @@ data = [
         [-139.000000, -160.000000, 173, 87.273689], 
         [-224.000000, -175.000000, 209, 93.814072], 
         [-346.000000, -190.000000, 265, 88.602821]] 
-
+'''
+file_name = '../envs/expert_datasets/university_students/annotation/students001.vsp'
 
 intval = preprocess_data_from_control_points(file_name, 1)
 
 
 #preprocess_data_from_stanford_drone_dataset('annotations.txt')
-'''
