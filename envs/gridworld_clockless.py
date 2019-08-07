@@ -5,6 +5,8 @@ import time
 import pdb
 import sys
 from PIL import Image
+from copy import copy
+from collections import defaultdict
 sys.path.insert(0, '..')
 import utils  # NOQA: E402
 
@@ -12,7 +14,7 @@ with utils.HiddenPrints():
     import pygame
 
 
-
+'''
 class Obstacles:
 
     def __init__(self,
@@ -29,7 +31,7 @@ class Obstacles:
         self.speed = speed
         self.width = width
         self.dynamics_model = None
-
+'''
 
 class MockActionspace:
     def __init__(self, n):
@@ -52,7 +54,7 @@ class GridWorldClockless:
         width = 10,
         goal_state = None,
         obstacles = None,
-        display = True,
+        display = False,
         is_onehot = True,
         is_random = False,
         stepReward=0.001,
@@ -69,6 +71,10 @@ class GridWorldClockless:
         np.random.seed(seed)
         pygame.init()
         #pygame.key.set_repeat(1,200)
+
+        #changing the obstacles and agent state with dictionaries instead of numpy arrays
+        #the goal state remains the same as before
+        self.default_obs_template = {'id':None, 'position':None, 'orientation':None, 'speed':None}
         self.seed = seed
         self.rows = rows
         self.cols = cols
@@ -90,9 +96,17 @@ class GridWorldClockless:
         else:
             self.step_size=step_size
 
-        self.upperLimit = self.cellWidth * np.asarray([self.rows-1, self.cols-1]) + self.cellWidth/2
-        self.lowerLimit = self.cellWidth/2 + np.asarray([0,0])
-        self.agent_state = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
+        self.upper_limit_goal = np.asarray([self.rows, self.cols]) - self.cellWidth/2
+        self.lower_limit_goal = self.cellWidth/2 + np.asarray([0,0])
+
+        self.upper_limit_agent = np.asarray([self.rows, self.cols]) - self.agent_width/2
+        self.lower_limit_agent = self.agent_width/2 + np.asarray([0,0])
+
+        self.upper_limit_obstacle = np.asarray([self.rows, self.cols]) - self.obs_width/2
+        self.lower_limit_obstacle = self.obs_width/2 + np.asarray([0,0])
+        
+        self.agent_state = copy(self.default_obs_template)
+        self.agent_state['position'] = np.asarray([np.random.randint(0,self.rows-1),np.random.randint(0,self.cols-1)])
         self.is_onehot = is_onehot
         self.is_random = is_random
         # these wrappers ensure correct output format
@@ -105,7 +119,7 @@ class GridWorldClockless:
             self.goal_state = goal_state
 
         #using manhattan distance
-        self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
+        self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
 
 
         self.display = display
@@ -134,27 +148,36 @@ class GridWorldClockless:
 
 
         self.cur_heading_dir = None
-
+        self.obstacles = []
         #does not matter if none or not.
         if isinstance(obstacles,str):
 
             self.read_obstacles_from_image(obstacles)
             self.freeze_obstacles = True
-        else:
 
-            self.obstacles = obstacles
+        if isinstance(obstacles, list):
+            for i in range(len(obstacles)):
+                cur_obs = copy(self.default_obs_template)
+                cur_obs['id'] = i
+                cur_obs['position'] = obstacles[i]
+                self.obstacles.append(cur_obs)
 
 
-        if isinstance(self.obstacles, int):
+        if isinstance(obstacles, int):
             
-            num_obs = self.obstacles
+            num_obs = obstacles
             self.obstacles = []
             for i in range(num_obs):
                 
-                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
+                cur_obs = copy(self.default_obs_template)
+                obs_pos = np.asarray([np.random.randint(self.lower_limit_obstacle[0],self.upper_limit_obstacle[0]),
+                                     np.random.randint(self.lower_limit_obstacle[1],self.upper_limit_obstacle[1])])
 
+                cur_obs['id'] = i
+                cur_obs['position'] = obs_pos
+                self.obstacles.append(cur_obs)
 
+        pdb.set_trace()
         '''
         this decides the state information based on whether 
         onehot information is needed or not.
@@ -218,7 +241,7 @@ class GridWorldClockless:
             if np.linalg.norm(self.actionArray[i])>0:
                 self.actionArray[i] = self.actionArray[i] / np.linalg.norm(self.actionArray[i])
 
-        print(self.actionArray)
+        #print(self.actionArray)
 
         self.action_dict = {}
 
@@ -235,7 +258,7 @@ class GridWorldClockless:
         # creates an environment spec containing useful info, notably reward
         # threshold at which the env is considered to be solved
 
-        print("environment initialized with goal state :",self.goal_state)
+        #print("environment initialized with goal state :",self.goal_state)
         self.spec = MockSpec(1.0)
 
         #this flag states if control has been released
@@ -252,6 +275,7 @@ class GridWorldClockless:
 
 
     def if_red(self,img,top,left):
+
         counter = 0
         thresh = self.obs_width*self.obs_width/3
         print('top',top)
@@ -276,18 +300,30 @@ class GridWorldClockless:
             self.obstacles = []
             img = Image.open(file_path)
             imgval = img.load()
-            self.rows = int(img.height/self.cellWidth)
-            self.cols = int(img.width/self.cellWidth)
-            self.upperLimit = self.cellWidth * np.asarray([self.rows-1, self.cols-1]) + self.cellWidth/2
-            self.lowerLimit = self.cellWidth/2 + np.asarray([0,0])
+            self.rows = img.height
+            self.cols = img.width
+
+            self.upper_limit_goal = np.asarray([self.rows, self.cols]) - self.cellWidth/2
+            self.lower_limit_goal = self.cellWidth/2 + np.asarray([0,0])
+
+            self.upper_limit_agent = np.asarray([self.rows, self.cols]) - self.agent_width/2
+            self.lower_limit_agent = self.agent_width/2 + np.asarray([0,0])
+
+            self.upper_limit_obstacle = np.asarray([self.rows, self.cols]) - self.obs_width/2
+            self.lower_limit_obstacle = self.obs_width/2 + np.asarray([0,0])
             #row_norm = self.rows*self.cellWidth/img.height
             #col_norm = self.cols*self.cellWidth/img.width
 
+            obs_counter=0
             for r in range(0,img.height-self.obs_width-1, self.obs_width):
                 for c in range(0,img.width-self.obs_width-1, self.obs_width):
 
                     if self.if_red(imgval,r,c):
-                        self.obstacles.append(int(self.obs_width/2)+np.asarray([int(r),int(c)]))
+                        cur_obs = copy(self.default_obs_template)
+                        cur_obs['id'] = obs_counter
+                        cur_obs['position'] = int(self.obs_width/2)+np.asarray([int(r),int(c)])
+                        self.obstacles.append(cur_obs)
+                        obs_counter+=1
                         #pdb.set_trace()
 
 
@@ -323,16 +359,20 @@ class GridWorldClockless:
                 self.obstacles = []
                 for i in range(num_obs):
 
-                    obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                    self.obstacles.append(self.cellWidth*obs_pos + (self.cellWidth/2))
+                    cur_obs = copy(self.default_obs_template)
+                    cur_obs['id'] = i
+                    cur_obs['position'] = np.asarray([np.random.randint(self.lower_limit_obstacle[0],self.upper_limit_obstacle[0]),
+                                                      np.random.randint(self.lower_limit_obstacle[1],self.upper_limit_obstacle[1])])
+                    self.obstacles.append(cur_obs)
 
 
             while True:
                 flag = False
-                self.goal_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.goal_state = self.goal_state + (self.cellWidth/2)
+                self.goal_state = np.asarray([np.random.randint(self.lower_limit_goal[0],self.upper_limit_goal[0]),
+                                              np.random.randint(self.lower_limit_goal[1],self.upper_limit_goal[1])])
+                
                 for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < self.cellWidth*dist_g:
+                    if np.linalg.norm(self.obstacles[i]['position']-self.goal_state) < (self.cellWidth + self.obs_width)/2 * dist_g:
 
                         flag = True
                 if not flag:
@@ -341,10 +381,11 @@ class GridWorldClockless:
         dist = self.agent_spawn_clearance
         while True:
             flag = False
-            self.agent_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-            self.agent_state = self.agent_state + (self.cellWidth/2)
+            self.agent_state['position'] = np.asarray([np.random.randint(self.lower_limit_agent[0],self.upper_limit_agent[0]),
+                                                       np.random.randint(self.lower_limit_agent[1],self.upper_limit_agent[1])])
+
             for i in range(num_obs):
-                if np.linalg.norm(self.obstacles[i]-self.agent_state) < self.cellWidth * dist:
+                if np.linalg.norm(self.obstacles[i]['position']-self.agent_state['position']) < (self.agent_width + self.obs_width)/2 * dist:
                     flag = True
 
             if not flag:
@@ -353,7 +394,7 @@ class GridWorldClockless:
 
 
         self.cur_heading_dir = 0
-        self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
+        self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
         self.release_control = False
         if self.is_onehot:
             self.state = self.onehotrep()
@@ -374,7 +415,7 @@ class GridWorldClockless:
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
 
-        self.pos_history.append(self.agent_state)
+        self.pos_history.append(self.agent_state['position'])
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
         return self.state
@@ -392,12 +433,12 @@ class GridWorldClockless:
                 self.state['agent_head_dir'] = action 
                 self.cur_heading_dir = action
 
-            self.agent_state = np.maximum(np.minimum(self.agent_state+ \
-                              (self.step_size * self.actionArray[action]),self.upperLimit),self.lowerLimit)
+            self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
+                              (self.step_size * self.actionArray[action]),self.upper_limit_agent),self.lower_limit_agent)
         
-        if not np.array_equal(self.pos_history[-1],self.agent_state):
-            self.pos_history.append(self.agent_state)
-        reward, done = self.calculateReward()
+        if not np.array_equal(self.pos_history[-1],self.agent_state['position']):
+            self.pos_history.append(self.agent_state['position'])
+        reward, done = self.calculate_reward()
 
         #if you are done ie hit an obstacle or the goal
         #you leave control of the agent and you are forced to
@@ -434,11 +475,11 @@ class GridWorldClockless:
         return self.state, reward, done, None
 
 
-    def check_overlap(self,temp_pos,obs_pos,width,buffer):
+    def check_overlap(self,temp_pos,obs_pos,width,buffer_val):
         #if true, that means there is an overlap
 
         boundary = self.agent_width/2
-        distance_to_maintain = boundary+(width/2)+buffer
+        distance_to_maintain = boundary+(width/2)+buffer_val
         #pdb.set_trace()
         if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
 
@@ -447,27 +488,27 @@ class GridWorldClockless:
             return False
 
 
-    def calculateReward(self):
+    def calculate_reward(self):
 
         hit = False
         done = False
 
         if self.obstacles is not None:
             for obs in self.obstacles:
-                if self.check_overlap(self.agent_state, obs, self.obs_width, self.buffer_from_obs):
+                if self.check_overlap(self.agent_state['position'], obs['position'], self.obs_width, self.buffer_from_obs):
                     hit = True
 
         if (hit):
             reward = -1
             done = True
 
-        elif self.check_overlap(self.agent_state ,self.goal_state, self.cellWidth, 0):
+        elif self.check_overlap(self.agent_state['position'] ,self.goal_state, self.cellWidth, 0):
             reward = 1
             done = True
 
         else:
 
-            newdist = np.sum(np.abs(self.agent_state-self.goal_state))
+            newdist = np.sum(np.abs(self.agent_state['position']-self.goal_state))
 
             reward = (self.distanceFromgoal - newdist)*self.stepReward
 
@@ -486,22 +527,29 @@ class GridWorldClockless:
 
 if __name__=="__main__":
     
-    world = GridWorld(display=True, seed = 0 , obstacles=[np.asarray([1,2])])
+    world = GridWorldClockless(is_onehot=False, is_random=True, rows=100, cols=100, seed = 0 , obstacles=5)
+    import time 
+
+    start_time = time.time()
     for i in range(100):
-        print ("here")
+        #print ("here")
         state = world.reset()
-        print (state)
+        #print (state)
         totalReward = 0
         done = False
-        while not done:
+        frame = 0
+        pdb.set_trace()
+        while frame < 1000:
 
-            action = world.takeUserAction()
-            next_state, reward,done,_ = world.step(action)
+            #action = world.takeUserAction()
+            action = np.random.randint(4)
+            next_state, reward,_,_ = world.step(action)
             #print(world.agent_state)
             #print(next_state)
-            totalReward+=reward
-            if done:
-                break
+            #totalReward+=reward
+            frame+=1
 
-            print("reward for the run : ", totalReward)
+            #print("reward for the run : ", totalReward)
 
+
+    print("--- %s seconds ---" % (time.time() - start_time))

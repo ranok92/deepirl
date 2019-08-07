@@ -4,6 +4,7 @@ import time
 import pdb
 import sys
 import math
+from copy import copy
 sys.path.insert(0, '..')
 
 
@@ -68,7 +69,7 @@ class GridWorld(GridWorldClockless):
         if display:
             self.clock = pygame.time.Clock()
             self.gameDisplay = None
-            self.tickSpeed = 1
+            self.tickSpeed = 60
             self.show_trail = show_trail
             self.place_goal_manually = place_goal_manually
         self.agent_action_flag = False
@@ -79,8 +80,12 @@ class GridWorld(GridWorldClockless):
             self.obstacles = []
             for i in range(num_obs):
                 
-                obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
+                cur_obs = copy(self.default_obs_template)
+                cur_obs['id'] = i
+                cur_obs['position'] = np.asarray([np.random.randint(self.lower_limit_obstacle[0],self.upper_limit_obstacle[0]),
+                                      np.random.randint(self.lower_limit_obstacle[1],self.upper_limit_obstacle[1])])
+                
+                self.obstacles.append(cur_obs)
 
 
         else:
@@ -96,12 +101,13 @@ class GridWorld(GridWorldClockless):
         print("printing from here")
      
         self.clock.tick(self.tickSpeed)
-        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+        self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
 
         self.gameDisplay.fill((255,255,255))
 
         obstacle_list = []
         RECORD_FLAG = False
+        obs_counter = 0
         while True:
 
             p = pygame.event.get()
@@ -118,11 +124,12 @@ class GridWorld(GridWorldClockless):
                     #record the coordinate of the mouse
                     #convert that to a location in the gridworld
                     #store that location into the obstacle_list
+                    cur_obs = copy(self.default_obs_template)
+                    cur_obs['id'] = obs_counter
+                    cur_obs['position'] = ([math.floor(event.pos[1]), math.floor(event.pos[0])])
                     
-                    grid_loc = ([math.floor(event.pos[1]/self.cellWidth), math.floor(event.pos[0]/self.cellWidth)])
-                    
-                    if grid_loc not in obstacle_list:
-                        obstacle_list.append(grid_loc)
+                    #if grid_loc not in obstacle_list:
+                    obstacle_list.append(cur_obs)
                     
                 
                 #the recording stops when the key 'q' is pressed
@@ -156,7 +163,7 @@ class GridWorld(GridWorldClockless):
     def render(self):
 
         #render board
-        self.gameDisplay = pygame.display.set_mode((self.cols*self.cellWidth,self.rows*self.cellWidth))
+        self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
         self.clock.tick(self.tickSpeed)
 
         self.gameDisplay.fill(self.white)
@@ -164,12 +171,12 @@ class GridWorld(GridWorldClockless):
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]-(self.obs_width/2),obs[0]-(self.obs_width/2),self.obs_width, self.obs_width])
+                pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2),self.obs_width, self.obs_width])
             
         #render goal
         pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-(self.cellWidth/2), self.goal_state[0]-(self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
-        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]-(self.agent_width/2), self.agent_state[0]-(self.agent_width/2), self.agent_width, self.agent_width])
+        pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state['position'][1]-(self.agent_width/2), self.agent_state['position'][0]-(self.agent_width/2), self.agent_width, self.agent_width])
         if self.show_trail:
             self.draw_trajectory()
 
@@ -225,8 +232,8 @@ class GridWorld(GridWorldClockless):
         if self.agent_action_flag:  
             (x,y) = pygame.mouse.get_pos()
             #print('x :',x, 'y :',y)
-            x = x - self.agent_state[1]
-            y = y - self.agent_state[0]
+            x = x - self.agent_state['position'][1]
+            y = y - self.agent_state['position'][0]
 
             x = int(x/self.step_size)
             y = int(y/self.step_size)
@@ -343,17 +350,20 @@ class GridWorld(GridWorldClockless):
             if not self.freeze_obstacles:
                 self.obstacles = []
                 for i in range(num_obs):
-
-                    obs_pos = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                    self.obstacles.append(self.cellWidth * obs_pos + (self.cellWidth/2))
+                    cur_obs = copy(self.default_obs_template)
+                    cur_obs['id'] = i 
+                    cur_obs['position'] = np.asarray([np.random.randint(self.lower_limit_obstacle[0], self.upper_limit_obstacle[0]),
+                                                      np.random.randint(self.lower_limit_obstacle[1], self.upper_limit_obstacle[1])])
+                    self.obstacles.append(cur_obs)
 
 
             while True:
                 flag = False
-                self.goal_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-                self.goal_state = self.goal_state + (self.cellWidth/2)
+                self.goal_state = np.asarray([np.random.randint(self.lower_limit_goal[0], self.upper_limit_obstacle[0]),
+                                              np.random.randint(self.lower_limit_goal[1], self.upper_limit_obstacle[1])])
+
                 for i in range(num_obs):
-                    if np.linalg.norm(self.obstacles[i]-self.goal_state) < self.cellWidth * dist_g:
+                    if np.linalg.norm(self.obstacles[i]['position']-self.goal_state) < (self.cellWidth+self.obs_width)/2 * dist_g:
 
                         flag = True
                 if not flag:
@@ -362,17 +372,18 @@ class GridWorld(GridWorldClockless):
         dist = self.agent_spawn_clearance
         while True:
             flag = False
-            self.agent_state = self.cellWidth * np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
-            self.agent_state = self.agent_state + (self.cellWidth/2)
+            self.agent_state['position'] = np.asarray([np.random.randint(self.lower_limit_agent[0],self.upper_limit_agent[0]),
+                                           np.random.randint(self.lower_limit_agent[1],self.upper_limit_agent[1])])
+            
             for i in range(num_obs):
-                if np.linalg.norm(self.obstacles[i]-self.agent_state) < self.cellWidth * dist:
+                if np.linalg.norm(self.obstacles[i]['position']-self.agent_state['position']) < (self.cellWidth+self.agent_width)/2 * dist:
                     flag = True
 
             if not flag:
                 break
 
 
-        self.distanceFromgoal = np.sum(np.abs(self.agent_state-self.goal_state))
+        self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
         self.release_control = False
         self.cur_heading_dir = 0
         if self.is_onehot:
@@ -410,17 +421,17 @@ if __name__=="__main__":
 
     #featExt = LocalGlobal(window_size=3, agent_width= 10, obs_width=6, grid_size=10,step_size=20,
     #                      fieldList=['agent_state','goal_state','obstacles'])
-    featExt = FrontBackSide(thresh1=1, thresh2=2, thresh3=3,
-                            fieldList = ['agent_state', 'goal_state', 'obstacles', 'agent_head_dir']) 
+    #featExt = FrontBackSide(thresh1=1, thresh2=2, thresh3=3,
+    #                        fieldList = ['agent_state', 'goal_state', 'obstacles', 'agent_head_dir']) 
     world = GridWorld(display=True, is_onehot = False, is_random=True,
-                        seed = 0 , obstacles='map7.png', 
-                        step_size=5, buffer_from_obs=10,
-                        rows = 50, cols = 50 , width=5, obs_width=10)
+                        seed = 0 , obstacles='./real_map.jpg', 
+                        step_size=5, buffer_from_obs=0, 
+                        rows = 100, cols = 300 , width=30, obs_width=10)
 
     for i in range(100):
         print ("here")
         state = world.reset()
-        state = feat_ext.extract_features(state)
+        #state = feat_ext.extract_features(state)
         totalReward = 0
         done = False
 
@@ -435,16 +446,16 @@ if __name__=="__main__":
                 print(action)
                 #action = 2
                 next_state, reward, done, _ = world.step(action)
-                print(next_state)
-                state = featExt.extract_features(next_state)
-                print('The heading :', state[0:4])
-                print('The goal info :', state[4:13].reshape(3, 3))
-                print('THe obstacle infor :', state[16:].reshape(3, 4))
+                #print(next_state)
+                #state = featExt.extract_features(next_state)
+                #print('The heading :', state[0:4])
+                #print('The goal info :', state[4:13].reshape(3, 3))
+                #print('THe obstacle infor :', state[16:].reshape(3, 4))
                 
                 if flag:
 
                     t += 1
-                    print(world.pos_history)
+                    #print(world.pos_history)
                     states.append(state)
                 if t > 1000 or done:
                     break
