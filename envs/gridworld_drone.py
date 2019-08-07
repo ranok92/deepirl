@@ -17,6 +17,21 @@ from envs.gridworld import GridWorld
 with utils.HiddenPrints():
     import pygame
 
+
+class Obstacles():
+
+    def __init__(self,
+                 idval=None,
+                 pos=None,
+                 speed=None,
+                 orientation=None
+                 ):
+        self.id = idval
+        self.position = pos
+        self.speed = speed 
+        self.orientation = orientation
+
+
 class GridWorldDrone(GridWorld):
 
     #the numbering starts from 0,0 from topleft corner and goes down and right
@@ -115,10 +130,11 @@ class GridWorldDrone(GridWorld):
         self.generate_pedestrian_dict()
         self.generate_annotation_dict_universal()
 
+        pdb.set_trace()
         ########### debugging ##############
 
         self.train_exact = train_exact
-
+        '''
         self.ped_start_pos = {} # a dictionary that will store the starting positions of all the pedestrians
         self.ped_goal_pos = {} # a dictionary that will store the goal positions of all the pedestrians
 
@@ -131,7 +147,7 @@ class GridWorldDrone(GridWorld):
 
                 self.ped_goal_pos[ped] = np.asarray([float(self.pedestrian_dict[ped][-1][2]),
                                                      float(self.pedestrian_dict[ped][-1][3])])
-
+        
         #print('Printing information :')
         #print('Pedestrian dictionary :', self.pedestrian_dict)
         #print('Pedestrian starting and ending points :')
@@ -139,7 +155,10 @@ class GridWorldDrone(GridWorld):
 
                 print('Ped :', ped, 'Starting point :', self.ped_start_pos[ped], ', Ending point :', self.ped_goal_pos[ped])
             print('Pedestrian ending point :', self.ped_goal_pos)
+        '''
         ################## remove this block ###################
+
+
     def generate_annotation_list(self):
         '''
         Reads lines from an annotation file and creates a list
@@ -220,14 +239,45 @@ class GridWorldDrone(GridWorld):
         based on each frame. Here the information is stored based on the pedestrians i.e. each pedestrian
         corresponds to a key in the dictionary and the corresponding to that key is a list consisting of the 
         trajectory information of that particular pedestrian
+
+        ***THERE SHOULD NOT BE ANY SKIPPING OF FRAMES***
+
+        The format of the dictionary:
+
+            pedestrian_dict['ped_id']['frame_no']{'pos': numpy, 'orientation': numpy, 'speed': float}
+        
         '''
         #the entries are of the format : frame_no, id, y_coord, x_coord
+
+
         for entry in self.annotation_list:
 
-            if entry[1] not in self.pedestrian_dict.keys():
-                self.pedestrian_dict[str(entry[1])] = []
+            if entry[1] not in self.pedestrian_dict.keys(): #adding a new pedestrian
 
-            self.pedestrian_dict[str(entry[1])].append(entry)
+                self.pedestrian_dict[str(entry[1])] = {}
+                self.pedestrian_dict[str(entry[1])]['initial_frame'] = str(entry[0])
+                self.pedestrian_dict[str(entry[1])]['final_frame'] = str(entry[0])
+                speed = None
+                orientation = None
+                pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
+            else:
+                pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
+                orientation = pos - self.pedestrian_dict[str(entry[1])][str(int(entry[0])-1)]['pos'] 
+                speed = np.linalg.norm(orientation)
+
+            self.pedestrian_dict[str(entry[1])][str(entry[0])] = {} #initialize the dictionary for the frame regardless of the first or any other frames
+
+            #update the final frame everytime you encounter something bigger
+            if int(self.pedestrian_dict[str(entry[1])]['final_frame']) < int(entry[0]):
+                self.pedestrian_dict[str(entry[1])]['final_frame'] = str(entry[0])
+
+            #populate the dictionary 
+            '''
+            the format of the dictionary : ped_dict['ped_id']['frame_id']['pos', 'orientation', 'speed']
+            '''
+            self.pedestrian_dict[str(entry[1])][str(entry[0])]['pos'] = pos
+            self.pedestrian_dict[str(entry[1])][str(entry[0])]['orientation'] = orientation
+            self.pedestrian_dict[str(entry[1])][str(entry[0])]['speed'] = speed
         #pdb.set_trace()
 
 
@@ -291,20 +341,25 @@ class GridWorldDrone(GridWorld):
         self.obstacles = []
         for element in frame_info:
 
+            #populating the obstacles
             if float(element[1]) not in self.skip_list:
+                obs_pos = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
+                self.obstacles.append(obs_pos)
 
-                self.obstacles.append(np.array([float(element[2]),float(element[3])]))
-
+            #populating the agent
             if float(element[1]) == self.subject:
-
-                self.agent_state = np.array([float(element[2]),float(element[3])])
+                agent_pos = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
+                self.agent_state = agent_pos
                 self.state['agent_state'] = self.agent_state
+
+            #populating the ghost
             if float(element[1]) == self.ghost:
 
-                self.ghost_state = np.array([float(element[2]),float(element[3])])
+                self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
 
 
         self.state['obstacles'] = self.obstacles 
+        #pdb.set_trace()
 
 
     def get_state_from_frame(self,frame_info):
@@ -535,20 +590,25 @@ class GridWorldDrone(GridWorld):
         Pro tip: Use this for testing the result.
         '''
         no_of_peds = len(self.pedestrian_dict.keys())
-        cur_ped = np.random.randint(no_of_peds)
-
-        #cur_ped = 20
+        cur_ped = np.random.randint(1,no_of_peds+1)
+        print('Cur ped', cur_ped)
+        pdb.set_trace()
         if self.show_comparison:
             self.ghost = cur_ped
         self.skip_list = []
         self.skip_list.append(cur_ped)
-        self.current_frame = int(self.pedestrian_dict[str(cur_ped)][0][0]) #frame from the first entry of the list
+        self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
         print('Current frame', self.current_frame)
-        self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
-                                      float(self.pedestrian_dict[str(cur_ped)][0][3])])
+        
+        self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]['pos']
+        #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
+        #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
 
-        self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
-                                      float(self.pedestrian_dict[str(cur_ped)][-1][3])])
+        final_frame = self.pedestrian_dict[str(cur_ped)]['final_frame']
+        #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
+        #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
+
+        self.goal_state = self.pedestrian_dict[str(cur_ped)][final_frame]['pos']
 
         self.release_control = False
 
@@ -740,13 +800,14 @@ if __name__=="__main__":
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
-                        show_comparison=False,
+                        show_comparison=True,
                         train_exact=True,                       
                         rows=576, cols=720, width=20)
     print ("here")
+    #pdb.set_trace()
     
     done = False
-    for i in range(20):
+    for i in range(100):
         world.reset()
         done = False
         while world.current_frame < world.final_frame and not done:
