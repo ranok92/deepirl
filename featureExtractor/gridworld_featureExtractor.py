@@ -59,7 +59,7 @@ class LocalGlobal():
     #                           next 3 : indicates whether the agent moved towards or away from goal
     #                           next n^2 : indicates local obstacle information
     def __init__(self,window_size=5, grid_size = 1, step_size=None,
-                agent_width = 1, obs_width = 1 , fieldList = []):
+                agent_width = 1, obs_width = 1):
 
         self.gl_size = 9
         self.rl_size = 3
@@ -71,7 +71,6 @@ class LocalGlobal():
         self.grid_size = grid_size
         self.agent_width = agent_width
         self.obs_width = obs_width
-        self.field_list = fieldList
         self.prev_dist = None
         #added new (26-3-19)
         #based on the state representation, this should contain a 
@@ -358,7 +357,7 @@ class FrontBackSideSimple():
 
     def __init__(self, thresh1=1, thresh2=2, thresh3=3, thresh4=4, 
                  agent_width=1, obs_width=1,
-                 step_size=1, grid_size=1, fieldList = []):
+                 step_size=1, grid_size=1):
 
         self.thresh1 = step_size*thresh1
         self.thresh2 = step_size*thresh2
@@ -371,7 +370,7 @@ class FrontBackSideSimple():
         self.grid_size = grid_size
 
 
-        self.field_list = fieldList
+        #self.field_list = fieldList
         self.prev_dist = None
         #added new (26-3-19)
         #based on the state representation, this should contain a 
@@ -489,16 +488,11 @@ class FrontBackSideSimple():
     #reads the list of fields from the state to create its features
     def get_info_from_state(self,state):
 
-        state_list = []
-        for field in self.field_list:
-            if type(state[field]) is list:
-                for val in state[field]:
-                    state_list.append(val)
-            else:
-                state_list.append(state[field])
+        agent_state = state['agent_state']
+        goal_state = state['goal_state']
+        obstacles = state['obstacles']
 
-        return np.array(state_list)
-
+        return agent_state, goal_state, obstacles
 
 
     def determine_index(self, diff_r, diff_c):
@@ -526,10 +520,8 @@ class FrontBackSideSimple():
         return index
 
 
-    def closeness_indicator(self,state_info):
+    def closeness_indicator(self, agent_pos, goal_pos):
 
-        agent_pos = state_info[0,:]
-        goal_pos = state_info[1,:]
         feature = np.zeros(3)
         current_dist = np.linalg.norm(agent_pos-goal_pos)
 
@@ -599,14 +591,14 @@ class FrontBackSideSimple():
     def extract_features(self, state):
 
         #pdb.set_trace()
-        state = self.get_info_from_state(state)
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
 
         mod_state = np.zeros(self.state_rep_size)
 
         #a = int((window_size**2-1)/2)
         
-        agent_pos = state[0]
-        goal_pos = state[1]
+        agent_pos = agent_state['position']
+        goal_pos = goal_state
         diff_r = goal_pos[0] - agent_pos[0]
         diff_c = goal_pos[1] - agent_pos[1]
         '''
@@ -621,18 +613,18 @@ class FrontBackSideSimple():
         '''
         index = self.determine_index(diff_r,diff_c)
         mod_state[index] = 1
-        feat = self.closeness_indicator(state)
+        feat = self.closeness_indicator(agent_pos, goal_pos)
 
         mod_state[9:12] = feat
 
-        for i in range(2,len(state)):
+        for i in range(len(obstacles)):
 
             #as of now this just measures the distance from the center of the obstacle
             #this distance has to be measured from the circumferance of the obstacle
 
             #new method, simulate overlap for each of the neighbouring places
             #for each of the obstacles
-            obs_pos = state[i]
+            obs_pos = obstacles[i]['position']
             orient, dist, is_hit = self.get_orientation_distance(agent_pos, obs_pos)
             if dist >= 0 and orient >= 0:
                 mod_state[12+dist*4+orient] = 1 # clockwise starting from the inner most circle
@@ -641,6 +633,9 @@ class FrontBackSideSimple():
                 mod_state[-1]=1
             
         return reset_wrapper(mod_state)
+
+
+
 
 class DroneFeature1():
     '''

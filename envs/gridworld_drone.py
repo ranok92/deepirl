@@ -38,59 +38,58 @@ class GridWorldDrone(GridWorld):
     #the obstacles should be a list of 2 dim numpy array stating the position of the 
     #obstacle
     def __init__(
-        self,
-        seed=7,
-        rows=10,
-        cols=10,
-        width=10,
-        goal_state=None,
-        obstacles=None,
-        display=True,
-        is_onehot=True,
-        is_random=False,
-        stepReward=0.001,
-        step_wrapper=utils.identity_wrapper,
-        reset_wrapper=utils.identity_wrapper,
-        show_trail=False,
-        annotation_file=None,
-        subject=None,
-        obs_width=10,
-        step_size=10,
-        agent_width=10,
-        show_comparison=False,
-        tick_speed=30,
-        train_exact=False #this option trains the agent for the exact scenarios as seen by the expert
-                          #Not an ideal thing to train on. Introduced as a debugging measure.
+            self,
+            seed=7,
+            rows=10,
+            cols=10,
+            width=10,
+            goal_state=None,
+            obstacles=None,
+            display=True,
+            is_onehot=True,
+            is_random=False,
+            stepReward=0.001,
+            step_wrapper=utils.identity_wrapper,
+            reset_wrapper=utils.identity_wrapper,
+            show_trail=False,
+            annotation_file=None,
+            subject=None,
+            obs_width=10,
+            step_size=10,
+            agent_width=10,
+            show_comparison=False,
+            tick_speed=30,
+            train_exact=False #this option trains the agent for the exact scenarios as seen by the expert
+                              #Not an ideal thing to train on. Introduced as a debugging measure.
     ):
-        super().__init__(seed = seed,
-                       rows = rows,
-                       cols = cols,
-                       width = width,
-                       goal_state = goal_state,
-                       obstacles = obstacles,
-                       display = display,
-                       is_onehot = is_onehot,
-                       is_random = is_random,
-                       stepReward= stepReward,
-                       step_wrapper=step_wrapper,
-                       reset_wrapper=reset_wrapper,
-                       show_trail = show_trail,
-                       obs_width=obs_width,
-                       agent_width=agent_width,
-                       step_size=step_size
-                       )
+        super().__init__(seed=seed,
+                         rows=rows,
+                         cols=cols,
+                         width=width,
+                         goal_state=goal_state,
+                         obstacles=obstacles,
+                         display=display,
+                         is_onehot=is_onehot,
+                         is_random=is_random,
+                         stepReward=stepReward,
+                         step_wrapper=step_wrapper,
+                         reset_wrapper=reset_wrapper,
+                         show_trail=show_trail,
+                         obs_width=obs_width,
+                         agent_width=agent_width,
+                         step_size=step_size
+                        )
         if display:
 
-            self.gameDisplay = pygame.display.set_mode((self.cols,self.rows))
+            self.gameDisplay = pygame.display.set_mode((self.cols, self.rows))
             self.clock = pygame.time.Clock()
             pygame.font.init()
-            self.env_font = pygame.font.SysFont('Comic Sans MS',20)
+            self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
             self.tickSpeed = tick_speed
             self.show_comparison = show_comparison
 
         self.ghost = None
-        self.ghost_state =None
-
+        self.ghost_state = None
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
         self.pedestrian_dict = {}
@@ -99,8 +98,6 @@ class GridWorldDrone(GridWorld):
         self.initial_frame = 999999999999 #a large number
         self.subject = subject
         self.max_obstacles = None
-        self.agent_state = None
-        self.goal_state = None
         self.agent_action_flag = False
         self.obstacle_width = obs_width
         self.step_size = step_size
@@ -109,10 +106,10 @@ class GridWorldDrone(GridWorld):
         self.skip_list = [] #dont consider these pedestrians as obstacles
 
         ############# this comes with the change in the action space##########
-        self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
-                            np.asarray([0,1]),np.asarray([1,1]),
-                            np.asarray([1,0]),np.asarray([1,-1]),
-                            np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+        self.actionArray = [np.asarray([-1, 0]), np.asarray([-1, 1]),
+                            np.asarray([0, 1]), np.asarray([1, 1]),
+                            np.asarray([1, 0]), np.asarray([1, -1]),
+                            np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
 
         self.action_dict = {}
 
@@ -429,15 +426,25 @@ class GridWorldDrone(GridWorld):
                 if action is not None:
                     if isinstance(action, int):
                         #print('its int', action)
-                        self.agent_state = np.maximum(np.minimum(self.agent_state+ \
-                                           self.step_size*self.actionArray[action],self.upperLimit),self.lowerLimit)
+                        prev_position = self.agent_state['position']
+                        self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
+                                           self.step_size*self.actionArray[action],self.upper_limit_agent),self.lower_limit_agent)
+
+                        self.agent_state['orientation'] = self.agent_state['position'] - prev_position
+                        self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
+
+
                     else:
                         #if the action is a torch
                         if len(action.shape)==1 and a.shape[0]==1: #check if it the tensor has a single value
                             if isinstance(action.item(), int):
-                                self.agent_state = np.maximum(np.minimum(self.agent_state+ \
-                                                          self.step_size*action,self.upperLimit),self.lowerLimit)
+                                prev_position = self.agent_state['position']
+                                self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
+                                                               self.step_size*self.actionArray[action],
+                                                               self.upper_limit_agent),self.lower_limit_agent)
 
+                                self.agent_state['orientation'] = self.agent_state['position'] - prev_position
+                                self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
                     #print("Agent :",self.agent_state)
                 
             if not np.array_equal(self.pos_history[-1],self.agent_state):
@@ -507,7 +514,7 @@ class GridWorldDrone(GridWorld):
         #########for debugging purposes###########
         if self.train_exact:
 
-            self.reset_and_replace()
+            return self.reset_and_replace()
 
         else:
 
@@ -545,6 +552,7 @@ class GridWorldDrone(GridWorld):
                 dist = self.agent_spawn_clearance
                 while True:
                     flag = False
+                    pdb.set_trace()
                     self.agent_state['position'] = np.asarray([np.random.randint(self.lower_limit_agent[0],self.upper_limit_agent[0]),
                                                    np.random.randint(self.lower_limit_agent[1],self.upper_limit_agent[1])])
 
@@ -641,6 +649,8 @@ class GridWorldDrone(GridWorld):
 
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
+
+        pdb.set_trace()
         return self.state
 
 
@@ -793,16 +803,19 @@ class GridWorldDrone(GridWorld):
 
 if __name__=="__main__":
 
-    #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
+    feat_ext = FrontBackSideSimple(agent_width=10,
+                                   obs_width=10,
+                                   step_size=10,
+                                   grid_size=10) 
     window_size = 9
-    feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
+    #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students001_processed.txt',
                         subject=67,
-                        tick_speed=5, 
+                        tick_speed=2, 
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
@@ -822,7 +835,7 @@ if __name__=="__main__":
             print('Global info:')
             print(feat[0:9].reshape(3,3))
             print('Local info:')
-            print(feat[-window_size**2:].reshape(window_size,window_size))
+            print(feat[-17:-1].reshape(4,4))
             print(world.agent_state)
             print (reward, done)
     
