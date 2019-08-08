@@ -18,7 +18,7 @@ with utils.HiddenPrints():
     import pygame
 
 
-class Obstacles():
+class Pedestrian():
 
     def __init__(self,
                  idval=None,
@@ -108,8 +108,6 @@ class GridWorldDrone(GridWorld):
         self.annotation_list = []
         self.skip_list = [] #dont consider these pedestrians as obstacles
 
-        self.upperLimit = np.asarray([self.rows-1, self.cols-1])
-        self.lowerLimit = np.asarray([0,0])
         ############# this comes with the change in the action space##########
         self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
                             np.asarray([0,1]),np.asarray([1,1]),
@@ -130,7 +128,6 @@ class GridWorldDrone(GridWorld):
         self.generate_pedestrian_dict()
         self.generate_annotation_dict_universal()
 
-        pdb.set_trace()
         ########### debugging ##############
 
         self.train_exact = train_exact
@@ -262,7 +259,7 @@ class GridWorldDrone(GridWorld):
                 pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
             else:
                 pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
-                orientation = pos - self.pedestrian_dict[str(entry[1])][str(int(entry[0])-1)]['pos'] 
+                orientation = pos - self.pedestrian_dict[str(entry[1])][str(int(entry[0])-1)]['position'] 
                 speed = np.linalg.norm(orientation)
 
             self.pedestrian_dict[str(entry[1])][str(entry[0])] = {} #initialize the dictionary for the frame regardless of the first or any other frames
@@ -275,7 +272,7 @@ class GridWorldDrone(GridWorld):
             '''
             the format of the dictionary : ped_dict['ped_id']['frame_id']['pos', 'orientation', 'speed']
             '''
-            self.pedestrian_dict[str(entry[1])][str(entry[0])]['pos'] = pos
+            self.pedestrian_dict[str(entry[1])][str(entry[0])]['position'] = pos
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['orientation'] = orientation
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['speed'] = speed
         #pdb.set_trace()
@@ -343,23 +340,24 @@ class GridWorldDrone(GridWorld):
 
             #populating the obstacles
             if float(element[1]) not in self.skip_list:
-                obs_pos = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
-                self.obstacles.append(obs_pos)
+
+                obs = self.pedestrian_dict[element[1]][str(self.current_frame)]
+                self.obstacles.append(obs)
 
             #populating the agent
             if float(element[1]) == self.subject:
-                agent_pos = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
-                self.agent_state = agent_pos
+                agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
+                self.agent_state = agent
                 self.state['agent_state'] = self.agent_state
 
             #populating the ghost
             if float(element[1]) == self.ghost:
 
-                self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]['pos']
+
+                self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]['position']
 
 
         self.state['obstacles'] = self.obstacles 
-        #pdb.set_trace()
 
 
     def get_state_from_frame(self,frame_info):
@@ -396,7 +394,7 @@ class GridWorldDrone(GridWorld):
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
-                pygame.draw.rect(self.gameDisplay, self.red, [obs[1]-(self.obs_width/2),obs[0]-(self.obs_width/2), \
+                pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2), \
                                 self.obs_width, self.obs_width])
         #render goal
         if self.goal_state is not None:
@@ -404,7 +402,7 @@ class GridWorldDrone(GridWorld):
                              (self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
         if self.agent_state is not None:
-            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state[1]-(self.agent_width/2), self.agent_state[0]- \
+            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state['position'][1]-(self.agent_width/2), self.agent_state['position'][0]- \
                             (self.agent_width/2), self.agent_width, self.agent_width])
         if self.ghost_state is not None:
             pygame.draw.rect(self.gameDisplay, (220,220,220),[self.ghost_state[1]-(self.agent_width/2), self.ghost_state[0]- \
@@ -444,7 +442,7 @@ class GridWorldDrone(GridWorld):
                 
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
-            reward, done = self.calculateReward()
+            reward, done = self.calculate_reward()
 
 
         #if you are done ie hit an obstacle or the goal
@@ -533,10 +531,11 @@ class GridWorldDrone(GridWorld):
                 #placing the goal
                 while True:
                     flag = False
-                    self.goal_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                    self.goal_state = np.asarray([np.random.randint(self.lower_limit_goal[0],self.upper_limit_goal[0]),
+                                                  np.random.randint(self.lower_limit_goal[1],self.upper_limit_goal[1])])
 
                     for i in range(num_obs):
-                        if np.linalg.norm(self.obstacles[i]-self.goal_state) < dist_g:
+                        if np.linalg.norm(self.obstacles[i]['position']-self.goal_state) < dist_g:
 
                             flag = True
                     if not flag:
@@ -546,9 +545,11 @@ class GridWorldDrone(GridWorld):
                 dist = self.agent_spawn_clearance
                 while True:
                     flag = False
-                    self.agent_state = np.asarray([np.random.randint(0,self.rows),np.random.randint(0,self.cols)])
+                    self.agent_state['position'] = np.asarray([np.random.randint(self.lower_limit_agent[0],self.upper_limit_agent[0]),
+                                                   np.random.randint(self.lower_limit_agent[1],self.upper_limit_agent[1])])
+
                     for i in range(num_obs):
-                        if np.linalg.norm(self.obstacles[i]-self.agent_state) < dist:
+                        if np.linalg.norm(self.obstacles[i]['position']-self.agent_state['position']) < dist:
                             flag = True
 
                     if not flag:
@@ -589,10 +590,14 @@ class GridWorldDrone(GridWorld):
         from the video feed in the environment with the agent. 
         Pro tip: Use this for testing the result.
         '''
-        no_of_peds = len(self.pedestrian_dict.keys())
-        cur_ped = np.random.randint(1,no_of_peds+1)
-        print('Cur ped', cur_ped)
-        pdb.set_trace()
+        while True:
+            no_of_peds = len(self.pedestrian_dict.keys())
+            cur_ped = np.random.randint(1,no_of_peds+1)
+            if str(cur_ped) in self.pedestrian_dict.keys():
+                break
+            else:
+                print('Selected pedestrian not available.')
+                pdb.set_trace()
         if self.show_comparison:
             self.ghost = cur_ped
         self.skip_list = []
@@ -600,7 +605,7 @@ class GridWorldDrone(GridWorld):
         self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
         print('Current frame', self.current_frame)
         
-        self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]['pos']
+        self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
 
@@ -608,7 +613,7 @@ class GridWorldDrone(GridWorld):
         #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
 
-        self.goal_state = self.pedestrian_dict[str(cur_ped)][final_frame]['pos']
+        self.goal_state = self.pedestrian_dict[str(cur_ped)][final_frame]['position']
 
         self.release_control = False
 
@@ -789,29 +794,35 @@ class GridWorldDrone(GridWorld):
 if __name__=="__main__":
 
     #featExt = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles']) 
-    feat_ext = LocalGlobal(window_size=3, fieldList=['agent_state', 'goal_state','obstacles'])
+    window_size = 9
+    feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students001_processed.txt',
-                        subject=None,
-                        tick_speed=90, 
+                        subject=67,
+                        tick_speed=5, 
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
                         show_comparison=True,
-                        train_exact=True,                       
+                        train_exact=False,                       
                         rows=576, cols=720, width=20)
     print ("here")
-    #pdb.set_trace()
+    pdb.set_trace()
     
     done = False
     for i in range(100):
         world.reset()
         done = False
         while world.current_frame < world.final_frame and not done:
-            _, reward , done, _ = world.step()
+            state, reward , done, _ = world.step()
+            feat = feat_ext.extract_features(state)
+            print('Global info:')
+            print(feat[0:9].reshape(3,3))
+            print('Local info:')
+            print(feat[-window_size**2:].reshape(window_size,window_size))
             print(world.agent_state)
             print (reward, done)
     

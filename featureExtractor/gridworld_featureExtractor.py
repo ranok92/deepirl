@@ -171,15 +171,11 @@ class LocalGlobal():
     #reads the list of fields from the state to create its features
     def get_info_from_state(self,state):
 
-        state_list = []
-        for field in self.field_list:
-            if type(state[field]) is list:
-                for val in state[field]:
-                    state_list.append(val)
-            else:
-                state_list.append(state[field])
+        agent_state = state['agent_state']
+        goal_state = state['goal_state']
+        obstacles = state['obstacles']
 
-        return np.array(state_list)
+        return agent_state, goal_state, obstacles
 
 
     '''
@@ -232,10 +228,10 @@ class LocalGlobal():
 
         return index
 
-    def closeness_indicator(self,state_info):
+    def closeness_indicator(self,agent_state, goal_state):
 
-        agent_pos = state_info[0,:]
-        goal_pos = state_info[1,:]
+        agent_pos = agent_state['position']
+        goal_pos = goal_state
         feature = np.zeros(self.rl_size)
         current_dist = np.linalg.norm(agent_pos-goal_pos)
 
@@ -267,7 +263,7 @@ class LocalGlobal():
     def extract_features(self,state):
 
         #pdb.set_trace()
-        state = self.get_info_from_state(state)
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
         window_size = self.window_size
         block_width = self.grid_size
         step = self.step_size
@@ -279,8 +275,8 @@ class LocalGlobal():
 
         #a = int((window_size**2-1)/2)
         
-        agent_pos = state[0]
-        goal_pos = state[1]
+        agent_pos = agent_state['position']
+        goal_pos = goal_state
         diff_r = goal_pos[0] - agent_pos[0]
         diff_c = goal_pos[1] - agent_pos[1]
         '''
@@ -293,21 +289,21 @@ class LocalGlobal():
         else:
             mod_state[2] = 1
         '''
-        index = self.determine_index(diff_r,diff_c)
+        index = self.determine_index(diff_r, diff_c)
         mod_state[index] = 1
 
-        feat = self.closeness_indicator(state)
+        feat = self.closeness_indicator(agent_state, goal_state)
 
         mod_state[self.gl_size:self.gl_size+self.rl_size] = feat
 
-        for i in range(2,len(state)):
+        for i in range(len(obstacles)):
 
             #as of now this just measures the distance from the center of the obstacle
             #this distance has to be measured from the circumferance of the obstacle
 
             #new method, simulate overlap for each of the neighbouring places
             #for each of the obstacles
-            obs_pos = state[i]
+            obs_pos = obstacles[i]['position']
             obs_width = self.obs_width
             for r in range(-row_start,row_start+1,1):
                 for c in range(-col_start,col_start+1,1):
@@ -647,6 +643,17 @@ class FrontBackSideSimple():
         return reset_wrapper(mod_state)
 
 class DroneFeature1():
+    '''
+    Features to put in:
+        1. Orientation of the obstacles
+        2. Speed of the obstacles
+        3. Social forces
+        4. Speed of the agent? 
+        N.B. To add speed of the agent, you have to have 
+             actions that deal with the speed of the agent.
+        5. Density of pedestrian around the agent?
+        6. Binary state representation?
+    '''
 
     def __init__(self, agent_width=10,
                  obs_width=10, step_size=10, grid_size=10, 
