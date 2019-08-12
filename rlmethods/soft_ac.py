@@ -13,7 +13,7 @@ sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
 from neural_nets.base_network import RectangleNN  # NOQA
 
-DEVICE = ('gpu' if torch.cuda.is_available() else 'cpu')
+DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def copy_params(source, target):
@@ -142,12 +142,20 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        state = self.env.reset()
+        state = torch.tensor(self.env.reset(), dtype=torch.float).to(DEVICE)
+        current_state = state
 
         while not self.replay_buffer.is_full():
             action, _ = self.select_action(state)
             next_state, reward, done, _ = self.env.step(action)
-            self.replay_buffer.push((state, action, reward, next_state, done))
+            self.replay_buffer.push((
+                current_state,
+                action,
+                reward,
+                next_state,
+                done
+            ))
+            current_state = next_state
 
     def train(self):
         """Train Soft Actor Critic"""

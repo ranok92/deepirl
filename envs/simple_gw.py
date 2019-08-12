@@ -93,6 +93,8 @@ class SimpleGridworld:
 
         :param action: Action peformed by player.
         """
+        # convert pytorch tensor to int
+        action = int(action.item())
         assert self.action_space.contains(action), "Invalid action!"
 
         action_vector = self.action_dict[action]
