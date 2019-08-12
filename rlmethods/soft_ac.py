@@ -7,6 +7,7 @@ import sys
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from torch.optim import Adam
 
 sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
@@ -47,7 +48,8 @@ class QNetwork(RectangleNN):
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, 1)
 
-    def forward(self, x):
+    def forward(self, states, actions):
+        x = torch.cat([states, actions], 1)
         x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
         x = self.head(x)
@@ -73,16 +75,18 @@ class PolicyNetwork(RectangleNN):
     def forward(self, x):
         x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
-        x = F.softmax(self.head(x), dim=-1)
+        x = self.head(x)
+        probs = F.softmax(x, dim=-1)
+        log_probs = F.log_softmax(x, dim=-1)
 
-        return x
+        return probs, log_probs
 
     def action_distribution(self, state):
         """Returns a pytorch distribution object based on policy output.
 
         :param state: Input state vector.
         """
-        probs = self.forward(state)
+        probs, _ = self.forward(state)
         dist = torch.distributions.Categorical(probs)
 
         return dist
@@ -91,7 +95,13 @@ class PolicyNetwork(RectangleNN):
 class SoftActorCritic:
     """Implementation of soft actor critic."""
 
-    def __init__(self, env, replay_buffer_size=10**6):
+    def __init__(
+            self,
+            env,
+            replay_buffer_size=10**6,
+            gamma=1,
+            learning_rate=3 * 10**-4
+    ):
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
@@ -107,8 +117,15 @@ class SoftActorCritic:
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
 
-        # initialize temperature
+        # set hyperparameters
         self.alpha = torch.tensor([1]).to(DEVICE)
+        self.gamma = gamma
+        self.entropy_target = -action_size
+
+        # optimizers
+        self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
+        self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
+        self.alpha_optim = Adam([self.alpha], lr=learning_rate)
 
     def select_action(self, state):
         """Generate an action based on state vector using current policy.
@@ -118,7 +135,7 @@ class SoftActorCritic:
         dist = self.policy.action_distribution(state)
         action = dist.sample()
 
-        return action
+        return action, dist.log_prob(action)
 
     def populate_buffer(self):
         """
@@ -128,7 +145,7 @@ class SoftActorCritic:
         state = self.env.reset()
 
         while not self.replay_buffer.is_full():
-            action = self.select_action(state)
+            action, _ = self.select_action(state)
             next_state, reward, done, _ = self.env.step(action)
             self.replay_buffer.push((state, action, reward, next_state, done))
 
@@ -138,9 +155,46 @@ class SoftActorCritic:
         self.populate_buffer()
 
         # weight updates
+        # TODO: which of the below are actually needed?
         replay_samples = self.replay_buffer.sample(100)
-        states = torch.from_numpy(replay_samples[0]).to(DEVICE)
-        actions = torch.from_numpy(replay_samples[1]).to(DEVICE)
-        rewards = torch.from_numpy(replay_samples[2]).to(DEVICE)
-        next_states = torch.from_numpy(replay_samples[3]).to(DEVICE)
-        dones = torch.tensor(replay_samples[4]).to(DEVICE)
+        state_batch = torch.from_numpy(replay_samples[0]).to(DEVICE)
+        action_batch = torch.from_numpy(replay_samples[1]).to(DEVICE)
+        reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
+        next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
+        # dones_batch = torch.tensor(replay_samples[4]).to(DEVICE)
+
+        with torch.no_grad():
+            # Figure out value function
+            next_actions, log_next_actions = self.policy.select_action(
+                next_state_batch
+            )
+            next_state_q = self.avg_q_net(next_state_batch, next_actions)
+            next_state_values = next_state_q - self.alpha * log_next_actions
+
+            # Calculate Q network target
+            q_net_target = reward_batch + self.gamma * next_state_values
+
+        # q network loss
+        q_values = self.q_net(state_batch, action_batch)
+        q_loss = F.mse_loss(q_values, q_net_target)
+
+        # policy loss
+        _, log_actions = self.policy(state_batch)
+        policy_loss = (self.alpha * log_actions - q_values).mean()
+
+        # automatic entropy tuning
+        alpha_loss = -self.alpha* (log_actions.detach() + self.entropy_target)
+        alpha_loss = alpha_loss.mean()
+
+        # update parameters
+        self.q_optim.zero_grad()
+        q_loss.backward()
+        self.q_optim.step()
+
+        self.policy_optim.zero_grad()
+        policy_loss.backward()
+        self.policy_optim.step()
+
+        self.alpha_optim.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optim.step()
