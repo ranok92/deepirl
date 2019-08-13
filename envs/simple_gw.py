@@ -73,7 +73,7 @@ class SimpleGridworld:
         valid_spots = np.argwhere(validity_condition)
         self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
 
-        return self.player_pos
+        return self.player_pos.astype('float32')
 
     def reward_function(self, state, action, next_state):
         """Generate a reward based on inputs.
@@ -82,10 +82,8 @@ class SimpleGridworld:
         :param action: Action a_t taken at state s_t.
         :param next_state: State resulting from performing a_t at s_t.
         """
-        if (self.goal_pos == next_state).all():
-            return np.array([1])
-
-        return np.array([0])
+        distance_to_goal = np.linalg.norm(self.goal_pos - self.player_pos)
+        return np.exp(-distance_to_goal).astype('float32')
 
     def step(self, action):
         """Advance the gridworld player based on action.
@@ -112,7 +110,7 @@ class SimpleGridworld:
 
         done = (self.player_pos == self.goal_pos).all()
 
-        return self.player_pos, reward, done, False
+        return self.player_pos.astype('float32'), reward, done, False
 
 
 class TorchGridworld:

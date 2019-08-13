@@ -3,7 +3,9 @@ Soft actor critic per "Soft Actor-Critic Algorithms and Applications" Haarnoja
 et. al 2019.
 """
 import sys
+import pdb
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -39,17 +41,35 @@ def move_average(source, target, tau=0.005):
         )
 
 
+def to_oh(index, num_classes):
+    """Convert to one hot.
+
+    :param index: 'hot' index (which index to set to one)
+    :param num_classes: total number of classes (length of vector)
+    """
+    oh = np.zeros(num_classes).astype('float32')
+    oh[index] = 1
+
+    return oh
+
+
 class QNetwork(RectangleNN):
     """Q function network."""
 
-    def __init__(self, num_inputs, num_layers, hidden_layer_width):
+    def __init__(self, state_length, action_length, num_layers, hidden_layer_width):
         super().__init__(num_layers, hidden_layer_width, F.relu)
 
-        self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
+        self.action_length = action_length
+
+        self.in_layer = nn.Linear(
+            state_length+action_length,
+            hidden_layer_width
+        )
         self.head = nn.Linear(hidden_layer_width, 1)
 
     def forward(self, states, actions):
-        x = torch.cat([states, actions], 1)
+        actions_vector = torch.eye(self.action_length)[actions]
+        x = torch.cat([states, actions_vector], 1)
         x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
         x = self.head(x)
@@ -99,7 +119,7 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer_size=10**6,
-            gamma=1,
+            gamma=1.0,
             learning_rate=3 * 10**-4
     ):
         self.env = env
@@ -111,14 +131,14 @@ class SoftActorCritic:
 
         # NNs
         self.policy = PolicyNetwork(2, state_size, 512, action_size).to(DEVICE)
-        self.q_net = QNetwork(state_size + action_size, 2, 512).to(DEVICE)
-        self.avg_q_net = QNetwork(state_size + action_size, 2, 512).to(DEVICE)
+        self.q_net = QNetwork(state_size, action_size, 2, 512).to(DEVICE)
+        self.avg_q_net = QNetwork(state_size, action_size, 2, 512).to(DEVICE)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.alpha = torch.tensor([1]).to(DEVICE)
+        self.alpha = torch.tensor([1.0]).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -action_size
 
@@ -142,11 +162,11 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        state = torch.tensor(self.env.reset(), dtype=torch.float).to(DEVICE)
+        state = self.env.reset()
         current_state = state
 
         while not self.replay_buffer.is_full():
-            action, _ = self.select_action(state)
+            action, _ = self.select_action(torch.from_numpy(state))
             next_state, reward, done, _ = self.env.step(action)
             self.replay_buffer.push((
                 current_state,
@@ -173,7 +193,7 @@ class SoftActorCritic:
 
         with torch.no_grad():
             # Figure out value function
-            next_actions, log_next_actions = self.policy.select_action(
+            next_actions, log_next_actions = self.select_action(
                 next_state_batch
             )
             next_state_q = self.avg_q_net(next_state_batch, next_actions)
@@ -188,10 +208,11 @@ class SoftActorCritic:
 
         # policy loss
         _, log_actions = self.policy(state_batch)
-        policy_loss = (self.alpha * log_actions - q_values).mean()
+        policy_loss = (self.alpha * log_actions - q_values.detach()).mean()
+
 
         # automatic entropy tuning
-        alpha_loss = -self.alpha* (log_actions.detach() + self.entropy_target)
+        alpha_loss = -self.alpha * (log_actions + self.entropy_target)
         alpha_loss = alpha_loss.mean()
 
         # update parameters
@@ -200,7 +221,7 @@ class SoftActorCritic:
         self.q_optim.step()
 
         self.policy_optim.zero_grad()
-        policy_loss.backward()
+        policy_loss.backward(retain_graph=True)
         self.policy_optim.step()
 
         self.alpha_optim.zero_grad()
