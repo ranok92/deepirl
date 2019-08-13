@@ -84,7 +84,10 @@ class SimpleGridworld:
         """
         goal_vector = self.goal_pos - self.player_pos
         movement_vector = next_state - state
-        reward = np.sign(np.dot(goal_vector, movement_vector))
+        reward = np.sign(np.dot(goal_vector, movement_vector)) *0.01
+        if (self.player_pos == self.goal_pos).all():
+            reward += 1.0
+
         return reward.astype('float32')
 
     def step(self, action):

@@ -138,7 +138,7 @@ class SoftActorCritic:
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.alpha = torch.tensor([1.0]).to(DEVICE)
+        self.alpha = torch.tensor([0.0], requires_grad=True).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -action_size
 
@@ -212,7 +212,7 @@ class SoftActorCritic:
 
 
         # automatic entropy tuning
-        alpha_loss = -self.alpha * (log_actions + self.entropy_target)
+        alpha_loss = -self.alpha * (log_actions + self.entropy_target).detach()
         alpha_loss = alpha_loss.mean()
 
         # update parameters
@@ -221,7 +221,7 @@ class SoftActorCritic:
         self.q_optim.step()
 
         self.policy_optim.zero_grad()
-        policy_loss.backward(retain_graph=True)
+        policy_loss.backward()
         self.policy_optim.step()
 
         self.alpha_optim.zero_grad()

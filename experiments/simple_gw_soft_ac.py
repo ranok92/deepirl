@@ -37,6 +37,9 @@ def main():
 
             print(np.mean(rs))
 
+        if i% 1000 == 0:
+            soft_ac.replay_buffer.buffer.clear()
+
 
 if __name__ == "__main__":
     main()
