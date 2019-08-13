@@ -1,12 +1,12 @@
 import pdb
 import os
-
 import argparse
 import matplotlib
 import numpy as np
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 from envs.gridworld_clockless import GridWorldClockless as GridWorld
+from logger.logger import Logger
 import utils
 
 
@@ -59,6 +59,12 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
+    to_save = './'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+    log_file = 'Experiment_info.txt'
+    experiment_logger = Logger(to_save, log_file)
+
+    experiment_logger.log_header('Arguments for the experiment :')
+    experiment_logger.log_info(vars(args))
 
     from rlmethods.rlutils import LossBasedTermination
     from rlmethods.b_actor_critic import ActorCritic
@@ -86,15 +92,17 @@ def main():
                                     step_size=step_size,
                                     agent_width=agent_width,
                                     obs_width=obs_width,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+                                    )
 
     if args.feat_extractor == 'LocalGlobal':
         feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
-                           fieldList = ['agent_state','goal_state','obstacles'])
+                           )
     
+    experiment_logger.log_header('Parameters of the feature extractor :')
+    experiment_logger.log_info(feat_ext.__dict__)
 
 
     #initialize the environment
@@ -127,7 +135,12 @@ def main():
                     consider_heading=False,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
-    
+
+
+    experiment_logger.log_header('Environment details :')
+    experiment_logger.log_info(env.__dict__)
+
+
     #CHANGE HEREq
 
     #CHANGE HERE
@@ -146,6 +159,8 @@ def main():
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
+    experiment_logger.log_header('Details of the RL method :')
+    experiment_logger.log_info(rlMethod.__dict__)
     
 
     # initialize IRL method
@@ -161,6 +176,9 @@ def main():
                            hidden_dims = args.reward_net_hidden_dims,
                            save_folder=args.save_folder)
     print("IRL method intialized.")
+    experiment_logger.log_header('Details of the IRL method :')
+    experiment_logger.log_info(irlMethod.__dict__)
+    
     print(irlMethod.reward)
     rewardNetwork = irlMethod.train()
 
