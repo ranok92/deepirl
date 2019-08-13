@@ -82,8 +82,10 @@ class SimpleGridworld:
         :param action: Action a_t taken at state s_t.
         :param next_state: State resulting from performing a_t at s_t.
         """
-        distance_to_goal = np.linalg.norm(self.goal_pos - self.player_pos)
-        return np.exp(-distance_to_goal).astype('float32')
+        goal_vector = self.goal_pos - self.player_pos
+        movement_vector = next_state - state
+        reward = np.sign(np.dot(goal_vector, movement_vector))
+        return reward.astype('float32')
 
     def step(self, action):
         """Advance the gridworld player based on action.
@@ -202,7 +204,8 @@ class TorchGridworld:
             next_state = state + action_vector
 
             # clamp player pos inside gridworld
-            next_state = torch.min(torch.max(next_state, self.min_pos), self.max_pos)
+            next_state = torch.min(
+                torch.max(next_state, self.min_pos), self.max_pos)
 
             self.player_pos = next_state
 
