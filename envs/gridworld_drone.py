@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, '..')
 
 from envs.gridworld_clockless import MockActionspace, MockSpec
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
+from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple, DroneFeatureSAM1
 
 from itertools import count
 import utils  # NOQA: E402
@@ -86,7 +86,7 @@ class GridWorldDrone(GridWorld):
             pygame.font.init()
             self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
             self.tickSpeed = tick_speed
-            self.show_comparison = show_comparison
+        self.show_comparison = show_comparison
 
         self.ghost = None
         self.ghost_state = None
@@ -552,7 +552,7 @@ class GridWorldDrone(GridWorld):
                 dist = self.agent_spawn_clearance
                 while True:
                     flag = False
-                    pdb.set_trace()
+                    #pdb.set_trace()
                     self.agent_state['position'] = np.asarray([np.random.randint(self.lower_limit_agent[0],self.upper_limit_agent[0]),
                                                    np.random.randint(self.lower_limit_agent[1],self.upper_limit_agent[1])])
 
@@ -598,21 +598,23 @@ class GridWorldDrone(GridWorld):
         from the video feed in the environment with the agent. 
         Pro tip: Use this for testing the result.
         '''
+        no_of_peds = len(self.pedestrian_dict.keys())
         while True:
-            no_of_peds = len(self.pedestrian_dict.keys())
+         
             cur_ped = np.random.randint(1,no_of_peds+1)
             if str(cur_ped) in self.pedestrian_dict.keys():
                 break
             else:
                 print('Selected pedestrian not available.')
-                pdb.set_trace()
-        if self.show_comparison:
-            self.ghost = cur_ped
+                #pdb.set_trace()
+        if self.display:
+            if self.show_comparison:
+                self.ghost = cur_ped
         self.skip_list = []
         self.skip_list.append(cur_ped)
         self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
-        print('Current frame', self.current_frame)
-        
+        #print('Current frame', self.current_frame)
+        self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
         self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
@@ -650,7 +652,7 @@ class GridWorldDrone(GridWorld):
         if self.is_onehot:
             self.state = self.reset_wrapper(self.state)
 
-        pdb.set_trace()
+        #pdb.set_trace()
         return self.state
 
 
@@ -698,8 +700,8 @@ class GridWorldDrone(GridWorld):
         if self.agent_action_flag:  
             (x,y) = pygame.mouse.get_pos()
             #print('x :',x, 'y :',y)
-            x = x - self.agent_state[1]
-            y = y - self.agent_state[0]
+            x = x - self.agent_state['position'][1]
+            y = y - self.agent_state['position'][0]
 
             x = int(x/self.step_size)
             y = int(y/self.step_size)
@@ -807,35 +809,40 @@ if __name__=="__main__":
                                    obs_width=10,
                                    step_size=10,
                                    grid_size=10) 
+    feat_drone = DroneFeatureSAM1()
     window_size = 9
     #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students001_processed.txt',
-                        subject=67,
-                        tick_speed=2, 
+                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
+                        subject=None,
+                        tick_speed=30, 
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
-                        show_comparison=True,
-                        train_exact=False,                       
+                        show_comparison=False,
+                        train_exact=True,                       
                         rows=576, cols=720, width=20)
     print ("here")
-    pdb.set_trace()
     
     done = False
     for i in range(100):
         world.reset()
         done = False
-        while world.current_frame < world.final_frame and not done:
+        init_frame = world.current_frame
+        fin_frame = init_frame+250
+        while world.current_frame < fin_frame and not done:
+            #action = input()
+
             state, reward , done, _ = world.step()
             feat = feat_ext.extract_features(state)
+            #orientation = feat_drone.extract_features(state)
             print('Global info:')
             print(feat[0:9].reshape(3,3))
             print('Local info:')
             print(feat[-17:-1].reshape(4,4))
-            print(world.agent_state)
-            print (reward, done)
+            #print(world.agent_state)
+            #print (reward, done)
     
