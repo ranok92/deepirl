@@ -100,10 +100,12 @@ class DeepMaxEnt():
         # needs to be made independant somehow
         # self.env.step = utils.step_torch_state()(self.env.step)
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
+        '''
         if self.env.is_onehot:
             self.state_size = self.env.reset().shape[0]
         else:
-            self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
+        '''
+        self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
         self.hidden_dims = hidden_dims
@@ -123,17 +125,18 @@ class DeepMaxEnt():
         self.regularizer = regularizer
         #folders for saving purposes
         self.plot_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+\
-                                '-seed-'+str(self.env.seed)+'-lr-'+str(learning_rate)+'/plots/'
+                                '-seed-'+str('self.env.seed')+'-lr-'+str(learning_rate)+'/plots/'
 
         self.reward_network_save_folder = './'+save_folder+'-reg-'+\
-                                          str(self.regularizer)+'-seed-'+str(self.env.seed)+'-lr-'+\
+                                          str(self.regularizer)+'-seed-'+str('self.env.seed')+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
         self.policy_network_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
-                                          str(self.env.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
+                                          str('self.env.seed')+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
             pass
         else:
+            print(self.plot_save_folder)
             os.mkdir(self.plot_save_folder)
 
     #******parts being operated on
