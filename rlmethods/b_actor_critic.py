@@ -373,8 +373,10 @@ class ActorCritic:
                     break
                     #pass
 
-            running_reward = running_reward * self.reward_threshold_ratio +\
-                ep_reward * (1-self.reward_threshold_ratio)
+            #running_reward = running_reward * self.reward_threshold_ratio +\
+            #    ep_reward * (1-self.reward_threshold_ratio)
+
+            running_reward += ep_reward
 
             self.finish_episode()
 
@@ -385,8 +387,8 @@ class ActorCritic:
                     
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward))
-
+                            i_episode, t, running_reward/self.log_interval))
+                        running_reward = 0
                         if self.plot_loss:
 
                             plt.plot(self.loss)
@@ -423,7 +425,9 @@ class ActorCritic:
 
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward))
+                            i_episode, t, running_reward/self.log_interval))
+                        running_reward = 0
+                        
                     else:
                         print(self.termination)
                         print('Ep {}\tLast length: {:5d}\
