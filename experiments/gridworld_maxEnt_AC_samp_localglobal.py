@@ -46,7 +46,7 @@ parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[1
 
 parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
 
-
+parser.add_argument('--obstacle-map', type=str, default=None, help='The map for the obstacles')
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -59,7 +59,7 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
-    to_save = './'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+    to_save = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
     log_file = 'Experiment_info.txt'
     experiment_logger = Logger(to_save, log_file)
 
@@ -83,7 +83,7 @@ def main():
     if args.feat_extractor == 'Onehot':
         feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     if args.feat_extractor == 'SocialNav':
-        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+        feat_ext = SocialNav()
     if args.feat_extractor == 'FrontBackSideSimple':
         feat_ext = FrontBackSideSimple(thresh1 = 1,
                                     thresh2 = 2,
@@ -121,14 +121,14 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-
+    obstacles = '../envs/'+args.obstacle_map
     env = GridWorld(display=args.render, is_random = True,
                     rows = 10, cols = 10,
                     agent_width=agent_width,
                     step_size=step_size,
                     obs_width=obs_width,
                     width=grid_size,
-                    obstacles= '../envs/map7.png',
+                    obstacles=obstacles,
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = args.seed,

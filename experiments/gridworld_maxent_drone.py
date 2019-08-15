@@ -9,6 +9,7 @@ sys.path.insert(0, '..')  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 import utils
 
+from logger.logger import Logger
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -63,6 +64,14 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
+    #####for the logger
+    base_folder = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+    log_file = 'Experiment_info.txt'
+    experiment_logger = Logger(base_folder, log_file)
+
+    experiment_logger.log_header('Arguments for the experiment :')
+    experiment_logger.log_info(vars(args))
+
 
     from rlmethods.rlutils import LossBasedTermination
     from rlmethods.b_actor_critic import ActorCritic
@@ -75,13 +84,18 @@ def main():
     obs_width = 10
     grid_size = 10
 
+
+    if args.feat_extractor is None:
+
+        print('Feature extractor missing.')
+        exit()
     
     #check for the feature extractor being used
     #initialize feature extractor
     if args.feat_extractor == 'Onehot':
         feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
     if args.feat_extractor == 'SocialNav':
-        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
+        feat_ext = SocialNav()
     if args.feat_extractor == 'FrontBackSideSimple':
         feat_ext = FrontBackSideSimple(thresh1 = 1,
                                     thresh2 = 2,
@@ -90,15 +104,18 @@ def main():
                                     step_size=step_size,
                                     agent_width=agent_width,
                                     obs_width=obs_width,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+                                    )
 
     if args.feat_extractor == 'LocalGlobal':
         feat_ext = LocalGlobal(window_size=5, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
-                           fieldList = ['agent_state','goal_state','obstacles'])
+                           )
     
+
+    experiment_logger.log_header('Parameters of the feature extractor :')
+    experiment_logger.log_info(feat_ext.__dict__)
 
 
     #initialize the environment
@@ -109,6 +126,11 @@ def main():
     if args.annotation_file is None:
         print('Specify annotation file for the environment.')
         exit()
+
+    if args.exp_trajectory_path is None:
+        print('Specify expert trajectory folder.')
+        exit()
+
     #**set is_onehot to false
     goal_state = np.asarray([1,5])
     '''
@@ -135,6 +157,12 @@ def main():
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
     
+
+
+    experiment_logger.log_header('Environment details :')
+    experiment_logger.log_info(env.__dict__)
+
+
     #CHANGE HEREq
 
     #CHANGE HERE
@@ -153,12 +181,16 @@ def main():
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
+
+    experiment_logger.log_header('Details of the RL method :')
+    experiment_logger.log_info(rlMethod.__dict__)
     
 
     # initialize IRL method
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
+    folder_to_save = '/results/'+args.save_folder
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
@@ -166,9 +198,12 @@ def main():
                            learning_rate=args.lr,
                            graft=True,
                            hidden_dims = args.reward_net_hidden_dims,
-                           save_folder=args.save_folder)
+                           save_folder=folder_to_save)
     print("IRL method intialized.")
     print(irlMethod.reward)
+
+    experiment_logger.log_header('Details of the IRL method :')
+    experiment_logger.log_info(irlMethod.__dict__)
     rewardNetwork = irlMethod.train()
 
     if not args.dont_save:

@@ -177,7 +177,7 @@ class GridWorldClockless:
                 cur_obs['position'] = obs_pos
                 self.obstacles.append(cur_obs)
 
-        pdb.set_trace()
+        #pdb.set_trace()
         '''
         this decides the state information based on whether 
         onehot information is needed or not.

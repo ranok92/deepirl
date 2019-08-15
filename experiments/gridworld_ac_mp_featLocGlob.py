@@ -1,7 +1,7 @@
 import pdb
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
-
+from logger.logger import Logger
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
@@ -32,6 +32,13 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 def main():
     
     args = parser.parse_args()
+
+    experiment_logger = Logger('temp_save.txt')
+
+
+    experiment_logger.log_header('Arguments for the experiment :')
+    experiment_logger.log_info(vars(args))
+    
     mp.set_start_method('spawn')
 
     if args.render:
@@ -58,17 +65,17 @@ def main():
                                     step_size=step_size,
                                     agent_width=agent_width,
                                     obs_width=obs_width,
-                                    fieldList = ['agent_state','goal_state','obstacles'])
+                                    )
 
     if args.feat_extractor == 'LocalGlobal':
         feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
-                           fieldList = ['agent_state','goal_state','obstacles'])
+                           )
     
-
-
+    experiment_logger.log_header('Parameters of the feature extractor :')
+    experiment_logger.log_info(feat_ext.__dict__)
 
     '''
     np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
@@ -76,21 +83,27 @@ def main():
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
                                 '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=True,
-                    rows=60, agent_width=agent_width,step_size=step_size,
+                    rows=100, agent_width=agent_width,step_size=step_size,
                     obs_width=obs_width,width=grid_size,
-                    cols=60,
+                    cols=100,
                     seed=7,
                     buffer_from_obs=0,
-                    obstacles='../envs/real_map.jpg',
+                    obstacles=3,
                                 
                     goal_state=np.asarray([5,5]))
 
+    experiment_logger.log_header('Environment details :')
+    experiment_logger.log_info(env.__dict__)
+
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
-                        log_interval=100,max_ep_length=100, hidden_dims=args.policy_net_hidden_dims,
+                        log_interval=100,max_ep_length=40, hidden_dims=args.policy_net_hidden_dims,
                         max_episodes=4000)
 
-    print(model.policy)
-    print(args.policy_net_hidden_dims)
+    experiment_logger.log_header('Details of the RL method :')
+    experiment_logger.log_info(model.__dict__)
+    
+    pdb.set_trace()
+
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
         

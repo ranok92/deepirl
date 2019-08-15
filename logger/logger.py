@@ -11,7 +11,7 @@ class Logger():
         if os.path.exists(parent_folder):
             pass
         else:
-            os.mkdir(parent_folder)
+            os.makedirs(parent_folder)
         #self.file_to_write = open(save_file,'w')
 
 		#sys.stdout = self.file_to_write

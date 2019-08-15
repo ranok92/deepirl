@@ -8,7 +8,7 @@ from copy import copy
 sys.path.insert(0, '..')
 
 
-from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide
+from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide, DroneFeatureSAM1
 
 
 
@@ -359,8 +359,8 @@ class GridWorld(GridWorldClockless):
 
             while True:
                 flag = False
-                self.goal_state = np.asarray([np.random.randint(self.lower_limit_goal[0], self.upper_limit_obstacle[0]),
-                                              np.random.randint(self.lower_limit_goal[1], self.upper_limit_obstacle[1])])
+                self.goal_state = np.asarray([np.random.randint(self.lower_limit_goal[0], self.upper_limit_goal[0]),
+                                              np.random.randint(self.lower_limit_goal[1], self.upper_limit_goal[1])])
 
                 for i in range(num_obs):
                     if np.linalg.norm(self.obstacles[i]['position']-self.goal_state) < (self.cellWidth+self.obs_width)/2 * dist_g:
@@ -419,10 +419,11 @@ class GridWorld(GridWorldClockless):
 
 if __name__=="__main__":
 
-    #featExt = LocalGlobal(window_size=3, agent_width= 10, obs_width=6, grid_size=10,step_size=20,
-    #                      fieldList=['agent_state','goal_state','obstacles'])
+    feat_ext = LocalGlobal(window_size=3, agent_width= 10, obs_width=6, grid_size=10,step_size=20)
     #featExt = FrontBackSide(thresh1=1, thresh2=2, thresh3=3,
     #                        fieldList = ['agent_state', 'goal_state', 'obstacles', 'agent_head_dir']) 
+
+    dro_feat = DroneFeatureSAM1()
     world = GridWorld(display=True, is_onehot = False, is_random=True,
                         seed = 0 , obstacles='./real_map.jpg', 
                         step_size=5, buffer_from_obs=0, 
@@ -431,7 +432,7 @@ if __name__=="__main__":
     for i in range(100):
         print ("here")
         state = world.reset()
-        #state = feat_ext.extract_features(state)
+        state = feat_ext.extract_features(state)
         totalReward = 0
         done = False
 
@@ -446,8 +447,11 @@ if __name__=="__main__":
                 print(action)
                 #action = 2
                 next_state, reward, done, _ = world.step(action)
+                if action!=8:
+                    
                 #print(next_state)
-                #state = featExt.extract_features(next_state)
+                    state = feat_ext.extract_features(next_state)
+                    c = dro_feat.extract_features(next_state)
                 #print('The heading :', state[0:4])
                 #print('The goal info :', state[4:13].reshape(3, 3))
                 #print('THe obstacle infor :', state[16:].reshape(3, 4))
