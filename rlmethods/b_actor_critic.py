@@ -130,11 +130,12 @@ class ActorCritic:
 
         self.termination = termination
 
+        '''
         if env.is_onehot:
             state_size = env.reset().shape[0]
         else:
-
-            state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
+        '''
+        state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
 
         print("Actor Critic initialized with state size ",state_size)
         # initialize a policy if none is passed.
@@ -246,7 +247,7 @@ class ActorCritic:
                 actions.append(action)
 
                 state, rewards, done, _ = self.env.step(action)
-                
+                self.env.render()
                 run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
@@ -369,8 +370,8 @@ class ActorCritic:
 
                 #now does not break when done
                 if done:
-                    #break
-                    pass
+                    break
+                    #pass
 
             running_reward = running_reward * self.reward_threshold_ratio +\
                 ep_reward * (1-self.reward_threshold_ratio)
