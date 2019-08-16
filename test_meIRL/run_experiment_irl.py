@@ -7,6 +7,7 @@ import gym, sys, time, os
 import torch
 import numpy as np 
 
+import datetime
 sys.path.insert(0, '..')  # NOQA: E402
 from logger.logger import Logger
 import utils
@@ -75,9 +76,13 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
-    parent_dir = './results/'+str(args.save_folder)
-    to_save = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+ \
-              '-seed-'+str('self.env.seed')+'-lr-'+str(args.lr)
+    ###
+    ts = time.time()
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    ###
+    parent_dir = './results/'+str(args.save_folder)+st
+    to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
+              '-seed-'+str(args.seed)+'-lr-'+str(args.lr)
               #'-seed-'+str(args.seed)
     log_file = 'Experiment_info.txt'
     experiment_logger = Logger(to_save, log_file)
@@ -159,6 +164,7 @@ def main():
                            regularizer = args.regularizer,
                            learning_rate = args.lr,
                            graft=True,
+                           seed=args.seed,
                            scale_svf=args.scale_svf,
                            hidden_dims = args.reward_net_hidden_dims,
                            save_folder=parent_dir)

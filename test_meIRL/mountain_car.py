@@ -196,7 +196,7 @@ def extract_features(state):
 
 def rollout(env, num_of_trajs):
 
-    feat = MCFeaturesOnehot(10,10)
+    feat = MCFeatures(128,128)
     global human_agent_action, human_wants_restart, human_sets_pause
     for i in range(num_of_trajs):
         state_list = []
@@ -220,7 +220,7 @@ def rollout(env, num_of_trajs):
 
             obser, r, done, info = env.step(a)
             #pdb.set_trace()
-            print(np.reshape(feat.extract_features(obser).cpu().numpy(),(2,10)))
+            print(np.reshape(feat.extract_features(obser).cpu().numpy(),(2,8)))
 
             state_list.append(feat.extract_features(obser))
 
@@ -253,8 +253,8 @@ if __name__=='__main__':
 
     env = gym.make('MountainCar-v0')
 
-    path = './exp_traj_mountain_car'
-    if os.path.exists('./exp_traj_mountain_car'):
+    path = './exp_traj_mountain_car_MCFeatures_128'
+    if os.path.exists(path):
         pass
     else:
         os.mkdir(path)
