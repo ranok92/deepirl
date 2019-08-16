@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
 
+from tensorboardX import SummaryWriter
+
 sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
 from neural_nets.base_network import RectangleNN  # NOQA
@@ -119,15 +121,19 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer_size=10**6,
+            buffer_sample_size=10**4,
             gamma=1.0,
-            learning_rate=3 * 10**-4
+            learning_rate=3 * 10**-4,
+            tbx_writer = None,
     ):
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
         action_size = env.action_space.n
 
+        # buffer
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
+        self.buffer_sample_size = buffer_sample_size
 
         # NNs
         self.policy = PolicyNetwork(2, state_size, 512, action_size).to(DEVICE)
@@ -142,10 +148,19 @@ class SoftActorCritic:
         self.gamma = gamma
         self.entropy_target = -action_size
 
+        # training meta
+        self.training_i = 0
+
         # optimizers
         self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
         self.alpha_optim = Adam([self.alpha], lr=learning_rate)
+
+        # tensorboardX settings
+        if not tbx_writer:
+            self.tbx_writer = SummaryWriter('runs/generic_soft_ac')
+        else:
+            self.tbx_writer = tbx_writer
 
     def select_action(self, state):
         """Generate an action based on state vector using current policy.
@@ -166,16 +181,19 @@ class SoftActorCritic:
         current_state = state
 
         while not self.replay_buffer.is_full():
-            action, _ = self.select_action(torch.from_numpy(state))
+            action, _ = self.select_action(torch.from_numpy(state).to(DEVICE))
             next_state, reward, done, _ = self.env.step(action)
             self.replay_buffer.push((
                 current_state,
-                action,
+                action.cpu().numpy(),
                 reward,
                 next_state,
                 done
             ))
-            current_state = next_state
+            if not done:
+                current_state = next_state
+            else:
+                current_state = self.env.reset()
 
     def train(self):
         """Train Soft Actor Critic"""
@@ -206,6 +224,8 @@ class SoftActorCritic:
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_net_target)
 
+        self.tbx_writer.add_scalar('Q loss', q_loss.item(), self.training_i)
+
         # policy loss
         _, log_actions = self.policy(state_batch)
         policy_loss = (self.alpha * log_actions - q_values.detach()).mean()
@@ -227,3 +247,8 @@ class SoftActorCritic:
         self.alpha_optim.zero_grad()
         alpha_loss.backward()
         self.alpha_optim.step()
+
+        # Step average Q net
+        move_average(self.q_net, self.avg_q_net)
+
+        self.training_i += 1
