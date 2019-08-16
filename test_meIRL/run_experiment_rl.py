@@ -12,7 +12,7 @@ from logger.logger import Logger
 import utils
 from mountain_car import extract_features
 
-from mountain_car import MCFeatures, MCFeaturesplain
+from mountain_car import MCFeatures, MCFeaturesplain, MCFeaturesOnehot
 import torch.multiprocessing as mp
 from rlmethods.b_actor_critic import ActorCritic
 import re
@@ -33,6 +33,9 @@ parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[12
 parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
                      feature extractor to be used in the experiment.')
 
+
+parser.add_argument('--state-discretization', type=int, default=128, help='The number of discrete \
+                    parts you want to break the state')
 numbers = re.compile(r'(\d+)')
 
 def numericalSort(value):
@@ -64,29 +67,17 @@ def main():
     obs_width = 10
     grid_size = 10
 
+    if args.feat_extractor=='MCFeatures':
+        feat_ext = MCFeatures(args.state_discretization, args.state_discretization) 
 
-    if args.feat_extractor == 'Onehot':
-        feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-    if args.feat_extractor == 'SocialNav':
-        feat_ext = SocialNav(fieldList = ['agent_state','goal_state'])
-    if args.feat_extractor == 'FrontBackSideSimple':
-        feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                    thresh2 = 2,
-                                    thresh3 = 3,
-                                    thresh4=4,
-                                    step_size=step_size,
-                                    agent_width=agent_width,
-                                    obs_width=obs_width,
-                                    )
+    elif args.feat_extractor=='MCFeaturesOnehot':
+        feat_ext = MCFeaturesOnehot(args.state_discretization, args.state_discretization)
 
-    if args.feat_extractor == 'LocalGlobal':
-        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
-                           agent_width=agent_width, 
-                           obs_width=obs_width,
-                           step_size=step_size,
-                           )
-    
-    feat_ext = MCFeatures(128, 128)
+    else:
+        print('Enter proper feature extractor value.')
+        exit()
+
+
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
 
@@ -117,7 +108,7 @@ def main():
     experiment_logger.log_header('Details of the RL method :')
     experiment_logger.log_info(model.__dict__)
     
-    pdb.set_trace()
+    #pdb.set_trace()
 
     if args.policy_path is not None:
         policy_file_list =  []

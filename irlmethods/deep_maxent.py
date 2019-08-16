@@ -26,6 +26,8 @@ from irlmethods import irlUtils
 # from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 from neural_nets.base_network import BaseNN
 
+
+from torch.optim.lr_scheduler import StepLR
 from rlmethods.b_actor_critic import Policy
 
 
@@ -111,7 +113,10 @@ class DeepMaxEnt():
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
         self.hidden_dims = hidden_dims
+
         self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
