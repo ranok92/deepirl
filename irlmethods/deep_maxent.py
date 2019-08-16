@@ -86,7 +86,8 @@ class DeepMaxEnt():
             hidden_dims=[128],
             regularizer=0.1,
             learning_rate=1e-3,
-            scale_svf=True 
+            scale_svf=True,
+            seed=10 
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -114,6 +115,7 @@ class DeepMaxEnt():
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
+        self.seed = seed
         self.scale_svf = scale_svf
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
@@ -127,13 +129,13 @@ class DeepMaxEnt():
         self.regularizer = regularizer
         #folders for saving purposes
         self.plot_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+\
-                                '-seed-'+str('self.env.seed')+'-lr-'+str(learning_rate)+'/plots/'
+                                '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
 
         self.reward_network_save_folder = './'+save_folder+'-reg-'+\
-                                          str(self.regularizer)+'-seed-'+str('self.env.seed')+'-lr-'+\
+                                          str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
         self.policy_network_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
-                                          str('self.env.seed')+'-lr-'+str(learning_rate)+'/saved-models/'
+                                          str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
             pass
