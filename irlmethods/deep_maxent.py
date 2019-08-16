@@ -79,13 +79,14 @@ class DeepMaxEnt():
             env=None,
             iterations=10,
             log_intervals=1,
-            on_server = True,
+            on_server=True,
             save_folder=None,
-            rl_max_episodes = 30,
-            graft = True,
-            hidden_dims = [128],
+            rl_max_episodes=30,
+            graft=True,
+            hidden_dims=[128],
             regularizer=0.1,
-            learning_rate=1e-3
+            learning_rate=1e-3,
+            scale_svf=True 
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -113,6 +114,7 @@ class DeepMaxEnt():
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
+        self.scale_svf = scale_svf
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float32
@@ -156,7 +158,7 @@ class DeepMaxEnt():
 
 
     def agent_svf_sampling(self,num_of_samples = 10000 , env = None,
-                            policy_nn = None , reward_nn = None,
+                            policy_nn = None , reward_nn = None, 
                             episode_length = 20, feature_extractor = None):
 
         return irlUtils.get_svf_from_sampling(no_of_samples=num_of_samples,
@@ -178,16 +180,17 @@ class DeepMaxEnt():
                                                             smoothing_window=smoothing_window)
         
         '''
-    def agent_svf_sampling_dict(self,num_of_samples=10000 , env=None,
-                                policy_nn=None, reward_nn=None, smoothing_window=None,
-                                episode_length=20, feature_extractor=None):
+    def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
+                                policy_nn=None, reward_nn=None, smoothing_window=None, 
+                                scale_svf=True, episode_length=20,
+                                feature_extractor=None):
 
          
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
-                                            env=  env, policy_nn = policy_nn,
-                                            reward_nn = reward_nn ,
-                                            episode_length = episode_length,
-                                            feature_extractor = feature_extractor)
+                                            env=env, policy_nn=policy_nn,
+                                            reward_nn=reward_nn, scale_svf=scale_svf,
+                                            episode_length=episode_length,
+                                            feature_extractor=feature_extractor)
         '''
         return irlUtils.calculate_svf_from_sampling_using_smoothing(no_of_samples=num_of_samples, 
                                                                     env=env, policy_nn=policy_nn, 

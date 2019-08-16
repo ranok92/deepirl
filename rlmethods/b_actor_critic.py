@@ -227,8 +227,9 @@ class ActorCritic:
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
 
-    def generate_trajectory(self, num_trajs, path):
+    def generate_trajectory(self, num_trajs, render):
 
+        reward_across_trajs = []
         for traj_i in range(num_trajs):
 
             # action and states lists for current trajectory
@@ -241,20 +242,22 @@ class ActorCritic:
             done = False
             t= 0
             run_reward = 0
-            while t < self.max_ep_length:
+            while not done and t < self.max_ep_length:
                 t+=1
                 action = self.select_action(states[-1])
                 actions.append(action)
 
                 state, rewards, done, _ = self.env.step(action)
-                self.env.render()
+                if render:
+                    self.env.render()
                 run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
                 states.append(state)
                 
             print('Reward for the run :',run_reward)
-
+            reward_across_trajs.append(run_reward)
+            '''
             if run_reward > 1: # not a bad run
 
                 actions_tensor = torch.tensor(actions)
@@ -269,6 +272,8 @@ class ActorCritic:
                            os.path.join(path, 'traj%s.states' % str(traj_i)))
             else:
                 print("Rejecting bad run.")
+            '''
+        return reward_across_trajs
 
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting

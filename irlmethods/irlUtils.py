@@ -602,7 +602,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
-                                gamma=0.99):
+                                gamma=0.99, scale_svf=True):
     
     '''
     calculating the state visitation frequency from sampling. This function
@@ -657,7 +657,12 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     rewards = np.exp(rewards)
     #print('Rewards :',rewards)
     total_reward = sum(rewards)
-    weights = rewards/total_reward
+
+    #putting a control on the reweighting as discussed.
+    if scale_svf:
+        weights = rewards/total_reward
+    else:
+        weights = np.ones(no_of_samples)
     #print('weights from svf_dict:',weights)
     #plt.plot(weights)
     #plt.draw()
