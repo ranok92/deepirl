@@ -39,12 +39,12 @@ def main():
     for i in range(10**6):
         soft_ac.train()
 
-        if i % 100 == 0:
-            rs = []
-            for j in range(5):
-                rs.append(play(soft_ac, env))
+        # if i % 100 == 0:
+            # rs = []
+            # for j in range(5):
+                # rs.append(play(soft_ac, env))
 
-            tbx_writer.add_scalar('avg reward', np.mean(rs), i)
+            # tbx_writer.add_scalar('avg reward', np.mean(rs), i)
 
         if i% 10000 == 0:
             soft_ac.replay_buffer.buffer.clear()

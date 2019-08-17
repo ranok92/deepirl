@@ -146,7 +146,7 @@ class SoftActorCritic:
         # set hyperparameters
         self.alpha = torch.tensor([0.0], requires_grad=True).to(DEVICE)
         self.gamma = gamma
-        self.entropy_target = -action_size
+        self.entropy_target = -1
 
         # training meta
         self.training_i = 0
@@ -237,8 +237,8 @@ class SoftActorCritic:
         )
 
         # automatic entropy tuning
-        alpha_loss = -self.alpha * (log_actions + self.entropy_target).detach()
-        alpha_loss = alpha_loss.mean()
+        alpha_loss = self.alpha * (log_actions + self.entropy_target).detach()
+        alpha_loss = -alpha_loss.mean()
 
         self.tbx_writer.add_scalar(
             'alpha loss',
@@ -265,3 +265,6 @@ class SoftActorCritic:
         move_average(self.q_net, self.avg_q_net)
 
         self.training_i += 1
+
+        if self.training_i % 1000 == 0:
+            pdb.set_trace()
