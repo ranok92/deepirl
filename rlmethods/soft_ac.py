@@ -227,13 +227,26 @@ class SoftActorCritic:
         self.tbx_writer.add_scalar('Q loss', q_loss.item(), self.training_i)
 
         # policy loss
-        _, log_actions = self.policy(state_batch)
+        _, log_actions = self.select_action(state_batch)
         policy_loss = (self.alpha * log_actions - q_values.detach()).mean()
 
+        self.tbx_writer.add_scalar(
+            'pi loss',
+            policy_loss.item(),
+            self.training_i
+        )
 
         # automatic entropy tuning
         alpha_loss = -self.alpha * (log_actions + self.entropy_target).detach()
         alpha_loss = alpha_loss.mean()
+
+        self.tbx_writer.add_scalar(
+            'alpha loss',
+            alpha_loss.item(),
+            self.training_i
+        )
+
+        self.tbx_writer.add_scalar('alpha', self.alpha.item(), self.training_i)
 
         # update parameters
         self.q_optim.zero_grad()
