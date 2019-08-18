@@ -32,19 +32,19 @@ def main():
     soft_ac = SoftActorCritic(
         env,
         replay_buffer_size=10**5,
-        buffer_sample_size=10**3,
+        buffer_sample_size=10**4,
         tbx_writer = tbx_writer,
     )
 
     for i in range(10**6):
         soft_ac.train()
 
-        # if i % 100 == 0:
-            # rs = []
-            # for j in range(5):
-                # rs.append(play(soft_ac, env))
+        if i % 100 == 0:
+            rs = []
+            for j in range(5):
+                rs.append(play(soft_ac, env))
 
-            # tbx_writer.add_scalar('avg reward', np.mean(rs), i)
+            tbx_writer.add_scalar('avg reward', np.mean(rs), i)
 
         if i% 10000 == 0:
             soft_ac.replay_buffer.buffer.clear()

@@ -265,6 +265,3 @@ class SoftActorCritic:
         move_average(self.q_net, self.avg_q_net)
 
         self.training_i += 1
-
-        if self.training_i % 1000 == 0:
-            pdb.set_trace()

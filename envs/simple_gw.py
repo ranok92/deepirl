@@ -10,6 +10,10 @@ torch.set_default_tensor_type(
     torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 )
 
+# Grid constants
+OBSTACLE = 2
+GOAL = 6
+
 
 class IterableDiscrete(Discrete):
     """A version of gym's Discrete actions space that can be iterated over."""
@@ -58,22 +62,29 @@ class SimpleGridworld:
         self.player_pos = goal_pos
 
     def reset(self):
+        """
+        Reset the gridworld, moving the player to random position on the
+        grid.
+        """
         # reset grid
         self.grid.fill(0)
 
         # fill obstacles (2 = obstacle)
-        self.grid[self.obstacles_map.T[0], self.obstacles_map.T[1]] = 2
+        self.grid[self.obstacles_map.T[0], self.obstacles_map.T[1]] = OBSTACLE
 
         # set goal
-        assert self.grid[tuple(self.goal_pos)] != 2, "Goal is an obstacle."
-        self.grid[tuple(self.goal_pos)] = 6
+        assert self.grid[tuple(self.goal_pos)] != OBSTACLE, "Goal is obstacle."
+        self.grid[tuple(self.goal_pos)] = GOAL
 
         # generate player location
-        validity_condition = np.logical_or(self.grid != 2, self.grid != 6)
+        validity_condition = np.logical_or(
+            self.grid != OBSTACLE,
+            self.grid != GOAL
+        )
         valid_spots = np.argwhere(validity_condition)
         self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
 
-        return self.player_pos.astype('float32')
+        return self.state_extractor().astype('float32')
 
     def reward_function(self, state, action, next_state):
         """Generate a reward based on inputs.
@@ -89,6 +100,23 @@ class SimpleGridworld:
             reward += 1.0
 
         return reward.astype('float32')
+
+    def state_extractor(self):
+        pad_width = 2
+        padded_grid = np.pad(
+            self.grid,
+            2,
+            mode='constant',
+            constant_values=OBSTACLE
+        )
+        padded_pos = self.player_pos + np.array([pad_width,pad_width])
+
+        state =  padded_grid[
+            padded_pos[0]-pad_width: padded_pos[0]+pad_width+1,
+            padded_pos[1]-pad_width: padded_pos[1]+pad_width+1,
+        ].flatten()
+
+        return state
 
     def step(self, action):
         """Advance the gridworld player based on action.
@@ -115,7 +143,7 @@ class SimpleGridworld:
 
         done = (self.player_pos == self.goal_pos).all()
 
-        return self.player_pos.astype('float32'), reward, done, False
+        return self.state_extractor().astype('float32'), reward, done, False
 
 
 class TorchGridworld:
@@ -160,6 +188,10 @@ class TorchGridworld:
         self.max_pos = torch.tensor([self.grid.shape[0], self.grid.shape[1]])
 
     def reset(self):
+        """
+        Reset the gridworld, moving the player to random position on the
+        grid.
+        """
         # reset grid
         self.grid.fill_(0)
 
