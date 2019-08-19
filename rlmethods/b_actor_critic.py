@@ -31,6 +31,28 @@ from neural_nets.base_network import BaseNN
 from rlmethods.rlutils import LossBasedTermination
 
 
+import gc
+
+import psutil
+process = psutil.Process(os.getpid())
+def display_memory_usage(memory_in_bytes):
+
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    mem_list = []
+    cur_mem = memory_in_bytes
+    while cur_mem > 1024:
+
+        mem_list.append(cur_mem%1024)
+        cur_mem /= 1024
+    
+    mem_list.append(cur_mem)
+    for i in range(len(mem_list)):
+
+        print(units[i] +':'+ str(mem_list[i])+', ', end='')
+
+    print('\n')
+
+
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -180,6 +202,20 @@ class ActorCritic:
         return action.item()
 
 
+    def select_action_play(self, state):
+        '''
+        use this function to play, as the other one keeps storing information which is not needed
+        when evaluating.
+        '''
+
+        probs, state_value = self.policy(state)
+        #m = Categorical(probs)
+        #action = m.sample()
+        val, ind = torch.max(probs,0)
+
+        return ind.item()
+
+
 
 
     def generate_trajectory_user(self, num_trajs , path):
@@ -230,32 +266,34 @@ class ActorCritic:
     def generate_trajectory(self, num_trajs, render):
 
         reward_across_trajs = []
+        
         for traj_i in range(num_trajs):
 
             # action and states lists for current trajectory
             actions = []
+            '''
             if self.feature_extractor is None:
                 states = [self.env.reset()]
             else:
                 states = [self.feature_extractor.extract_features(self.env.reset())]
-
+            '''
+            state = self.feature_extractor.extract_features(self.env.reset())
             done = False
             t= 0
             run_reward = 0
             while not done and t < self.max_ep_length:
                 t+=1
-                action = self.select_action(states[-1])
-                actions.append(action)
-
+                action = self.select_action_play(state)
+                
                 state, rewards, done, _ = self.env.step(action)
                 if render:
                     self.env.render()
                 run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
-                states.append(state)
-                
-            print('Reward for the run :',run_reward)
+
+                #states.append(state)
+            
             reward_across_trajs.append(run_reward)
             '''
             if run_reward > 1: # not a bad run

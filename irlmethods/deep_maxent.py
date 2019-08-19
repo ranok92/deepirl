@@ -114,7 +114,7 @@ class DeepMaxEnt():
         self.reward = RewardNet(self.state_size, hidden_dims)
         self.hidden_dims = hidden_dims
 
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0)
+        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0.045)
         self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
         self.EPS = np.finfo(np.float32).eps.item()
@@ -226,7 +226,7 @@ class DeepMaxEnt():
 
         loss = dot_prod+(lambda1*l1_reg)   
         loss.backward()
-
+        self.lr_scheduler.step()
         return loss, dot_prod , lambda1*l1_reg, torch.norm(stateRewards.squeeze(), 1)
 
 

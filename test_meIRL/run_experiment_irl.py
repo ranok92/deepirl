@@ -55,7 +55,7 @@ parser.add_argument('--feat-extractor', type=str, default='MCFeatures', help='Th
 parser.add_argument('--state-discretization', type=int, default=128, help='The number of discrete \
                     parts you want to break the state')
 
-parser.add_argument('--scale-svf', action='store_true', default=True, help='If true, will scale the states \
+parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
                     based on the reward the trajectory got.')
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
