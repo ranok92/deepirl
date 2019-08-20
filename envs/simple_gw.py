@@ -96,16 +96,20 @@ class SimpleGridworld:
         goal_vector = self.goal_pos - self.player_pos
         movement_vector = next_state - state
         reward = np.sign(np.dot(goal_vector, movement_vector)) *0.01
+
         if (self.player_pos == self.goal_pos).all():
             reward += 1.0
+
+        if (self.grid[tuple(self.player_pos)] == OBSTACLE):
+            reward += -1.0
 
         return reward.astype('float32')
 
     def state_extractor(self):
-        pad_width = 2
+        pad_width = 5
         padded_grid = np.pad(
             self.grid,
-            2,
+            pad_width,
             mode='constant',
             constant_values=OBSTACLE
         )
@@ -141,7 +145,13 @@ class SimpleGridworld:
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
-        done = (self.player_pos == self.goal_pos).all()
+        goal_reached = (self.player_pos == self.goal_pos).all()
+        obstacle_hit = (self.grid[tuple(self.player_pos)] == OBSTACLE)
+
+        done = goal_reached or obstacle_hit
+
+        if done:
+            self.reset()
 
         return self.state_extractor().astype('float32'), reward, done, False
 
