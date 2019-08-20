@@ -152,6 +152,8 @@ class DeepMaxEnt():
         self.clipping = clipping_value
 
     #******parts being operated on
+    ############ array based svf calculation. Not feasible for larger state spaces#######
+    #####################################################################################
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path, feat=self.rl.feature_extractor)
 
@@ -177,13 +179,19 @@ class DeepMaxEnt():
                                             episode_length = episode_length,
                                             feature_extractor = feature_extractor)
 
-    #***********
+    
+    ####################################################################################
+    ####################################################################################
 
 
-    #***********
-    def expert_svf_dict(self,smoothing_window=None):
+
+    #********************* dictionary based svf calculation***************************
+    ##################################################################################
+    def expert_svf_dict(self,smoothing_window=None,gamma=1):
         
-        return irlUtils.calculate_expert_svf(self.traj_path, feature_extractor= self.rl.feature_extractor)
+        return irlUtils.calculate_expert_svf(self.traj_path, 
+                                             feature_extractor=self.rl.feature_extractor,
+                                             gamma=gamma)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
                                                             feature_extractor=self.rl.feature_extractor,
@@ -192,7 +200,7 @@ class DeepMaxEnt():
         '''
     def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
                                 policy_nn=None, reward_nn=None, smoothing_window=None, 
-                                scale_svf=True, episode_length=20,
+                                scale_svf=True, episode_length=20, gamma=0.99,
                                 feature_extractor=None):
 
          
@@ -200,6 +208,7 @@ class DeepMaxEnt():
                                             env=env, policy_nn=policy_nn,
                                             reward_nn=reward_nn, scale_svf=scale_svf,
                                             episode_length=episode_length,
+                                            gamma=gamma,
                                             feature_extractor=feature_extractor)
         '''
         return irlUtils.calculate_svf_from_sampling_using_smoothing(no_of_samples=num_of_samples, 
@@ -211,14 +220,16 @@ class DeepMaxEnt():
 
         '''
     #***********
-
+    ####################################################################################
+    ####################################################################################
 
 
 
 
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
-
+        
+        #calculates the gradients on the reward network
         optimizer.zero_grad()
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
@@ -266,7 +277,9 @@ class DeepMaxEnt():
 
 
     def per_state_reward(self, reward_function):
-
+        '''
+        calculates the rewards of all possible states. Suitable with small state spaces
+        '''
         all_state_list = []
         state_dict = self.rl.feature_extractor.state_str_arr_dict
 
@@ -283,13 +296,18 @@ class DeepMaxEnt():
 
 
     def get_rewards_of_states(self, reward_function, state_list):
-
+        '''
+        Calculates the rewards of the states provided in the state_list. 
+        More in line to handle bigger state spaces
+        '''
 
         state_tensors = torch.tensor(state_list, dtype=torch.float).to(self.device)
 
         return reward_function(state_tensors)
 
 
+
+    ''' Not being used for now.
     def plot(self, images, titles, save_path=None):
 
         nrows = max(1,int(len(images)/2)+1)
@@ -320,6 +338,8 @@ class DeepMaxEnt():
 
         for cb in colorbars:
             cb.remove()
+    '''
+
 
     def plot_info(self,inp_tuple):
         #pass a tuple containing n number of lists , this function goes through all and plots them
@@ -359,8 +379,11 @@ class DeepMaxEnt():
         print(self.rl.policy)
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
 
-    #############################################
-
+    #############################################################################
+    #############################################################################
+    #******************Following are a bunch of debugging methods****************
+    '''does not contribute to the main workings of the algorithm '''
+    
     def extract_svf_difference(self,svf_dict, svf_array):
         #here the dict is converted to array and the difference is taken
         #diff = array - dict
@@ -458,8 +481,10 @@ class DeepMaxEnt():
         return collections.OrderedDict(sorted(state_dict.items()))
 
 
+    ###############################################################################
+    ###############################################################################
 
-    #############################################
+
 
     def train(self):
         '''
@@ -485,12 +510,14 @@ class DeepMaxEnt():
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
 
-        smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
+        #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
-        expertdemo_svf = self.expert_svf_dict(smoothing_window=smoothing_window)
+        expertdemo_svf = self.expert_svf_dict(smoothing_window=None, gamma=1)
         print('Done reading expert-svf.')
+
         #expertdemo_svf = self.expert_svf_dict()
         #expert_svf_arr  = self.expert_svf()
+
         lossList = []
         dot_prod_list = []
         svf_diff_list = []
@@ -529,13 +556,16 @@ class DeepMaxEnt():
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
+                                                             gamma=1,
+                                                             scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episodes,
-                                                             smoothing_window=smoothing_window)
+                                                             smoothing_window=None)
+
 
             model_performance_list.append(true_reward)
             model_performance_nn.append(nn_reward)
-
+    
             print('Completed agent-svf sampling.')
             #print('True reward :', true_reward)
             #print('NN reward :', nn_reward)

@@ -628,6 +628,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         run_reward = 0
         run_reward_true = 0
         current_svf_dict = {}
+        done = False
         state = env.reset()
         #print('agent position:', state['agent_state'])
         state = feature_extractor.extract_features(state)
@@ -674,7 +675,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     if scale_svf:
         weights = rewards_exp/total_reward_exp
     else:
-        weights = np.ones(no_of_samples)
+        weights = np.ones(no_of_samples)/no_of_samples
     #print('weights from svf_dict:',weights)
     #plt.plot(weights)
     #plt.draw()
