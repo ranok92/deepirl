@@ -64,7 +64,7 @@ class QNetwork(RectangleNN):
         self.action_length = action_length
 
         self.in_layer = nn.Linear(
-            state_length+action_length,
+            state_length + action_length,
             hidden_layer_width
         )
         self.head = nn.Linear(hidden_layer_width, 1)
@@ -124,7 +124,8 @@ class SoftActorCritic:
             buffer_sample_size=10**4,
             gamma=1.0,
             learning_rate=3 * 10**-4,
-            tbx_writer = None,
+            tbx_writer=None,
+            entropy_tuning=False
     ):
         self.env = env
         starting_state = self.env.reset()
@@ -144,17 +145,18 @@ class SoftActorCritic:
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.alpha = torch.tensor([0.0], requires_grad=True).to(DEVICE)
+        self.log_alpha = torch.tensor([1.0], requires_grad=True).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -1
 
         # training meta
         self.training_i = 0
+        self.entropy_tuning = entropy_tuning
 
         # optimizers
         self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
-        self.alpha_optim = Adam([self.alpha], lr=learning_rate)
+        self.alpha_optim = Adam([self.log_alpha], lr=learning_rate)
 
         # tensorboardX settings
         if not tbx_writer:
@@ -201,13 +203,15 @@ class SoftActorCritic:
         self.populate_buffer()
 
         # weight updates
-        # TODO: which of the below are actually needed?
-        replay_samples = self.replay_buffer.sample(100)
+        replay_samples = self.replay_buffer.sample(self.buffer_sample_size)
         state_batch = torch.from_numpy(replay_samples[0]).to(DEVICE)
         action_batch = torch.from_numpy(replay_samples[1]).to(DEVICE)
         reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
         # dones_batch = torch.tensor(replay_samples[4]).to(DEVICE)
+
+        # alpha must be clamped with a minumum of zero, so use exponential.
+        alpha = self.log_alpha.exp().detach()
 
         with torch.no_grad():
             # Figure out value function
@@ -215,7 +219,7 @@ class SoftActorCritic:
                 next_state_batch
             )
             next_state_q = self.avg_q_net(next_state_batch, next_actions)
-            next_state_values = next_state_q - self.alpha * log_next_actions
+            next_state_values = next_state_q - alpha * log_next_actions
 
             # Calculate Q network target
             q_net_target = reward_batch + self.gamma * next_state_values
@@ -224,29 +228,31 @@ class SoftActorCritic:
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_net_target)
 
-        self.tbx_writer.add_scalar('Q loss', q_loss.item(), self.training_i)
+        self.tbx_writer.add_scalar(
+            'loss/Q loss', q_loss.item(), self.training_i)
 
         # policy loss
         _, log_actions = self.select_action(state_batch)
-        policy_loss = (self.alpha * log_actions - q_values.detach()).mean()
+        policy_loss = (alpha * log_actions - q_values.detach()).mean()
 
         self.tbx_writer.add_scalar(
-            'pi loss',
+            'loss/pi loss',
             policy_loss.item(),
             self.training_i
         )
 
         # automatic entropy tuning
-        alpha_loss = self.alpha * (log_actions + self.entropy_target).detach()
+        alpha_loss = self.log_alpha * \
+            (log_actions + self.entropy_target).detach()
         alpha_loss = -alpha_loss.mean()
 
         self.tbx_writer.add_scalar(
-            'alpha loss',
+            'loss/alpha loss',
             alpha_loss.item(),
             self.training_i
         )
 
-        self.tbx_writer.add_scalar('alpha', self.alpha.item(), self.training_i)
+        self.tbx_writer.add_scalar('alpha', alpha.item(), self.training_i)
 
         # update parameters
         self.q_optim.zero_grad()
@@ -257,9 +263,10 @@ class SoftActorCritic:
         policy_loss.backward()
         self.policy_optim.step()
 
-        self.alpha_optim.zero_grad()
-        alpha_loss.backward()
-        self.alpha_optim.step()
+        if self.entropy_tuning:
+            self.alpha_optim.zero_grad()
+            alpha_loss.backward()
+            self.alpha_optim.step()
 
         # Step average Q net
         move_average(self.q_net, self.avg_q_net)
