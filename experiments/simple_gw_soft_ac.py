@@ -31,17 +31,17 @@ def main():
     env = SimpleGridworld((10, 10), np.array([5, 5]), np.array([7, 7]))
     soft_ac = SoftActorCritic(
         env,
-        replay_buffer_size=10**5,
-        buffer_sample_size=10**4,
+        replay_buffer_size=10**4,
+        buffer_sample_size=10**3,
         tbx_writer = tbx_writer,
     )
 
     for i in range(10**6):
         soft_ac.train()
 
-        if i % 100 == 0:
+        if i % 1000 == 0:
             rs = []
-            for j in range(5):
+            for j in range(10):
                 rs.append(play(soft_ac, env))
 
             tbx_writer.add_scalar('avg reward', np.mean(rs), i)
