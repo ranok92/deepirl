@@ -101,11 +101,11 @@ class ReplayBuffer():
         """
         sample_batch = random.sample(self.buffer, n)
         inverted_batch = list(map(list, zip(*sample_batch)))
-        sample_states = np.array(inverted_batch[0])
-        sample_actions = np.array(inverted_batch[1])
-        sample_rewards = np.array(inverted_batch[2])
-        sample_next_states = np.array(inverted_batch[3])
-        dones = np.array(np.array(inverted_batch[4]))
+        sample_states = np.array(inverted_batch[0]).astype('float32')
+        sample_actions = np.array(inverted_batch[1]).astype('float32')
+        sample_rewards = np.array(inverted_batch[2]).astype('float32')
+        sample_next_states = np.array(inverted_batch[3]).astype('float32')
+        dones = np.array(np.array(inverted_batch[4])).astype('float32')
 
         return (
             sample_states,

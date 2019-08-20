@@ -70,7 +70,9 @@ class QNetwork(RectangleNN):
         self.head = nn.Linear(hidden_layer_width, 1)
 
     def forward(self, states, actions):
-        actions_vector = torch.eye(self.action_length)[actions]
+        # actions need to be byte or long to be used as indices
+        _actions = actions.type(torch.long)
+        actions_vector = torch.eye(self.action_length)[_actions]
         x = torch.cat([states, actions_vector], 1)
         x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
@@ -167,7 +169,7 @@ class SoftActorCritic:
     def select_action(self, state):
         """Generate an action based on state vector using current policy.
 
-        :param state: Current state vector.
+        :param state: Current state vector. must be Torch 32 bit float tensor.
         """
         dist = self.policy.action_distribution(state)
         action = dist.sample()
@@ -183,8 +185,9 @@ class SoftActorCritic:
         current_state = state
 
         while not self.replay_buffer.is_full():
-            action, _ = self.select_action(torch.from_numpy(state).to(DEVICE))
-            next_state, reward, done, _ = self.env.step(action)
+            _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
+            action, _ = self.select_action(_state)
+            next_state, reward, done, _ = self.env.step(action.item())
             self.replay_buffer.push((
                 current_state,
                 action.cpu().numpy(),
@@ -192,10 +195,8 @@ class SoftActorCritic:
                 next_state,
                 done
             ))
-            if not done:
-                current_state = next_state
-            else:
-                current_state = self.env.reset()
+
+            current_state = next_state
 
     def train(self):
         """Train Soft Actor Critic"""
