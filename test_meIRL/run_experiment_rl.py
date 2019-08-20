@@ -17,6 +17,10 @@ import torch.multiprocessing as mp
 from rlmethods.b_actor_critic import ActorCritic
 import re
 
+
+import psutil
+process = psutil.Process(os.getpid())
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
 parser.add_argument('--reward-path' , type=str, nargs='?', default= None)
@@ -37,6 +41,25 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 parser.add_argument('--state-discretization', type=int, default=128, help='The number of discrete \
                     parts you want to break the state')
 numbers = re.compile(r'(\d+)')
+
+def display_memory_usage(memory_in_bytes):
+
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    mem_list = []
+    cur_mem = memory_in_bytes
+    while cur_mem > 1024:
+
+        mem_list.append(cur_mem%1024)
+        cur_mem /= 1024
+    
+    mem_list.append(cur_mem)
+    for i in range(len(mem_list)):
+
+        print(units[i] +':'+ str(mem_list[i])+', ', end='')
+
+    print('\n')
+
+
 
 def numericalSort(value):
     parts = numbers.split(value)
@@ -102,8 +125,8 @@ def main():
     experiment_logger.log_info(env.__dict__)
 
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
-                        log_interval=100,max_ep_length=1000, hidden_dims=args.policy_net_hidden_dims,
-                        max_episodes=3000)
+                        log_interval=10, max_ep_length=2000, hidden_dims=args.policy_net_hidden_dims,
+                        max_episodes=600)
 
     experiment_logger.log_header('Details of the RL method :')
     experiment_logger.log_info(model.__dict__)
@@ -136,6 +159,9 @@ def main():
             model.policy.save('./saved-models/')
 
     if args.play:
+        xaxis = []
+        counter = 1
+
         for policy_file in policy_file_list:
 
             model.policy.load(policy_file)
@@ -147,7 +173,8 @@ def main():
 
         #plotting the 2d list
 
-            xaxis = np.arange(len(reward_across_models))
+            xaxis.append(counter)
+            counter += 1
             reward_across_models_np = np.array(reward_across_models)
             mean_rewards = np.mean(reward_across_models_np, axis=1)
             std_rewards = np.std(reward_across_models_np, axis=1)
@@ -156,6 +183,14 @@ def main():
                         mean_rewards+std_rewards, alpha = 0.5, facecolor = 'r')
             plt.draw()
             plt.pause(0.001)
+            '''
+            print('RAM usage :')
+            display_memory_usage(process.memory_info().rss)
+            print('GPU usage :')
+            display_memory_usage(torch.cuda.memory_allocated())
+            torch.cuda.empty_cache()
+            display_memory_usage(torch.cuda.memory_allocated())
+            '''
             #plt.show()
         plt.show()
     if args.play_user:

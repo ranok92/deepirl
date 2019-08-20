@@ -608,24 +608,31 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     calculating the state visitation frequency from sampling. This function
     returns a dictionary, where the keys consists of only the states that has been
     visited and their corresponding values are the visitation frequency
+
+    ##update
+    Also returns the mean true and mean reward according to the current reward network 
     '''
     eps = 0.000001
     if feature_extractor is None:
         print('Featrue extractor missing. Exiting.')
         return None
 
-    rewards = np.zeros(no_of_samples)
+    rewards_true = np.zeros(no_of_samples) #the true rewards
+    rewards = np.zeros(no_of_samples) #the reward according to the reward network if present
+
     norm_factor = np.zeros(no_of_samples)
 
     svf_dict_list = []
     for i in range(no_of_samples):
+
         run_reward = 0
+        run_reward_true = 0
         current_svf_dict = {}
         state = env.reset()
         #print('agent position:', state['agent_state'])
         state = feature_extractor.extract_features(state)
         current_svf_dict[feature_extractor.hash_function(state)] = 1
-
+        #print('episode len', episode_length)
         for t in range(episode_length):
 
             action = select_action(policy_nn, state)
@@ -633,7 +640,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             #print(action)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
-
+            run_reward_true += reward
             
             #get the state index
 
@@ -644,23 +651,28 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                 current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
                                                   
             if reward_nn is not None:
-                reward  = reward_nn(state)
+                nn_reward  = reward_nn(state)
+                run_reward+=nn_reward
 
-            run_reward+=reward
+            if done:
+                break
 
-        rewards[i] = run_reward
+        if reward_nn is not None:
+            rewards[i] = run_reward
+
+        rewards_true[i] = run_reward_true
         svf_dict_list.append(current_svf_dict)
 
     #rewards = rewards - np.min(rewards)+eps
     #changing it to the more generic exp
     #print('rewards non exp', rewards)
-    rewards = np.exp(rewards)
+    rewards_exp = np.exp(rewards)
     #print('Rewards :',rewards)
-    total_reward = sum(rewards)
+    total_reward_exp = sum(rewards_exp)
 
     #putting a control on the reweighting as discussed.
     if scale_svf:
-        weights = rewards/total_reward
+        weights = rewards_exp/total_reward_exp
     else:
         weights = np.ones(no_of_samples)
     #print('weights from svf_dict:',weights)
@@ -688,7 +700,11 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             else:
                 master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
 
-    return collections.OrderedDict(sorted(master_dict.items()))
+
+
+    #print(rewards)
+    #print(rewards_true)
+    return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
 
 
 

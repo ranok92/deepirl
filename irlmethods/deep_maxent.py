@@ -25,11 +25,10 @@ import utils  # NOQA: E402
 from irlmethods import irlUtils
 # from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 from neural_nets.base_network import BaseNN
-
+from torch.nn.utils import clip_grad_norm_
 
 from torch.optim.lr_scheduler import StepLR
 from rlmethods.b_actor_critic import Policy
-
 
 class RewardNet(BaseNN):
     """Reward network"""
@@ -89,7 +88,8 @@ class DeepMaxEnt():
             regularizer=0.1,
             learning_rate=1e-3,
             scale_svf=True,
-            seed=10 
+            seed=10, 
+            clipping_value=None
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -97,7 +97,7 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episodes = rl_max_episodes
+        self.rl_max_episodes = self.rl.max_ep_length
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
@@ -147,6 +147,9 @@ class DeepMaxEnt():
         else:
             print(self.plot_save_folder)
             os.mkdir(self.plot_save_folder)
+
+
+        self.clipping = clipping_value
 
     #******parts being operated on
     def expert_svf(self):
@@ -215,19 +218,35 @@ class DeepMaxEnt():
 
 
     def calculate_grads(self, optimizer, stateRewards, freq_diff):
+
         optimizer.zero_grad()
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
-        
+
+
         #adding L1 regularization
         lambda1 = self.regularizer
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
+        grad_mag = torch.tensor(0, dtype=torch.float).to(self.device)
+
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)
 
-        loss = dot_prod+(lambda1*l1_reg)   
+        loss = dot_prod+(lambda1*l1_reg) 
         loss.backward()
-        self.lr_scheduler.step()
-        return loss, dot_prod , lambda1*l1_reg, torch.norm(stateRewards.squeeze(), 1)
+
+        #clipping if asked for
+        if self.clipping is not None:
+            clip_grad_norm_(self.reward.parameters(), self.clipping)
+
+
+        for param in self.reward.parameters():
+            grad_mag +=torch.norm(param.grad, 1)
+
+        #print ('The magnitude of gradients after clipping:', grad_mag)
+        #print('The magnitude of the parameters :', l1_reg)
+
+
+        return loss, dot_prod , l1_reg, grad_mag, torch.norm(stateRewards.squeeze(), 1)
 
 
     '''
@@ -305,7 +324,7 @@ class DeepMaxEnt():
     def plot_info(self,inp_tuple):
         #pass a tuple containing n number of lists , this function goes through all and plots them
         i = 0
-        color_list  = ['r','g','b','c','m']
+        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
         for list_val in inp_tuple:
             plt.figure(i)
             plt.plot(list_val,color_list[i])
@@ -478,6 +497,11 @@ class DeepMaxEnt():
         l1_reg_list = []
         rewards_norm_list = []
 
+        #added new
+        model_performance_list = [] #list to store the raw score obtained by the current policy
+        model_performance_nn = []
+        reward_grad_norm_list = []
+
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
 
@@ -501,14 +525,20 @@ class DeepMaxEnt():
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=3000,
+            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=500,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episodes,
                                                              smoothing_window=smoothing_window)
+
+            model_performance_list.append(true_reward)
+            model_performance_nn.append(nn_reward)
+
             print('Completed agent-svf sampling.')
+            #print('True reward :', true_reward)
+            #print('NN reward :', nn_reward)
 
             #np.random.seed(11)
             #test_agent_svf = self.agent_svf_sampling(num_of_samples=300,
@@ -537,16 +567,23 @@ class DeepMaxEnt():
 
             # GRAD AND BACKPROP
 
-            loss, dot_prod, l1val , rewards_norm = self.calculate_grads(self.optimizer, state_rewards, diff_freq)
+            loss, dot_prod, l1val, reward_nn_grad_magnitude, rewards_norm = self.calculate_grads(self.optimizer, state_rewards,
+                                                                        diff_freq)
+
 
             lossList.append(loss)
             dot_prod_list.append(dot_prod)
             l1_reg_list.append(l1val)
             rewards_norm_list.append(rewards_norm)
-            
+            reward_grad_norm_list.append(reward_nn_grad_magnitude)
+
+
             self.plot_info((lossList, svf_diff_list, 
-                            l1_reg_list, dot_prod_list, rewards_norm_list))
+                            l1_reg_list, dot_prod_list, rewards_norm_list, reward_grad_norm_list,
+                            model_performance_list, model_performance_nn))
+
             self.optimizer.step()
+            self.lr_scheduler.step()
 
             print('done')
 
@@ -572,6 +609,18 @@ class DeepMaxEnt():
                 
                 plt.figure(4)
                 file_name = self.plot_save_folder+'rewards-norm'+str(i)+'.jpg'
+                plt.savefig(file_name)
+
+                plt.figure(5)
+                file_name = self.plot_save_folder+'reward-net-grad-norm'+str(i)+'.jpg'
+                plt.savefig(file_name)
+
+                plt.figure(6)
+                file_name = self.plot_save_folder+'model-performance-true'+str(i)+'.jpg'
+                plt.savefig(file_name)
+
+                plt.figure(7)
+                file_name = self.plot_save_folder+'model-performance-nn'+str(i)+'.jpg'
                 plt.savefig(file_name)
 
 

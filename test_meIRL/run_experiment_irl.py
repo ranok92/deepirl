@@ -57,6 +57,9 @@ parser.add_argument('--state-discretization', type=int, default=128, help='The n
 
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
                     based on the reward the trajectory got.')
+
+parser.add_argument('--clipping-value', type=float, default=None, help='For gradient clipping of the \
+                    reward network.')
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 
@@ -166,7 +169,8 @@ def main():
                            graft=True,
                            seed=args.seed,
                            scale_svf=args.scale_svf,
-                           hidden_dims = args.reward_net_hidden_dims,
+                           hidden_dims=args.reward_net_hidden_dims,
+                           clipping_value=args.clipping_value,
                            save_folder=parent_dir)
     print("IRL method intialized.")
     experiment_logger.log_header('Details of the IRL method :')
