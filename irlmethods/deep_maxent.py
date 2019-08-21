@@ -30,6 +30,11 @@ from torch.nn.utils import clip_grad_norm_
 from torch.optim.lr_scheduler import StepLR
 from rlmethods.b_actor_critic import Policy
 
+
+#adding tensorboard for visualization
+from tensorboardX import SummaryWriter
+
+#writer = SummaryWriter('../test_meIRL/tensorboard_log')
 class RewardNet(BaseNN):
     """Reward network"""
 
@@ -133,6 +138,10 @@ class DeepMaxEnt():
 
         self.regularizer = regularizer
         #folders for saving purposes
+
+        self.save_folder_tf = './'+save_folder+'-reg-'+str(self.regularizer)+\
+                                '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/tf_logs/'
+
         self.plot_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
 
@@ -150,7 +159,7 @@ class DeepMaxEnt():
 
 
         self.clipping = clipping_value
-
+        self.writer = SummaryWriter(self.save_folder_tf)
     #******parts being operated on
     ############ array based svf calculation. Not feasible for larger state spaces#######
     #####################################################################################
@@ -564,7 +573,9 @@ class DeepMaxEnt():
 
 
             model_performance_list.append(true_reward)
+            self.writer.add_scalar('Log_info/model_performance_true', true_reward, i)
             model_performance_nn.append(nn_reward)
+            self.writer.add_scalar('Log_info/model_performance_nn', nn_reward, i)
     
             print('Completed agent-svf sampling.')
             #print('True reward :', true_reward)
@@ -602,10 +613,19 @@ class DeepMaxEnt():
 
 
             lossList.append(loss)
+            self.writer.add_scalar('Log_info/loss', loss, i)
+
             dot_prod_list.append(dot_prod)
+            self.writer.add_scalar('Log_info/dot_product_val', dot_prod, i)
+
             l1_reg_list.append(l1val)
+            self.writer.add_scalar('Log_info/l1_parameters', l1val, i)
+
             rewards_norm_list.append(rewards_norm)
+            self.writer.add_scalar('Log_info/reward_norm', rewards_norm, i)
+
             reward_grad_norm_list.append(reward_nn_grad_magnitude)
+            self.writer.add_scalar('Log_info/reward_grad_norm', reward_nn_grad_magnitude, i)
 
 
             self.plot_info((lossList, svf_diff_list, 
@@ -653,5 +673,5 @@ class DeepMaxEnt():
                 file_name = self.plot_save_folder+'model-performance-nn'+str(i)+'.jpg'
                 plt.savefig(file_name)
 
-
+        self.writer.close()
         return self.reward
