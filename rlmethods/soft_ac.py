@@ -239,7 +239,7 @@ class SoftActorCritic:
 
         self.tbx_writer.add_histogram(
             'pi/action_dist',
-            action_dist.probs.means(),
+            action_dist.probs.mean(),
             global_step=self.training_i,
         )
 
