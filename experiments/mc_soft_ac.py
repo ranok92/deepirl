@@ -7,8 +7,15 @@ sys.path.insert(0, '..')  # NOQA: E402
 from rlmethods.soft_ac import SoftActorCritic
 from rlmethods.soft_ac import DEVICE
 from envs.simple_gw import SimpleGridworld
+from argparse import ArgumentParser
 
 import gym
+
+parser = ArgumentParser()
+parser.add_argument('replay-buffer-size', type=int)
+parser.add_argument('replay-buffer-sample-size', type=int)
+
+args = parser.parse_args()
 
 def play(rl, gw):
     done = False
@@ -38,8 +45,8 @@ def main():
 
     soft_ac = SoftActorCritic(
         env,
-        replay_buffer_size=10**4,
-        buffer_sample_size=10**3,
+        replay_buffer_size=args.replay_buffer_size,
+        buffer_sample_size=args.replay_buffer_sample_size,
         tbx_writer = tbx_writer,
     )
 
