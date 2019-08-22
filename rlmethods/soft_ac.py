@@ -238,11 +238,6 @@ class SoftActorCritic:
         policy_loss = (alpha * log_actions - q_values.squeeze().detach())
         policy_loss = policy_loss.mean()
 
-        mean_action_dist = action_dist.probs.mean(dim=0)
-        fig, ax = plt.subplots()
-        ax.plot(mean_action_dist.cpu().detach().numpy())
-        self.tbx_writer.add_figure('pi/action_dist', fig, self.training_i)
-
         self.tbx_writer.add_scalar(
             'pi/avg_entropy',
             action_dist.entropy().mean(),
