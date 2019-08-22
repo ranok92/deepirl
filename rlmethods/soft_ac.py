@@ -239,7 +239,7 @@ class SoftActorCritic:
 
         self.tbx_writer.add_histogram(
             'pi/action_dist',
-            action_dist.probs.mean(),
+            action_dist.probs.mean(dim=0),
             global_step=self.training_i,
         )
 
@@ -284,8 +284,5 @@ class SoftActorCritic:
 
         # Step average Q net
         move_average(self.q_net, self.avg_q_net)
-
-        if self.training_i % 100 == 0:
-            breakpoint()
 
         self.training_i += 1
