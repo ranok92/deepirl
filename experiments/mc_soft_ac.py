@@ -18,7 +18,7 @@ def play(rl, gw):
     iters = 0
     while not done:
         _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
-        action, _ = rl.select_action(_state)
+        action, _, _ = rl.select_action(_state)
         next_state, reward, done, _ = gw.step(action.item())
 
         # update environment variables

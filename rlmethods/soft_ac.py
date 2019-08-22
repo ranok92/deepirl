@@ -174,7 +174,7 @@ class SoftActorCritic:
         dist = self.policy.action_distribution(state)
         action = dist.sample()
 
-        return action, dist.log_prob(action)
+        return action, dist.log_prob(action), dist
 
     def populate_buffer(self):
         """
@@ -186,7 +186,7 @@ class SoftActorCritic:
 
         while not self.replay_buffer.is_full():
             _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
-            action, _ = self.select_action(_state)
+            action, _, _ = self.select_action(_state)
             next_state, reward, done, _ = self.env.step(action.item())
             self.replay_buffer.push((
                 current_state,
@@ -216,7 +216,7 @@ class SoftActorCritic:
 
         with torch.no_grad():
             # Figure out value function
-            next_actions, log_next_actions = self.select_action(
+            next_actions, log_next_actions, _ = self.select_action(
                 next_state_batch
             )
             next_q = self.avg_q_net(next_state_batch, next_actions)
@@ -225,25 +225,30 @@ class SoftActorCritic:
             # Calculate Q network target
             q_target = reward_batch + self.gamma * next_state_values.squeeze()
 
-            self.tbx_writer.add_embedding(q_target.unsqueeze(1))
-            self.tbx_writer.add_embedding(reward_batch.unsqueeze(1))
-            self.tbx_writer.add_embedding(next_state_values)
-
         # q network loss
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
-
-        self.tbx_writer.add_embedding(q_values)
 
         self.tbx_writer.add_scalar(
             'loss/Q loss', q_loss.item(), self.training_i)
 
         # policy loss
-        _, log_actions = self.select_action(state_batch)
+        _, log_actions, action_dist = self.select_action(state_batch)
         policy_loss = (alpha * log_actions - q_values.squeeze().detach())
         policy_loss = policy_loss.mean()
 
-        self.tbx_writer.add_embedding(log_actions.unsqueeze(1))
+        self.tbx_writer.add_histogram(
+            'pi/action_dist',
+            action_dist.probs.means(),
+            global_step=self.training_i,
+        )
+
+        self.tbx_writer.add_scalar(
+            'pi/avg_entropy',
+            action_dist.entropy().mean(),
+            global_step=self.training_i
+        )
+
         self.tbx_writer.add_scalar(
             'loss/pi loss',
             policy_loss.item(),
@@ -279,5 +284,8 @@ class SoftActorCritic:
 
         # Step average Q net
         move_average(self.q_net, self.avg_q_net)
+
+        if self.training_i % 100 == 0:
+            breakpoint()
 
         self.training_i += 1
