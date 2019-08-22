@@ -199,6 +199,8 @@ class SoftActorCritic:
 
             current_state = next_state
 
+        print('Populated replay buffer.')
+
     def train(self):
         """Train Soft Actor Critic"""
         # Populate the buffer
