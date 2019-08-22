@@ -12,8 +12,8 @@ from argparse import ArgumentParser
 import gym
 
 parser = ArgumentParser()
-parser.add_argument('replay-buffer-size', type=int)
-parser.add_argument('replay-buffer-sample-size', type=int)
+parser.add_argument('replay_buffer_size', type=int)
+parser.add_argument('replay_buffer_sample_size', type=int)
 
 args = parser.parse_args()
 
@@ -40,6 +40,7 @@ def play(rl, gw):
 def main():
 
     tbx_writer = SummaryWriter()
+    breakpoint()
 
     env = gym.make('MountainCar-v0')
 

@@ -199,8 +199,6 @@ class SoftActorCritic:
 
             current_state = next_state
 
-        print('Populated replay buffer.')
-
     def train(self):
         """Train Soft Actor Critic"""
         # Populate the buffer
@@ -212,7 +210,6 @@ class SoftActorCritic:
         action_batch = torch.from_numpy(replay_samples[1]).to(DEVICE)
         reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
-        # dones_batch = torch.tensor(replay_samples[4]).to(DEVICE)
 
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
