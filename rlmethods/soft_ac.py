@@ -219,22 +219,23 @@ class SoftActorCritic:
             next_actions, log_next_actions = self.select_action(
                 next_state_batch
             )
-            next_state_q = self.avg_q_net(next_state_batch, next_actions)
-            next_state_values = next_state_q - alpha * log_next_actions
+            next_q = self.avg_q_net(next_state_batch, next_actions)
+            next_state_values = next_q - alpha * log_next_actions.unsqueeze(1)
 
             # Calculate Q network target
-            q_net_target = reward_batch + self.gamma * next_state_values
+            q_target = reward_batch + self.gamma * next_state_values.squeeze()
 
         # q network loss
         q_values = self.q_net(state_batch, action_batch)
-        q_loss = F.mse_loss(q_values, q_net_target)
+        q_loss = F.mse_loss(q_values, q_target)
 
         self.tbx_writer.add_scalar(
             'loss/Q loss', q_loss.item(), self.training_i)
 
         # policy loss
         _, log_actions = self.select_action(state_batch)
-        policy_loss = (alpha * log_actions - q_values.detach()).mean()
+        policy_loss = (alpha * log_actions - q_values.squeeze().detach())
+        policy_loss = policy_loss.mean()
 
         self.tbx_writer.add_scalar(
             'loss/pi loss',
