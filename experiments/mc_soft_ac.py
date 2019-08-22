@@ -40,7 +40,6 @@ def play(rl, gw):
 def main():
 
     tbx_writer = SummaryWriter()
-    breakpoint()
 
     env = gym.make('MountainCar-v0')
 
