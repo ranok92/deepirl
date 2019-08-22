@@ -255,6 +255,17 @@ class SoftActorCritic:
             self.training_i
         )
 
+        self.tbx_writer.add_scalar(
+            'pi/avg_log_actions',
+            log_actions.detach().mean().item(),
+            self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            'pi/avg_q_values',
+            q_values.squeeze().detach().mean().item(),
+            self.training_i
+        )
+
         # automatic entropy tuning
         alpha_loss = self.log_alpha * \
             (log_actions + self.entropy_target).detach()
