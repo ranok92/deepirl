@@ -52,7 +52,7 @@ parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate fo
 parser.add_argument('--feat-extractor', type=str, default='MCFeatures', help='The feature extractor  \
                     to be used in the experiment')
 
-parser.add_argument('--state-discretization', type=int, default=128, help='The number of discrete \
+parser.add_argument('--state-discretization', nargs="*", type=int, default=[128,128], help='The number of discrete \
                     parts you want to break the state')
 
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
@@ -103,10 +103,10 @@ def main():
     #check for the feature extractor being used
     #initialize feature extractor
     if args.feat_extractor=='MCFeatures':
-        feat_ext = MCFeatures(args.state_discretization, args.state_discretization) 
+        feat_ext = MCFeatures(args.state_discretization[0], args.state_discretization[1]) 
 
     if args.feat_extractor=='MCFeaturesOnehot':
-        feat_ext = MCFeaturesOnehot(args.state_discretization, args.state_discretization)
+        feat_ext = MCFeaturesOnehot(args.state_discretization[0], args.state_discretization[1])
 
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)

@@ -100,14 +100,21 @@ class MCFeatures():
 #discretize the position in 128 values and each value is provided a binary number
 #7+3 = 10 state size
 #the same discretization could be applied to the velocity
-    def __init__(self, disc_pos, disc_vel):
-
+    def __init__(self, disc_pos, disc_vel, pad1=False):
+        #keeping the pad1 value as 'True' increases the size of the state
+        #representation by 1, where in the extra position a '1' is introduced.
+        #Mentioned in Fahad et al to introduce stability in the learning process.
         self.init = 0
         self.pos_range = [-1.2, 0.6]
         self.vel_range = [-0.07, 0.07]
         self.disc_pos = disc_pos #controls the discretization
-        self.disc_vel = disc_vel #controls the discretization of the velocity
-        self.state_rep_size = len(np.binary_repr(self.disc_pos))+len(np.binary_repr(self.disc_vel))
+        self.disc_vel = disc_vel #controls the discretization of the velocity\
+        self.pad = pad1
+        if self.pad:
+            self.state_rep_size = len(np.binary_repr(self.disc_pos))+len(np.binary_repr(self.disc_vel))+1
+        else:
+            self.state_rep_size = len(np.binary_repr(self.disc_pos))+len(np.binary_repr(self.disc_vel))
+
         self.generate_hash_variable()
 
     def generate_hash_variable(self):
@@ -166,9 +173,14 @@ class MCFeatures():
         feat = state
         pos = feat[0]
         vel = feat[1]
+        pad = np.ones(1)
         pos_repr = self.get_binary_representation(pos, self.disc_pos, self.pos_range)
         vel_repr = self.get_binary_representation(vel, self.disc_vel, self.vel_range)
-        return reset_wrapper(np.concatenate((pos_repr,vel_repr),axis=0))
+
+        if self.pad:
+            return reset_wrapper(np.concatenate((pos_repr,vel_repr,pad),axis=0))
+        else:
+            return reset_wrapper(np.concatenate((pos_repr,vel_repr),axis=0))
 
 
 
@@ -196,7 +208,7 @@ def extract_features(state):
 
 def rollout(env, num_of_trajs):
 
-    feat = MCFeatures(128,128)
+    feat = MCFeatures(128,8,pad1=False)
     global human_agent_action, human_wants_restart, human_sets_pause
     for i in range(num_of_trajs):
         state_list = []
@@ -220,8 +232,9 @@ def rollout(env, num_of_trajs):
 
             obser, r, done, info = env.step(a)
             #pdb.set_trace()
-            print(np.reshape(feat.extract_features(obser).cpu().numpy(),(2,8)))
-
+            print(np.reshape(feat.extract_features(obser).cpu().numpy()[0:8],(1,8)))
+            print(feat.extract_features(obser).cpu().numpy()[8:])
+            print(feat.extract_features(obser))
             state_list.append(feat.extract_features(obser))
 
             #print(obser)
@@ -253,7 +266,7 @@ if __name__=='__main__':
 
     env = gym.make('MountainCar-v0')
 
-    path = './exp_traj_mountain_car_MCFeatures_128'
+    path = './exp_traj_mountain_car_MCFeatures_128_8'
     if os.path.exists(path):
         pass
     else:
