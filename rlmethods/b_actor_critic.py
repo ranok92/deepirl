@@ -133,7 +133,7 @@ class ActorCritic:
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
                  log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128],
-                 reward_threshold_ratio=0.99 , plot_loss = False):
+                 reward_threshold_ratio=0.99 , plot_loss = False, save_folder=None):
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
@@ -179,9 +179,16 @@ class ActorCritic:
 
         #for plotting loss
         self.plot_loss = plot_loss
+        #stores two things, the plot for loss at the end of each RL iteration 
+        #the plot for the reward obtained throughout the training from each of the threads
 
+        if save_folder is not None:
+            self.save_folder = save_folder+'/RL_Training'
+        else:
+            self.save_folder = None
+        
         if self.plot_loss:
-            self.loss_interval = 50
+            self.loss_interval = 1
             self.loss_mean = []
             self.loss = []
 
@@ -354,7 +361,7 @@ class ActorCritic:
         loss.backward()
 
         #adding loss in the loss list
-        if self.plot_loss:
+        if self.plot_loss or self.save_folder:
             self.loss_mean.append(loss.item())
             if len(self.loss_mean)==self.loss_interval:
                 self.loss.append(statistics.mean(self.loss_mean))
@@ -364,13 +371,15 @@ class ActorCritic:
         self.optimizer.step()
 
         del self.policy.rewards[:]
-        del saved_actions[:]
+        del self.policy.saved_actions[:]
 
     def train(self, rewardNetwork=None, featureExtractor=None, irl=False):
         """Train actor critic method on given gym environment."""
-
+        #along with the policy, the train now returns the loss and the 
+        #rewards obtained in the form of a list
         running_reward = 0
-
+        running_reward_list =[]
+        plt.figure('Loss')
         for i_episode in count(1):
 
             if self.feature_extractor is not None:
@@ -426,11 +435,12 @@ class ActorCritic:
             # if not in an IRL setting, solve environment according to specs
             if not irl:
 
-                if i_episode > 10 and i_episode % self.log_interval == 0:
+                if i_episode >= 10 and i_episode % self.log_interval == 0:
                     
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
+                        running_reward_list.append(running_reward/self.log_interval)
                         running_reward = 0
                         if self.plot_loss:
 
@@ -464,13 +474,15 @@ class ActorCritic:
             else:
                 assert self.max_episodes > 0
 
-                if i_episode > 10 and  i_episode % self.log_interval == 0:
+                if i_episode >= 10 and  i_episode % self.log_interval == 0:
 
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
+                        running_reward_list.append(running_reward/self.log_interval)
+
                         running_reward = 0
-                        
+
                     else:
                         print(self.termination)
                         print('Ep {}\tLast length: {:5d}\
@@ -479,6 +491,10 @@ class ActorCritic:
                             i_episode, t, running_reward, 
                             self.termination.current_avg_loss))
 
+                    if self.plot_loss:
+                            plt.plot(self.loss)
+                            plt.draw()
+                            plt.pause(.0001)
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
@@ -488,6 +504,14 @@ class ActorCritic:
                 if self.termination is not None:
                     if self.termination.check_termination():
                         break
+
+        loss_list = self.loss
+        self.loss = []
+        self.loss_mean = []
+
+        if self.save_folder:
+            self.plot_and_save_info((loss_list, running_reward_list), ('Loss', 'rewards_obtained'))
+
 
         return self.policy
 
@@ -548,6 +572,31 @@ class ActorCritic:
 
         return self.policy
 
+    def plot_and_save_info(self, inp_tuple, name_tuple):
+        #pass a tuple containing n number of lists , this function goes through all and plots them
+        i = 0
+        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
+        for list_val in inp_tuple:
+            plt.figure(i)
+            plt.plot(list_val,color_list[i])
+            plt.draw()
+            plt.pause(.0001)
+
+            #getting the file_name, counting the number of files that are already existing
+            folder = self.save_folder + '/' + name_tuple[i] +'/'
+            print('The folder :', folder)
+            pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+            plot_i = 0
+            while os.path.exists(os.path.join(folder, '%s.jpg' % plot_i)):
+                plot_i += 1
+
+            file_name = folder + str(plot_i)+'.jpg'
+            plt.savefig(file_name)
+            i += 1
+
+
+
+
 
 def train_spawnable(process_index, rl, *args):
     print("%d process spawned." % process_index)
@@ -565,3 +614,6 @@ if __name__ == '__main__':
                         log_interval=args.log_interval)
 
     model.train()
+
+
+    

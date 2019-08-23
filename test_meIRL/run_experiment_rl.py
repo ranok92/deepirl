@@ -15,6 +15,7 @@ from mountain_car import extract_features
 from mountain_car import MCFeatures, MCFeaturesplain, MCFeaturesOnehot
 import torch.multiprocessing as mp
 from rlmethods.b_actor_critic import ActorCritic
+
 import re
 
 
@@ -38,8 +39,11 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
                      feature extractor to be used in the experiment.')
 
 
-parser.add_argument('--state-discretization', type=int, default=128, help='The number of discrete \
+parser.add_argument('--state-discretization', nargs="*", type=int, default=[128, 128], help='The number of discrete \
                     parts you want to break the state')
+parser.add_argument('--save-folder', type=str, default=None, help='The name of the folder to store the results.')
+
+
 numbers = re.compile(r'(\d+)')
 
 def display_memory_usage(memory_in_bytes):
@@ -70,7 +74,7 @@ def numericalSort(value):
 def main():
     
     args = parser.parse_args()
-
+    save_folder = './results/'+ args.save_folder
     experiment_logger = Logger('./results','temp_save.txt')
 
 
@@ -91,10 +95,10 @@ def main():
     grid_size = 10
 
     if args.feat_extractor=='MCFeatures':
-        feat_ext = MCFeatures(args.state_discretization, args.state_discretization) 
+        feat_ext = MCFeatures(args.state_discretization[0], args.state_discretization[1]) 
 
     elif args.feat_extractor=='MCFeaturesOnehot':
-        feat_ext = MCFeaturesOnehot(args.state_discretization, args.state_discretization)
+        feat_ext = MCFeaturesOnehot(args.state_discretization[0], args.state_discretization[1])
 
     else:
         print('Enter proper feature extractor value.')
@@ -124,9 +128,10 @@ def main():
     experiment_logger.log_header('Environment details :')
     experiment_logger.log_info(env.__dict__)
 
-    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
-                        log_interval=10, max_ep_length=2000, hidden_dims=args.policy_net_hidden_dims,
-                        max_episodes=600)
+
+    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99, plot_loss=True,
+                        log_interval=10, max_ep_length=30, hidden_dims=args.policy_net_hidden_dims,
+                        max_episodes=10, save_folder=save_folder)
 
     experiment_logger.log_header('Details of the RL method :')
     experiment_logger.log_info(model.__dict__)
@@ -148,9 +153,10 @@ def main():
         if args.reward_path is None:
             model.train_mp(n_jobs=4)
         else:
+
             from irlmethods.deep_maxent import RewardNet
-            state_size = featExtract.extract_features(env.reset()).shape[0]
-            reward_net = RewardNet(state_size)
+            state_size = feat_ext.state_rep_size
+            reward_net = RewardNet(state_size, args.policy_net_hidden_dims)
             reward_net.load(args.reward_path)
             print(next(reward_net.parameters()).is_cuda)
             model.train_mp(reward_net = reward_net,n_jobs = 4)
