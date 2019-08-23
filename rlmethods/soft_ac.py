@@ -184,8 +184,9 @@ class SoftActorCritic:
         """
         state = self.env.reset()
         current_state = state
+        done = False
 
-        while not self.replay_buffer.is_full():
+        while not self.replay_buffer.is_full() and not done:
             _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
             action, _, _ = self.select_action(_state)
             next_state, reward, done, _ = self.env.step(action.item())
