@@ -23,6 +23,8 @@ import psutil
 process = psutil.Process(os.getpid())
 
 parser = argparse.ArgumentParser()
+
+parser.add_argument('--on-server', action='store_true')
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
 parser.add_argument('--reward-path' , type=str, nargs='?', default= None)
 parser.add_argument('--play', action='store_true',
@@ -74,6 +76,13 @@ def numericalSort(value):
 def main():
     
     args = parser.parse_args()
+    if args.on_server:
+        # matplotlib without monitor
+        matplotlib.use('Agg')
+
+        # pygame without monitor
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'
+
     save_folder = './results/'+ args.save_folder
     experiment_logger = Logger('./results','temp_save.txt')
 
