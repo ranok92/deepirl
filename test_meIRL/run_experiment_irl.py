@@ -11,7 +11,6 @@ import datetime
 sys.path.insert(0, '..')  # NOQA: E402
 from logger.logger import Logger
 import utils
-from mountain_car import extract_features
 
 from mountain_car import MCFeatures, MCFeaturesOnehot
 
@@ -52,7 +51,7 @@ parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate fo
 parser.add_argument('--feat-extractor', type=str, default='MCFeatures', help='The feature extractor  \
                     to be used in the experiment')
 
-parser.add_argument('--state-discretization', nargs="*", type=int, default=[128,128], help='The number of discrete \
+parser.add_argument('--state-discretization', nargs="*", type=int, default=[128, 128], help='The number of discrete \
                     parts you want to break the state')
 
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
@@ -146,6 +145,8 @@ def main():
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
                             termination=None,
+                            plot_loss=False,
+                            save_folder=to_save,
                             hidden_dims=args.reward_net_hidden_dims,
                             feat_extractor=feat_ext)
     print("RL method initialized.")
@@ -166,7 +167,7 @@ def main():
                            on_server=args.on_server,
                            regularizer = args.regularizer,
                            learning_rate = args.lr,
-                           graft=True,
+                           graft=False,
                            seed=args.seed,
                            scale_svf=args.scale_svf,
                            hidden_dims=args.reward_net_hidden_dims,

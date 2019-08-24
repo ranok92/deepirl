@@ -6,11 +6,9 @@ import gym, sys, time, os
 import glob
 import torch
 import numpy as np 
-from matplotlib import pyplot as plt
 sys.path.insert(0, '..')  # NOQA: E402
 from logger.logger import Logger
 import utils
-from mountain_car import extract_features
 
 from mountain_car import MCFeatures, MCFeaturesplain, MCFeaturesOnehot
 import torch.multiprocessing as mp
@@ -79,6 +77,7 @@ def main():
     if args.on_server:
         # matplotlib without monitor
         matplotlib.use('Agg')
+        from matplotlib import pyplot as plt
 
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
@@ -138,9 +137,9 @@ def main():
     experiment_logger.log_info(env.__dict__)
 
 
-    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99, plot_loss=True,
-                        log_interval=10, max_ep_length=30, hidden_dims=args.policy_net_hidden_dims,
-                        max_episodes=10, save_folder=save_folder)
+    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99, plot_loss=False,
+                        log_interval=10, max_ep_length=300, hidden_dims=args.policy_net_hidden_dims,
+                        max_episodes=30, save_folder=save_folder)
 
     experiment_logger.log_header('Details of the RL method :')
     experiment_logger.log_info(model.__dict__)

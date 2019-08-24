@@ -5,8 +5,19 @@ import torch
 import numpy as np 
 import math
 import pdb
+import glob
+from irlmethods.deep_maxent import RewardNet
 from utils import reset_wrapper, step_wrapper
 
+from matplotlib import pyplot as plt
+import re
+numbers = re.compile(r'(\d+)')
+
+
+def numericalSort(value):
+    parts = numbers.split(value)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 
 class MCFeaturesplain():
@@ -22,15 +33,15 @@ class MCFeaturesplain():
 
 class MCFeaturesOnehot():
 
-    def __init__(self, discrete_pos, discrete_vel):
+    def __init__(self, disc_pos, disc_vel):
 
-        self.discrete_pos = discrete_pos
-        self.discrete_vel = discrete_vel
+        self.disc_pos = disc_pos
+        self.disc_vel = disc_vel
 
         self.pos_range = [-1.2, 0.6]
         self.vel_range = [-0.07, 0.07]
 
-        self.state_rep_size = discrete_pos+discrete_vel
+        self.state_rep_size = disc_pos+disc_vel
         self.generate_hash_variable()
 
     def generate_hash_variable(self):
@@ -83,12 +94,12 @@ class MCFeaturesOnehot():
         pos = state[0]
         vel = state[1]
 
-        rescaled_pos = self.rescale_value(pos, self.discrete_pos, self.pos_range)
-        pos_vector = np.zeros(self.discrete_pos)
+        rescaled_pos = self.rescale_value(pos, self.disc_pos, self.pos_range)
+        pos_vector = np.zeros(self.disc_pos)
         pos_vector[rescaled_pos] = 1
 
-        rescaled_vel = self.rescale_value(vel, self.discrete_vel, self.vel_range)
-        vel_vector = np.zeros(self.discrete_vel)
+        rescaled_vel = self.rescale_value(vel, self.disc_vel, self.vel_range)
+        vel_vector = np.zeros(self.disc_vel)
         vel_vector[rescaled_vel] = 1
         #pdb.set_trace()
         return reset_wrapper(np.concatenate((pos_vector, vel_vector), axis=0))
@@ -200,12 +211,6 @@ def key_release(key, mod):
         human_agent_action = 0
 
 
-
-def extract_features(state):
-
-    feature = state
-    return feature
-
 def rollout(env, num_of_trajs):
 
     feat = MCFeatures(128,8,pad1=False)
@@ -255,6 +260,112 @@ def rollout(env, num_of_trajs):
         print("timesteps %i reward %0.2f" % (total_timesteps, total_reward))
 
 
+
+def plot_true_and_network_reward(reward_network_folder, feature_extractor):
+
+    env = gym.make('MountainCar-v0')
+    reward_network_names = glob.glob(os.path.join(reward_network_folder,'*.pt'))
+
+    exhaustive_state_list, true_reward = get_exhaustive_state_list(feature_extractor)
+    reward_holder = np.zeros([len(reward_network_names)+1, len(exhaustive_state_list)])
+
+
+    hidden_dims = [1024]
+    net_counter = 0
+    for reward_net in sorted(reward_network_names, key=numericalSort):
+
+        reward_net_model = RewardNet(feature_extractor.state_rep_size, hidden_dims)
+        print("loading reward_net :", reward_net)
+        reward_net_model.load(reward_net)
+        reward_net_model.eval()
+        reward_net_model.to('cuda')
+
+        for j in range(len(exhaustive_state_list)):
+
+            state = exhaustive_state_list[j]
+            reward = reward_net_model(state)
+            reward_holder[net_counter][j] = reward
+
+        net_counter+=1
+
+    reward_holder[-1][:] = np.array(true_reward)
+    pdb.set_trace()
+    #print(reward_holder[:,0:200])
+    plt.pcolor(reward_holder)
+    #plt.matshow(reward_holder[:,:])
+    plt.show()
+    return reward_holder
+
+def get_exhaustive_state_list(feature_extractor):
+
+    state_list = []
+    true_reward_list = []
+    vel_state = feature_extractor.disc_vel
+    pos_state = feature_extractor.disc_pos
+
+    vel_incrementor = (feature_extractor.vel_range[1] - feature_extractor.vel_range[0])/vel_state
+    pos_incrementor = (feature_extractor.pos_range[1] - feature_extractor.pos_range[0])/pos_state
+
+    ##print(vel_incrementor)
+    ##print(pos_incrementor)
+
+
+    #v = feature_extractor.vel_range[0] + vel_incrementor/2
+    p_init = feature_extractor.pos_range[0] + pos_incrementor/2
+    for i in range(pos_state):
+        p = p_init + i*pos_incrementor
+        v_init = feature_extractor.vel_range[0] + vel_incrementor/2
+        for j in range(vel_state):
+            v = v_init + j*vel_incrementor
+            state = np.array([p,v])
+            true_reward = p - 0.5 + v*10
+            if p > 0.5:
+                true_reward_list.append(true_reward)
+            else:
+                true_reward_list.append(true_reward)
+            #print(state)
+            state_list.append(feature_extractor.extract_features(state))
+
+    return state_list, true_reward_list
+
+
+def view_reward_from_trajectory(reward_network_folder, trajectory_folder, feature_extractor):
+
+    hidden_dims = [1024]
+    reward_network_names = glob.glob(os.path.join(reward_network_folder,'*.pt'))
+    trajectories = glob.glob(os.path.join(trajectory_folder,'*.states'))
+    
+    rewards_across_traj_model = np.zeros((len(reward_network_names), len(trajectories)))
+    reward_counter = 0
+    for reward_net in sorted(reward_network_names, key=numericalSort):
+
+        reward_net_model = RewardNet(feature_extractor.state_rep_size, hidden_dims)
+        print("loading reward_net :", reward_net)
+        reward_net_model.load(reward_net)
+        reward_net_model.eval()
+        reward_net_model.to('cuda')
+        traj_counter = 0
+        for trajectory in trajectories:
+
+            state_list = torch.load(trajectory)
+            cur_reward = 0
+            for state in state_list:
+
+                reward = reward_net_model(state)
+                cur_reward+=reward
+
+            rewards_across_traj_model[reward_counter][traj_counter] = cur_reward
+            traj_counter += 1
+
+        reward_counter += 1
+
+    pdb.set_trace()
+
+    return rewards_across_traj_model
+
+
+
+
 '''
 while 1:
     window_still_open = rollout(env, 10)
@@ -263,7 +374,7 @@ while 1:
 
 if __name__=='__main__':
 
-
+    '''
     env = gym.make('MountainCar-v0')
 
     path = './exp_traj_mountain_car_MCFeatures_128_8'
@@ -288,6 +399,17 @@ if __name__=='__main__':
     print("No keys pressed is taking action 0")
 
     rollout(env, 20)
+    '''
+
+    feature_extractor = MCFeaturesOnehot(10,10)
+    print(feature_extractor.state_rep_size)
+    l = plot_true_and_network_reward('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_no_scaling_Svf2019-08-21 17:28:32-reg-0-seed-111-lr-0.001/saved-models-rewards', feature_extractor)
+    
+    #view_reward_from_trajectory('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_no_scaling_Svf2019-08-21 17:28:32-reg-0-seed-111-lr-0.001/saved-models-rewards', 
+    #                            './exp_traj_mountain_car_MCFeaturesOnehot_10',
+    #                            feature_extractor)
+
+    #print(l)
 
 
     #collect_trajectories(env, 10)

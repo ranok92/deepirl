@@ -35,6 +35,8 @@ from rlmethods.b_actor_critic import Policy
 from tensorboardX import SummaryWriter
 
 #writer = SummaryWriter('../test_meIRL/tensorboard_log')
+
+
 class RewardNet(BaseNN):
     """Reward network"""
 
@@ -117,6 +119,13 @@ class DeepMaxEnt():
         self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
+        #############debug###########
+        #self.reward.load('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_8_no_sampling_SVF2019-08-22 08:56:38-reg-0-seed-110-lr-0.0001/saved-models-rewards/3.pt')
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+
+        self.reward = self.reward.to(self.device)
+
         self.hidden_dims = hidden_dims
 
         self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0.045)
@@ -127,11 +136,9 @@ class DeepMaxEnt():
 
         self.seed = seed
         self.scale_svf = scale_svf
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+ 
         self.dtype = torch.float32
 
-        self.reward = self.reward.to(self.device)
 
         #making it run on server
         self.on_server = on_server
@@ -160,6 +167,7 @@ class DeepMaxEnt():
 
         self.clipping = clipping_value
         self.writer = SummaryWriter(self.save_folder_tf)
+
     #******parts being operated on
     ############ array based svf calculation. Not feasible for larger state spaces#######
     #####################################################################################
@@ -236,10 +244,10 @@ class DeepMaxEnt():
 
 
 
-    def calculate_grads(self, optimizer, stateRewards, freq_diff):
+    def calculate_grads(self, stateRewards, freq_diff):
         
         #calculates the gradients on the reward network
-        optimizer.zero_grad()
+        self.optimizer.zero_grad()
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
 
@@ -251,7 +259,7 @@ class DeepMaxEnt():
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)
 
-        loss = dot_prod+(lambda1*l1_reg) 
+        loss = dot_prod
         loss.backward()
 
         #clipping if asked for
@@ -373,7 +381,7 @@ class DeepMaxEnt():
 
 
     def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
-
+        
         if graft:
             newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims,
@@ -382,10 +390,11 @@ class DeepMaxEnt():
         else:
             newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims)
-
+        
         newNN.to(self.device)
         self.rl.policy = newNN
-        print(self.rl.policy)
+        print('the rewards of the new policy :')
+        print(self.rl.policy.rewards)
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
 
     #############################################################################
@@ -543,7 +552,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size, self.action_size, self.hidden_dims, self.graft)
+            #self.resetTraining(self.state_size, self.action_size, self.hidden_dims, graft=self.graft)
 
             #save the reward network
 
@@ -596,6 +605,7 @@ class DeepMaxEnt():
             
 
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
+            self.writer.add_scalar('Log_info/svf_difference', np.linalg.norm(diff_freq,1), i)
             svf_diff_list.append(np.linalg.norm(diff_freq,1))
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
@@ -608,7 +618,7 @@ class DeepMaxEnt():
 
             # GRAD AND BACKPROP
 
-            loss, dot_prod, l1val, reward_nn_grad_magnitude, rewards_norm = self.calculate_grads(self.optimizer, state_rewards,
+            loss, dot_prod, l1val, reward_nn_grad_magnitude, rewards_norm = self.calculate_grads(state_rewards,
                                                                         diff_freq)
 
 

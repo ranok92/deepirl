@@ -187,7 +187,7 @@ class ActorCritic:
         else:
             self.save_folder = None
         
-        if self.plot_loss:
+        if self.plot_loss or self.save_folder:
             self.loss_interval = 1
             self.loss_mean = []
             self.loss = []
@@ -592,6 +592,7 @@ class ActorCritic:
 
             file_name = folder + str(plot_i)+'.jpg'
             plt.savefig(file_name)
+            plt.close()
             i += 1
 
 
