@@ -148,7 +148,7 @@ class SoftActorCritic:
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.log_alpha = torch.tensor([1.0], requires_grad=True).to(DEVICE)
+        self.log_alpha = torch.tensor([-0.5], requires_grad=True).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -1
 
@@ -182,23 +182,29 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        state = self.env.reset()
-        current_state = state
-        done = False
+        done = True
 
-        while not self.replay_buffer.is_full() and not done:
-            _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
-            action, _, _ = self.select_action(_state)
-            next_state, reward, done, _ = self.env.step(action.item())
-            self.replay_buffer.push((
-                current_state,
-                action.cpu().numpy(),
-                reward,
-                next_state,
-                done
-            ))
+        while not self.replay_buffer.is_full():
+            if done:
+                current_state = self.env.reset()
+                done = False
 
-            current_state = next_state
+            while not done:
+                _state = torch.from_numpy(current_state).type(torch.float).to(DEVICE)
+                action, _, _ = self.select_action(_state)
+                next_state, reward, done, _ = self.env.step(action.item())
+                self.replay_buffer.push((
+                    current_state,
+                    action.cpu().numpy(),
+                    reward,
+                    next_state,
+                    done
+                ))
+                current_state = next_state
+
+    def tbx_logger(self, log_dict, training_i):
+        for tag, value in log_dict.items():
+            self.tbx_writer.add_scalar(tag, value, training_i)
 
     def train(self):
         """Train Soft Actor Critic"""
@@ -230,49 +236,13 @@ class SoftActorCritic:
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
 
-        self.tbx_writer.add_scalar(
-            'loss/Q loss', q_loss.item(), self.training_i)
 
         # policy loss
-        _, log_actions, action_dist = self.select_action(state_batch)
-        policy_loss = (alpha * log_actions - q_values.squeeze().detach())
+        pi_actions, log_actions, action_dist = self.select_action(state_batch)
+        q_values_pi = self.q_net(state_batch, pi_actions)
+        policy_loss = (alpha * log_actions - q_values_pi.squeeze())
         policy_loss = policy_loss.mean()
 
-        self.tbx_writer.add_scalar(
-            'pi/avg_entropy',
-            action_dist.entropy().mean(),
-            global_step=self.training_i
-        )
-
-        self.tbx_writer.add_scalar(
-            'loss/pi loss',
-            policy_loss.item(),
-            self.training_i
-        )
-
-        self.tbx_writer.add_scalar(
-            'pi/avg_log_actions',
-            log_actions.detach().mean().item(),
-            self.training_i
-        )
-        self.tbx_writer.add_scalar(
-            'pi/avg_q_values',
-            q_values.squeeze().detach().mean().item(),
-            self.training_i
-        )
-
-        # automatic entropy tuning
-        alpha_loss = self.log_alpha * \
-            (log_actions + self.entropy_target).detach()
-        alpha_loss = -alpha_loss.mean()
-
-        self.tbx_writer.add_scalar(
-            'loss/alpha loss',
-            alpha_loss.item(),
-            self.training_i
-        )
-
-        self.tbx_writer.add_scalar('alpha', alpha.item(), self.training_i)
 
         # update parameters
         self.q_optim.zero_grad()
@@ -283,6 +253,11 @@ class SoftActorCritic:
         policy_loss.backward()
         self.policy_optim.step()
 
+        # automatic entropy tuning
+        alpha_loss = self.log_alpha * \
+            (log_actions + self.entropy_target).detach()
+        alpha_loss = -alpha_loss.mean()
+
         if self.entropy_tuning:
             self.alpha_optim.zero_grad()
             alpha_loss.backward()
@@ -290,5 +265,23 @@ class SoftActorCritic:
 
         # Step average Q net
         move_average(self.q_net, self.avg_q_net)
+
+        # logging
+        self.tbx_logger(
+            {
+                'loss/Q loss': q_loss.item(),
+                'Q/avg_q_target': q_target.mean().item(),
+                'Q/avg_q': q_values.mean().item(),
+                'Q/avg_reward': reward_batch.mean().item(),
+                'Q/avg_V': next_state_values.mean().item(),
+                'pi/avg_entropy': action_dist.entropy().mean(),
+                'loss/pi loss': policy_loss.item(),
+                'pi/avg_log_actions': log_actions.detach().mean().item(),
+                'pi/avg_q_values': q_values.squeeze().detach().mean().item(),
+                'loss/alpha loss': alpha_loss.item(),
+                'alpha': alpha.item(),
+            },
+            self.training_i
+        )
 
         self.training_i += 1
