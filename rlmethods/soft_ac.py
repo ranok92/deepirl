@@ -44,18 +44,6 @@ def move_average(source, target, tau=0.005):
         )
 
 
-def to_oh(index, num_classes):
-    """Convert to one hot.
-
-    :param index: 'hot' index (which index to set to one)
-    :param num_classes: total number of classes (length of vector)
-    """
-    oh = np.zeros(num_classes).astype('float32')
-    oh[index] = 1
-
-    return oh
-
-
 class QNetwork(RectangleNN):
     """Q function network."""
 
@@ -125,7 +113,7 @@ class SoftActorCritic:
             env,
             replay_buffer_size=10**6,
             buffer_sample_size=10**4,
-            gamma=1.0,
+            gamma=0.99,
             learning_rate=3 * 10**-4,
             tbx_writer=None,
             entropy_tuning=False
@@ -140,9 +128,9 @@ class SoftActorCritic:
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
-        self.policy = PolicyNetwork(2, state_size, 512, action_size).to(DEVICE)
-        self.q_net = QNetwork(state_size, action_size, 2, 512).to(DEVICE)
-        self.avg_q_net = QNetwork(state_size, action_size, 2, 512).to(DEVICE)
+        self.policy = PolicyNetwork(2, state_size, 256, action_size).to(DEVICE)
+        self.q_net = QNetwork(state_size, action_size, 2, 256).to(DEVICE)
+        self.avg_q_net = QNetwork(state_size, action_size, 2, 256).to(DEVICE)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
@@ -190,7 +178,8 @@ class SoftActorCritic:
                 done = False
 
             while not done:
-                _state = torch.from_numpy(current_state).type(torch.float).to(DEVICE)
+                _state = torch.from_numpy(current_state).type(
+                    torch.float).to(DEVICE)
                 action, _, _ = self.select_action(_state)
                 next_state, reward, done, _ = self.env.step(action.item())
                 self.replay_buffer.push((
@@ -208,6 +197,10 @@ class SoftActorCritic:
 
     def train(self):
         """Train Soft Actor Critic"""
+
+        if self.training_i % 1000 == 0:
+            breakpoint()
+
         # Populate the buffer
         self.populate_buffer()
 
@@ -236,13 +229,11 @@ class SoftActorCritic:
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
 
-
         # policy loss
         pi_actions, log_actions, action_dist = self.select_action(state_batch)
         q_values_pi = self.q_net(state_batch, pi_actions)
         policy_loss = (alpha * log_actions - q_values_pi.squeeze())
         policy_loss = policy_loss.mean()
-
 
         # update parameters
         self.q_optim.zero_grad()
@@ -270,15 +261,15 @@ class SoftActorCritic:
         self.tbx_logger(
             {
                 'loss/Q loss': q_loss.item(),
+                'loss/pi loss': policy_loss.item(),
+                'loss/alpha loss': alpha_loss.item(),
                 'Q/avg_q_target': q_target.mean().item(),
                 'Q/avg_q': q_values.mean().item(),
                 'Q/avg_reward': reward_batch.mean().item(),
                 'Q/avg_V': next_state_values.mean().item(),
                 'pi/avg_entropy': action_dist.entropy().mean(),
-                'loss/pi loss': policy_loss.item(),
                 'pi/avg_log_actions': log_actions.detach().mean().item(),
-                'pi/avg_q_values': q_values.squeeze().detach().mean().item(),
-                'loss/alpha loss': alpha_loss.item(),
+                'pi/avg_q_values': q_values_pi.squeeze().detach().mean().item(),
                 'alpha': alpha.item(),
             },
             self.training_i
