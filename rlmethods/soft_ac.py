@@ -60,9 +60,7 @@ class QNetwork(RectangleNN):
 
     def forward(self, states, actions):
         # actions need to be byte or long to be used as indices
-        _actions = actions.type(torch.long)
-        actions_vector = torch.eye(self.action_length)[_actions]
-        x = torch.cat([states, actions_vector], 1)
+        x = torch.cat([states, actions.type(torch.float).unsqueeze(1)], 1)
         x = F.relu(self.in_layer(x))
         x = self.hidden_forward(x)
         x = self.head(x)
@@ -121,7 +119,7 @@ class SoftActorCritic:
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
-        action_size = env.action_space.n
+        action_size = 1
 
         # buffer
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
