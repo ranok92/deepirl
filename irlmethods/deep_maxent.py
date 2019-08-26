@@ -45,13 +45,13 @@ class RewardNet(BaseNN):
 
         self.input = nn.Sequential(
             nn.Linear(state_dims, hidden_dims[0]),
-            nn.ReLU(),
+            nn.ELU(),
         )
         self.hidden_layers = []
         for i in range(1,len(hidden_dims)):
             self.hidden_layers.append(nn.Sequential(
                                                     nn.Linear(hidden_dims[i-1], hidden_dims[i]),
-                                                    nn.ReLU(),
+                                                    nn.ELU(),
                                                     )
                                       )
         self.hidden_layers = nn.ModuleList(self.hidden_layers)
@@ -128,7 +128,7 @@ class DeepMaxEnt():
 
         self.hidden_dims = hidden_dims
 
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate, weight_decay=0.045)
+        self.optimizer = optim.SGD(self.reward.parameters(), lr=learning_rate)
         self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
         self.EPS = np.finfo(np.float32).eps.item()
@@ -272,8 +272,7 @@ class DeepMaxEnt():
 
         #print ('The magnitude of gradients after clipping:', grad_mag)
         #print('The magnitude of the parameters :', l1_reg)
-
-
+        #pdb.set_trace()
         return loss, dot_prod , l1_reg, grad_mag, torch.norm(stateRewards.squeeze(), 1)
 
 
@@ -381,7 +380,7 @@ class DeepMaxEnt():
 
 
     def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
-        
+        '''
         if graft:
             newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims,
@@ -395,6 +394,7 @@ class DeepMaxEnt():
         self.rl.policy = newNN
         print('the rewards of the new policy :')
         print(self.rl.policy.rewards)
+        '''
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
 
     #############################################################################
@@ -552,7 +552,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            #self.resetTraining(self.state_size, self.action_size, self.hidden_dims, graft=self.graft)
+            self.resetTraining(self.state_size, self.action_size, self.hidden_dims, graft=self.graft)
 
             #save the reward network
 
@@ -642,8 +642,10 @@ class DeepMaxEnt():
                             l1_reg_list, dot_prod_list, rewards_norm_list, reward_grad_norm_list,
                             model_performance_list, model_performance_nn))
 
+            #pdb.set_trace()
             self.optimizer.step()
-            self.lr_scheduler.step()
+
+            #self.lr_scheduler.step()
 
             print('done')
 

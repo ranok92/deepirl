@@ -289,7 +289,7 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     return svf
 
 
-def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
+def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, gamma=0.99):
     '''
     Does the state visitation frequency calculation without creating a dictionary or storing the 
     entire state space.
@@ -311,24 +311,31 @@ def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
 
         #iterating through each of the states 
         #in the trajectory
-        for i in range(traj_np.shape[0]):
+        #pdb.set_trace()
 
-            #this is for onehot
+        for i in range(traj_np.shape[0]):
             state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
                 svf[state_hash] = 1*math.pow(gamma,i)
             else:
                 svf[state_hash] += 1*math.pow(gamma,i)
+        for pad_i in range(i+1,max_time_steps):
+
+            state_hash = feature_extractor.hash_function(traj_np[i])
+            svf[state_hash] += 1*math.pow(gamma,pad_i)
+
 
     #normalize the svf
+    '''
     total_visitation = 0
     for state in svf.keys():
 
         total_visitation += svf[state]
-
+    '''
+    total_trajectories = len(states)
     for state in svf.keys():
 
-        svf[state] /= total_visitation
+        svf[state] /= total_trajectories
 
     return collections.OrderedDict(sorted(svf.items()))
 
@@ -683,26 +690,52 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #merge the different dictionaries to a master dictionary and adjust the visitation 
     #frequencies according to the weights calculated
 
+    '''
     for i in range(len(svf_dict_list)):
 
         dictionary = svf_dict_list[i]
         for key in dictionary:
 
             norm_factor[i] += dictionary[key]
-
+    '''
+    norm_factor = np.ones(no_of_samples)
     master_dict = {}
     #print ('The norm factor :', norm_factor)
     for i in range(len(svf_dict_list)):
         dictionary = svf_dict_list[i]
         for key in dictionary:
-
+            #pdb.set_trace()
             if key not in master_dict:
                 master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
             else:
                 master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
 
+    '''
+    ######### for debugging purposes ##########
+    ######### plots the state visitation frequency based on the position ########
+    state_arr = np.zeros(128)
 
+    conv_arr = np.array([2**i for i in range(7,-1,-1)])
+    for key in master_dict.keys():
 
+        state = feature_extractor.recover_state_from_hash_value(key)
+        pos = state[0:8]
+        print(pos)
+        print(conv_arr)
+        state_arr[int(pos.dot(conv_arr))] += master_dict[key]
+
+    plt.close()
+    plt.plot(state_arr)
+    plt.show()
+    
+    
+    svf_sum = 0
+    for key in master_dict.keys():
+        svf_sum += master_dict[key]
+    
+    ################################################
+    '''
+    #pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
     return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
@@ -811,6 +844,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     and returns two ordered lists containing the states visited and the 
     difference in their visitation frequency.
     '''
+
     state_list = []
     diff_list = []
     expert_iterator = 0
@@ -819,9 +853,17 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     expert_key_list = list(expert_svf_dict.keys())
     agent_key_list = list(agent_svf_dict.keys())
 
-    while True:
 
-        #pdb.set_trace()
+    tot = 0
+    for key in expert_key_list:
+        tot += expert_svf_dict[key]
+
+    ag_tot = 0
+    for key in agent_key_list:
+        ag_tot += agent_svf_dict[key]
+
+    while True:
+        
         exp_state = expert_key_list[expert_iterator]
         agent_state = agent_key_list[agent_iterator]
         if exp_state == agent_state:
@@ -869,7 +911,6 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                     expert_iterator += 1
 
                 break
-
     return state_list , diff_list
 
         
@@ -879,7 +920,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
 if __name__ == '__main__':
 
 
-
+    '''
     r = 10
     c = 10
 
@@ -906,13 +947,16 @@ if __name__ == '__main__':
     				obstacles=[np.array([2,3])],
     				goal_state=np.array([5,5]),
     				is_onehot=False)
+    '''
+
 
     
     #calculating the SVF for policy
 
     #calculating the svf for experts
-    
-    exp_svf = calculate_expert_svf(expert_folder, feature_extractor=feat)
+    feat = MCFeatures(128, 8)
+
+    exp_svf = calculate_expert_svf(expert_folder, max_time_step=300, feature_extractor=feat)
 
     pdb.set_trace()
     print('printing from the expert :',exp_svf)

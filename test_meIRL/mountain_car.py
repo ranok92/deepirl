@@ -7,6 +7,8 @@ import math
 import pdb
 import glob
 from irlmethods.deep_maxent import RewardNet
+
+from irlmethods.irlUtils import calculate_expert_svf
 from utils import reset_wrapper, step_wrapper
 
 from matplotlib import pyplot as plt
@@ -269,8 +271,7 @@ def plot_true_and_network_reward(reward_network_folder, feature_extractor):
     exhaustive_state_list, true_reward = get_exhaustive_state_list(feature_extractor)
     reward_holder = np.zeros([len(reward_network_names)+1, len(exhaustive_state_list)])
 
-
-    hidden_dims = [1024]
+    hidden_dims = [256]
     net_counter = 0
     for reward_net in sorted(reward_network_names, key=numericalSort):
 
@@ -374,10 +375,12 @@ while 1:
 
 if __name__=='__main__':
 
+    
     '''
+    ######## collecting expert svf########
     env = gym.make('MountainCar-v0')
 
-    path = './exp_traj_mountain_car_MCFeatures_128_8'
+    path = './exp_traj_mountain_car_MCFeatures_128_8_test'
     if os.path.exists(path):
         pass
     else:
@@ -398,18 +401,46 @@ if __name__=='__main__':
     print("Press keys 1 2 3 ... to take actions 1 2 3 ...")
     print("No keys pressed is taking action 0")
 
-    rollout(env, 20)
+    rollout(env, 10)
+    #########################################
     '''
-
+    '''
+    ##################getting a better understanding of the rewards
     feature_extractor = MCFeaturesOnehot(10,10)
     print(feature_extractor.state_rep_size)
-    l = plot_true_and_network_reward('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_no_scaling_Svf2019-08-21 17:28:32-reg-0-seed-111-lr-0.001/saved-models-rewards', feature_extractor)
-    
+    l = plot_true_and_network_reward('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Dont-save-this2019-08-25 15:48:10-reg-0-seed-10101-lr-0.001/saved-models-rewards/', feature_extractor)
+    ##################################################################
+    '''
     #view_reward_from_trajectory('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_no_scaling_Svf2019-08-21 17:28:32-reg-0-seed-111-lr-0.001/saved-models-rewards', 
     #                            './exp_traj_mountain_car_MCFeaturesOnehot_10',
     #                            feature_extractor)
 
     #print(l)
 
-
     #collect_trajectories(env, 10)
+    
+    #### debugging expert svf####
+    feature_extractor = MCFeatures(128,8)
+    traj_path = './exp_traj_mountain_car_MCFeatures_128_8_test/'
+    exp = calculate_expert_svf(traj_path, max_time_steps=3000, feature_extractor=feature_extractor, gamma=1)
+    
+    state_arr = np.zeros(128)
+
+    conv_arr = np.array([2**i for i in range(7,-1,-1)])
+    for key in exp.keys():
+
+        state = feature_extractor.recover_state_from_hash_value(key)
+        pos = state[0:8]
+        print(pos)
+        print(conv_arr)
+        state_arr[int(pos.dot(conv_arr))] += exp[key]
+
+    plt.plot(state_arr)
+    plt.show()
+    sum_svf = 0
+    for key in exp.keys():
+
+        sum_svf += exp[key]
+
+    pdb.set_trace()
+    
