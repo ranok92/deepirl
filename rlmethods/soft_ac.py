@@ -198,9 +198,6 @@ class SoftActorCritic:
     def train(self):
         """Train Soft Actor Critic"""
 
-        if self.training_i % 1000 == 0:
-            breakpoint()
-
         # Populate the buffer
         self.populate_buffer()
 
