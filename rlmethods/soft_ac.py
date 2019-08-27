@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
-from neural_nets.base_network import RectangleNN  # NOQA
+from neural_nets.base_network import BaseNN  # NOQA
 
 DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -44,11 +44,11 @@ def move_average(source, target, tau=0.005):
         )
 
 
-class QNetwork(RectangleNN):
+class QNetwork(BaseNN):
     """Q function network."""
 
-    def __init__(self, state_length, action_length, num_layers, hidden_layer_width):
-        super().__init__(num_layers, hidden_layer_width, F.relu)
+    def __init__(self, state_length, action_length, hidden_layer_width):
+        super().__init__()
 
         self.action_length = action_length
 
@@ -56,48 +56,52 @@ class QNetwork(RectangleNN):
             state_length + action_length,
             hidden_layer_width
         )
+        self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, 1)
 
     def forward(self, states, actions):
         # actions need to be byte or long to be used as indices
         x = torch.cat([states, actions.type(torch.float).unsqueeze(1)], 1)
         x = F.relu(self.in_layer(x))
-        x = self.hidden_forward(x)
+        x = F.relu(self.hidden1(x))
+        x = F.relu(self.hidden2(x))
         x = self.head(x)
 
         return x
 
 
-class PolicyNetwork(RectangleNN):
+class PolicyNetwork(BaseNN):
     """Policy network for soft actor critic."""
 
     def __init__(
             self,
-            num_layers,
             num_inputs,
             hidden_layer_width,
             out_layer_width
     ):
-        super().__init__(num_layers, hidden_layer_width, F.relu)
+        super().__init__()
 
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
+        self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, out_layer_width)
 
     def forward(self, x):
         x = F.relu(self.in_layer(x))
-        x = self.hidden_forward(x)
+        x = F.relu(self.hidden1(x))
+        x = F.relu(self.hidden2(x))
         x = self.head(x)
         probs = F.softmax(x, dim=-1)
-        log_probs = F.log_softmax(x, dim=-1)
 
-        return probs, log_probs
+        return probs
 
     def action_distribution(self, state):
         """Returns a pytorch distribution object based on policy output.
 
         :param state: Input state vector.
         """
-        probs, _ = self.forward(state)
+        probs = self.__call__(state)
         dist = torch.distributions.Categorical(probs)
 
         return dist
@@ -126,15 +130,15 @@ class SoftActorCritic:
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
-        self.policy = PolicyNetwork(2, state_size, 256, action_size).to(DEVICE)
-        self.q_net = QNetwork(state_size, action_size, 2, 256).to(DEVICE)
-        self.avg_q_net = QNetwork(state_size, action_size, 2, 256).to(DEVICE)
+        self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
+        self.q_net = QNetwork(state_size, action_size, 256)
+        self.avg_q_net = QNetwork(state_size, action_size, 256)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.log_alpha = torch.tensor([-0.5], requires_grad=True).to(DEVICE)
+        self.log_alpha = torch.tensor([-2.995], requires_grad=True).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -1
 
@@ -221,6 +225,8 @@ class SoftActorCritic:
             q_target = reward_batch + self.gamma * next_state_values.squeeze()
 
         # q network loss
+        if self.training_i % 1000 == 0:
+            breakpoint()
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
 
@@ -269,5 +275,10 @@ class SoftActorCritic:
             },
             self.training_i
         )
+
+        # Things to do only once on the first iteration
+        if self.training_i == 0:
+            self.tbx_writer.add_graph(self.policy, state_batch)
+            # self.tbx_writer.add_graph(self.q_net, [state_batch, pi_actions])
 
         self.training_i += 1
