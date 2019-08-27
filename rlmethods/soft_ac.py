@@ -52,18 +52,14 @@ class QNetwork(BaseNN):
 
         self.action_length = action_length
 
-        self.in_layer = nn.Linear(
-            state_length + action_length,
-            hidden_layer_width
-        )
+        self.in_layer = nn.Linear(state_length, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.head = nn.Linear(hidden_layer_width, 1)
+        self.head = nn.Linear(hidden_layer_width, action_length)
 
-    def forward(self, states, actions):
+    def forward(self, states):
         # actions need to be byte or long to be used as indices
-        x = torch.cat([states, actions.type(torch.float).unsqueeze(1)], 1)
-        x = F.relu(self.in_layer(x))
+        x = F.relu(self.in_layer(states))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
         x = self.head(x)
@@ -118,7 +114,9 @@ class SoftActorCritic:
             gamma=0.99,
             learning_rate=3 * 10**-4,
             tbx_writer=None,
-            entropy_tuning=False
+            entropy_tuning=False,
+            tau=0.005,
+            log_alpha=-2.995,
     ):
         self.env = env
         starting_state = self.env.reset()
@@ -131,16 +129,17 @@ class SoftActorCritic:
 
         # NNs
         self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
-        self.q_net = QNetwork(state_size, action_size, 256)
-        self.avg_q_net = QNetwork(state_size, action_size, 256)
+        self.q_net = QNetwork(state_size, env.action_space.n, 256)
+        self.avg_q_net = QNetwork(state_size, env.action_space.n, 256)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.log_alpha = torch.tensor([-2.995], requires_grad=True).to(DEVICE)
+        self.log_alpha = torch.tensor([log_alpha], requires_grad=True).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -1
+        self.tau = tau
 
         # training meta
         self.training_i = 0
@@ -189,7 +188,7 @@ class SoftActorCritic:
                     action.cpu().numpy(),
                     reward,
                     next_state,
-                    done
+                    not done
                 ))
                 current_state = next_state
 
@@ -209,6 +208,7 @@ class SoftActorCritic:
         action_batch = torch.from_numpy(replay_samples[1]).to(DEVICE)
         reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
+        dones = torch.from_numpy(replay_samples[4]).type(torch.long).to(DEVICE)
 
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
@@ -218,23 +218,29 @@ class SoftActorCritic:
             next_actions, log_next_actions, _ = self.select_action(
                 next_state_batch
             )
-            next_q = self.avg_q_net(next_state_batch, next_actions)
-            next_state_values = next_q - alpha * log_next_actions.unsqueeze(1)
+            next_q_a = self.avg_q_net(next_state_batch)
+            next_q = next_q_a[torch.arange(len(next_actions)), next_actions]
+            next_state_values = next_q - alpha * log_next_actions
 
             # Calculate Q network target
-            q_target = reward_batch + self.gamma * next_state_values.squeeze()
+            q_target = reward_batch + self.gamma * dones.type(torch.float) * next_state_values.squeeze()
 
         # q network loss
-        if self.training_i % 1000 == 0:
-            breakpoint()
-        q_values = self.q_net(state_batch, action_batch)
+        q_a_values = self.q_net(state_batch)
+        q_values = q_a_values[torch.arange(len(action_batch)),
+                              action_batch.type(torch.long)]
         q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
 
         # policy loss
         pi_actions, log_actions, action_dist = self.select_action(state_batch)
-        q_values_pi = self.q_net(state_batch, pi_actions)
-        policy_loss = (alpha * log_actions - q_values_pi.squeeze())
-        policy_loss = policy_loss.mean()
+        q_a_values_pi = self.q_net(state_batch)
+        q_values_pi = q_a_values_pi[torch.arange(len(pi_actions)), pi_actions]
+        q_distribution = torch.distributions.Categorical(F.softmax((1.0/alpha)*q_a_values_pi, dim=-1))
+        policy_loss = torch.distributions.kl.kl_divergence(action_dist, q_distribution).mean()
+        # q_values_pi = self.q_net(state_batch, pi_actions)
+        # policy_loss = (alpha * log_actions - q_values_pi.squeeze())
+        # policy_loss = policy_loss.mean()
+
 
         # update parameters
         self.q_optim.zero_grad()
@@ -256,7 +262,7 @@ class SoftActorCritic:
             self.alpha_optim.step()
 
         # Step average Q net
-        move_average(self.q_net, self.avg_q_net)
+        move_average(self.q_net, self.avg_q_net, self.tau)
 
         # logging
         self.tbx_logger(
@@ -268,6 +274,7 @@ class SoftActorCritic:
                 'Q/avg_q': q_values.mean().item(),
                 'Q/avg_reward': reward_batch.mean().item(),
                 'Q/avg_V': next_state_values.mean().item(),
+                'Q/entropy': q_distribution.entropy().mean(),
                 'pi/avg_entropy': action_dist.entropy().mean(),
                 'pi/avg_log_actions': log_actions.detach().mean().item(),
                 'pi/avg_q_values': q_values_pi.squeeze().detach().mean().item(),
@@ -277,8 +284,8 @@ class SoftActorCritic:
         )
 
         # Things to do only once on the first iteration
-        if self.training_i == 0:
-            self.tbx_writer.add_graph(self.policy, state_batch)
+        # if self.training_i == 0:
+            # self.tbx_writer.add_graph(self.policy, state_batch)
             # self.tbx_writer.add_graph(self.q_net, [state_batch, pi_actions])
 
         self.training_i += 1

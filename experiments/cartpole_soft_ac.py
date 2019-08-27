@@ -48,6 +48,9 @@ def main():
         replay_buffer_size=args.replay_buffer_size,
         buffer_sample_size=args.replay_buffer_sample_size,
         tbx_writer = tbx_writer,
+        tau=0.005,
+        log_alpha=-5.00,
+        entropy_tuning=False,
     )
 
     for i in range(10**6):
@@ -58,9 +61,10 @@ def main():
             for j in range(10):
                 rs.append(play(soft_ac, env))
 
-            tbx_writer.add_scalar('avg reward', np.mean(rs), i)
+            tbx_writer.add_scalar('rewards/avg reward', np.mean(rs), i)
+            tbx_writer.add_scalar('rewards/max_reward', np.max(rs), i)
 
-        if i% 10000 == 0:
+        if i% 1000 == 0:
             soft_ac.replay_buffer.buffer.clear()
 
 
