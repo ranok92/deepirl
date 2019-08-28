@@ -82,13 +82,15 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
-    save_folder = './results/'+ args.save_folder
-    experiment_logger = Logger('./results','temp_save.txt')
+    save_folder = None
+    if not args.dont_save:
+        save_folder = './results/'+ args.save_folder
+        experiment_logger = Logger(save_folder,'experiment_info.txt')
 
-
-    experiment_logger.log_header('Arguments for the experiment :')
-    experiment_logger.log_info(vars(args))
+        experiment_logger.log_header('Arguments for the experiment :')
+        experiment_logger.log_info(vars(args))
     
+
     mp.set_start_method('spawn')
 
     if args.render:
@@ -112,9 +114,9 @@ def main():
         print('Enter proper feature extractor value.')
         exit()
 
-
-    experiment_logger.log_header('Parameters of the feature extractor :')
-    experiment_logger.log_info(feat_ext.__dict__)
+    if not args.dont_save:
+        experiment_logger.log_header('Parameters of the feature extractor :')
+        experiment_logger.log_info(feat_ext.__dict__)
 
     '''
     np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
@@ -133,16 +135,21 @@ def main():
     '''
     env = gym.make('MountainCar-v0')
     env = env.unwrapped
-    experiment_logger.log_header('Environment details :')
-    experiment_logger.log_info(env.__dict__)
+
+    if not args.dont_save:
+
+        experiment_logger.log_header('Environment details :')
+        experiment_logger.log_info(env.__dict__)
 
 
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99, plot_loss=False,
                         log_interval=10, max_ep_length=300, hidden_dims=args.policy_net_hidden_dims,
                         max_episodes=30, save_folder=save_folder)
 
-    experiment_logger.log_header('Details of the RL method :')
-    experiment_logger.log_info(model.__dict__)
+    if not args.dont_save:
+
+        experiment_logger.log_header('Details of the RL method :')
+        experiment_logger.log_info(model.__dict__)
     
     #pdb.set_trace()
 
@@ -170,7 +177,7 @@ def main():
             model.train_mp(reward_net = reward_net,n_jobs = 4)
 
         if not args.dont_save:  
-            model.policy.save('./saved-models/')
+            model.policy.save(save_folder+'/policy/')
 
     if args.play:
         xaxis = []

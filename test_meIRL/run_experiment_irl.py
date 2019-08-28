@@ -45,6 +45,10 @@ parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The n
 parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the reward network.')
 
+parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
+                     hidden layers of the policy network.')
+
+
 parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
 
 
@@ -140,14 +144,14 @@ def main():
     #initialize loss based termination
     # intialize RL method
     #CHANGE HERE
-    rlMethod = ActorCritic(env, gamma=0.99,
+    rlMethod = ActorCritic(env, gamma=1,
                             log_interval=args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
                             termination=None,
                             plot_loss=False,
                             save_folder=to_save,
-                            hidden_dims=args.reward_net_hidden_dims,
+                            hidden_dims=args.policy_net_hidden_dims,
                             feat_extractor=feat_ext)
     print("RL method initialized.")
     print(rlMethod.policy)

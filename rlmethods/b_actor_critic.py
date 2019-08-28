@@ -83,11 +83,11 @@ class Policy(BaseNN):
         else:
             self.input = nn.Sequential(
                 nn.Linear(state_dims, hidden_dims[0]),
-                nn.ReLU()
+                nn.ELU()
             )
             for i in range(1, len(hidden_dims)):
                 self.hidden_layers.append(nn.Sequential(nn.Linear(hidden_dims[i-1], hidden_dims[i]),
-                                                    nn.ReLU()
+                                                    nn.ELU()
                                                     )
                                           )
 
@@ -174,7 +174,7 @@ class ActorCritic:
         self.policy = self.policy.to(self.device)
 
         # optimizer setup
-        self.optimizer = optim.SGD(self.policy.parameters(), lr=0.0000001)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=0.001)
         self.EPS = np.finfo(np.float32).eps.item()
 
         #for plotting loss

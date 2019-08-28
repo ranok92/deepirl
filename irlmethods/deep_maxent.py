@@ -57,6 +57,7 @@ class RewardNet(BaseNN):
         self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.head = nn.Sequential(
             nn.Linear(hidden_dims[-1], 1),
+            nn.Tanh(),
         )
 
     def forward(self, x):

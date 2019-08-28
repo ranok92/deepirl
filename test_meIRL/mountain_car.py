@@ -1,6 +1,6 @@
 import gym, sys, time, os
 sys.path.insert(0, '..')
-
+from mpl_toolkits.mplot3d import Axes3D
 import torch
 import numpy as np 
 import math
@@ -43,6 +43,8 @@ class MCFeaturesOnehot():
         self.pos_range = [-1.2, 0.6]
         self.vel_range = [-0.07, 0.07]
 
+        self.pos_rep_dim =  disc_pos
+        self.vel_rep_dim = disc_vel
         self.state_rep_size = disc_pos+disc_vel
         self.generate_hash_variable()
 
@@ -128,6 +130,8 @@ class MCFeatures():
         else:
             self.state_rep_size = len(np.binary_repr(self.disc_pos))+len(np.binary_repr(self.disc_vel))
 
+        self.pos_rep_dim = len(np.binary_repr(self.disc_pos))
+        self.vel_rep_dim = len(np.binary_repr(self.disc_vel))
         self.generate_hash_variable()
 
     def generate_hash_variable(self):
@@ -271,7 +275,7 @@ def plot_true_and_network_reward(reward_network_folder, feature_extractor):
     exhaustive_state_list, true_reward = get_exhaustive_state_list(feature_extractor)
     reward_holder = np.zeros([len(reward_network_names)+1, len(exhaustive_state_list)])
 
-    hidden_dims = [256]
+    hidden_dims = [1024, 256]
     net_counter = 0
     for reward_net in sorted(reward_network_names, key=numericalSort):
 
@@ -291,6 +295,51 @@ def plot_true_and_network_reward(reward_network_folder, feature_extractor):
 
     reward_holder[-1][:] = np.array(true_reward)
     pdb.set_trace()
+
+    
+    ##################for visualizing the rewards###############
+
+    conv_arr = np.array([2**i for i in range(7, -1, -1)])
+    conv_arr_vel = np.array([2**i for i in range(3, -1, -1)])
+    print(conv_arr_vel)
+    reward_mat = np.zeros((128,8))
+    for i in range(reward_holder.shape[0]-1):
+        state_arr = np.zeros(128)
+        fig = plt.figure()
+        fig2 = plt.figure()
+        ax = Axes3D(fig)
+        ax2 = fig2.add_subplot(111)
+        lx = reward_mat.shape[0]
+        ly = reward_mat.shape[1]
+        
+        xpos = np.arange(0, lx, 1)
+        ypos = np.arange(0, ly, 1)
+
+        xpos, ypos = np.meshgrid(xpos, ypos)
+        xpos = xpos.flatten()   # Convert positions to 1D array
+        ypos = ypos.flatten()
+        zpos = np.zeros(lx*ly)
+
+        dx = 0.5 * np.ones_like(zpos)
+        dy = dx.copy()
+        
+        #cs = ['r', 'g', 'b', 'y', 'c'] * ly
+        for j in range(reward_holder.shape[1]):
+
+
+            
+            state = exhaustive_state_list[j].cpu().numpy()
+            pos = state[0:8]
+            vel = state[8:]
+            print('pos',pos)
+            print('vel', vel)
+            print(conv_arr)
+            reward_mat[int(pos.dot(conv_arr))-1][int(vel.dot(conv_arr_vel)-1)] = reward_holder[i][j]
+
+        ax.bar3d(xpos,ypos,zpos, dx, dy, reward_mat.flatten())
+        cax = ax2.matshow(reward_mat, interpolation='nearest')
+        fig2.colorbar(cax)
+        plt.show()
     #print(reward_holder[:,0:200])
     plt.pcolor(reward_holder)
     #plt.matshow(reward_holder[:,:])
@@ -332,7 +381,12 @@ def get_exhaustive_state_list(feature_extractor):
 
 def view_reward_from_trajectory(reward_network_folder, trajectory_folder, feature_extractor):
 
-    hidden_dims = [1024]
+    '''
+    given a reward network folder, a trajectory folder and a feature extractor, this plots the 
+    rewards given to each of the trajectories by each of the reward networks in the reward network folder
+
+    '''
+    hidden_dims = [1024, 256]
     reward_network_names = glob.glob(os.path.join(reward_network_folder,'*.pt'))
     trajectories = glob.glob(os.path.join(trajectory_folder,'*.states'))
     
@@ -360,10 +414,63 @@ def view_reward_from_trajectory(reward_network_folder, trajectory_folder, featur
 
         reward_counter += 1
 
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111)
+    cax = ax2.matshow(rewards_across_traj_model, interpolation='nearest')
+    fig2.colorbar(cax)
+    plt.show()
     pdb.set_trace()
 
     return rewards_across_traj_model
 
+def plot_svf_on_state_space(trajectory_folder, feature_extractor):
+
+    '''
+    given a trajectory folder and a feature extractor, plots the 
+    svf of the trajectory on the state space as dictated by the feature
+    extractor
+    '''
+    pos_dim = feature_extractor.pos_rep_dim
+    vel_dim = feature_extractor.vel_rep_dim
+    conv_arr_pos = np.array([2**i for i in range(pos_dim-1, -1, -1)])
+    conv_arr_vel = np.array([2**i for i in range(vel_dim-1, -1, -1)])
+    trajectories = glob.glob(os.path.join(trajectory_folder,'*.states'))
+
+    for trajectory in trajectories:
+
+        state_list = torch.load(trajectory)
+        svf_matrix = np.zeros((feature_extractor.disc_pos, feature_extractor.disc_vel))
+        fig2 = plt.figure()
+        ax2 = fig2.add_subplot(111)
+        for state in state_list:
+
+            pos = state[0:pos_dim].cpu().numpy()
+            vel = state[pos_dim:].cpu().numpy()
+            pos = int(pos.dot(conv_arr_pos))-1
+            vel = int(vel.dot(conv_arr_vel))-1
+
+            svf_matrix[pos][vel] += 1
+
+        cax = ax2.matshow(svf_matrix)
+        fig2.colorbar(cax)
+        plt.show()
+
+
+
+
+'''
+def evalualuate_trajectory(trajectory, reward_network):
+
+    #given a trajectory (a sequence of states) and a reward_network
+    #this will return the reward obtained by the trajectory
+    reward = 0
+    for state in trajectory:
+        reward += reward_network(state)
+
+    return reward
+
+def mass_trajectory_evaluation(trajectory_folder, reward_network_folder):
+'''
 
 
 
@@ -404,21 +511,21 @@ if __name__=='__main__':
     rollout(env, 10)
     #########################################
     '''
-    '''
-    ##################getting a better understanding of the rewards
-    feature_extractor = MCFeaturesOnehot(10,10)
-    print(feature_extractor.state_rep_size)
-    l = plot_true_and_network_reward('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Dont-save-this2019-08-25 15:48:10-reg-0-seed-10101-lr-0.001/saved-models-rewards/', feature_extractor)
-    ##################################################################
-    '''
-    #view_reward_from_trajectory('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_no_scaling_Svf2019-08-21 17:28:32-reg-0-seed-111-lr-0.001/saved-models-rewards', 
-    #                            './exp_traj_mountain_car_MCFeaturesOnehot_10',
-    #                            feature_extractor)
-
-    #print(l)
-
-    #collect_trajectories(env, 10)
     
+    ##################getting a better understanding of the rewards
+    feature_extractor = MCFeatures(128, 8)
+    #print(feature_extractor.state_rep_size)
+    #l = plot_true_and_network_reward('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_8_updated_svf_calc2019-08-26 14:56:46-reg-0-seed-23-lr-0.001/saved-models-rewards/', feature_extractor)
+    
+    #reward_mat = view_reward_from_trajectory('./results/Beluga/MountainCar_beluga_MCFeatures_128_8_updated_svf_calc2019-08-26 14:56:46-reg-0-seed-23-lr-0.001/saved-models-rewards', 
+    #                            './exp_traj_mountain_car_MCFeatures_128_8',
+    #                            feature_extractor)
+    ##################################################################
+    plot_svf_on_state_space('./exp_traj_mountain_car_MCFeatures_128_8', feature_extractor)
+    #print(l)
+        
+
+    '''
     #### debugging expert svf####
     feature_extractor = MCFeatures(128,8)
     traj_path = './exp_traj_mountain_car_MCFeatures_128_8_test/'
@@ -443,4 +550,4 @@ if __name__=='__main__':
         sum_svf += exp[key]
 
     pdb.set_trace()
-    
+    '''
