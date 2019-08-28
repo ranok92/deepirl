@@ -402,12 +402,13 @@ def generate_agent_grid_visitation_map(policy_fname_list,feature_extractor = Non
 
 
 
-def compare_svf(expert_folder, agent_policy, env=None, feat=None):
+def compare_svf(expert_folder, agent_policy, env_reward=None, env=None, feat=None):
     '''
     expert folder - folder containing expert trajectories
     agent_policy_folder/policy - a folder or a single policy
     Given these two information, the compare_svf function 
     saves the svf for all the policies which can be used for visual comparison.
+    env_reward is the reward network corresponding to the policy network
     '''
 
     dot_product_loss = []
@@ -419,7 +420,7 @@ def compare_svf(expert_folder, agent_policy, env=None, feat=None):
     expert_svf_dict = calculate_expert_svf(expert_folder, 
                         feature_extractor=feat,
                         gamma=0.99)
-    pdb.set_trace()
+    #pdb.set_trace()
     exp_arr = np.zeros(len(expert_svf_dict.keys()))
     i = 0
     exp_state_key = {}
@@ -442,15 +443,16 @@ def compare_svf(expert_folder, agent_policy, env=None, feat=None):
     #plotting for the agents
 
     if os.path.isfile(agent_policy):
+        
         policy = Policy(state_space, environment.action_space.n, hidden_dims=[256])
         policy.load(agent_policy)
         policy.eval()
         policy.to(DEVICE)
 
         agent_file_name = agent_policy.strip().split('/')[-1].split('.')[0]
-        agent_svf_dict = calculate_svf_from_sampling(no_of_samples=1000, env=environment,
+        agent_svf_dict = calculate_svf_from_sampling(no_of_samples=500, env=environment,
                                           policy_nn=policy, reward_nn=None,
-                                          episode_length=20, feature_extractor=feat,
+                                          episode_length=40, feature_extractor=feat,
                                           gamma=.99)
         agent_arr = np.zeros(len(expert_svf_dict.keys()))
         i = 0
@@ -464,7 +466,7 @@ def compare_svf(expert_folder, agent_policy, env=None, feat=None):
         plt.show()
 
         states, diff = get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat)
-        pdb.set_trace()
+        #pdb.set_trace()
 
         plt.plot(diff)
         plt.show()
@@ -475,26 +477,37 @@ def compare_svf(expert_folder, agent_policy, env=None, feat=None):
 
         #read files from the directory
         model_names = glob.glob(os.path.join(agent_policy, '*.pt'))
-
+        reward_names = glob.glob(os.path.join(env_reward, '*.pt'))
+        reward_names = sorted(reward_names, key=numericalSort)
+        counter = 0
         for name in sorted(model_names, key=numericalSort):
 
+            #load the policy network
             policy = Policy(state_space, environment.action_space.n, hidden_dims=[256])
             print('Loading file:', name)
             policy.load(name)
             policy.eval()
             policy.to(DEVICE)
 
+            #load the reward network
+            reward_net_name = reward_names[counter]
+            reward = RewardNet(state_space, hidden_dims=[256])
+            print('Loading reward network :', reward_net_name)
+            reward.load(reward_net_name)
+            reward.eval()
+            reward.to(DEVICE)
+            counter+=1
             agent_file_name = name.split('/')[-1].split('.')[0]
             agent_svf_dict = calculate_svf_from_sampling(no_of_samples=3000, env=environment,
-                                              policy_nn=policy, reward_nn=None,
+                                              policy_nn=policy, reward_nn=reward,
                                               episode_length=30, feature_extractor=feat,
                                               gamma=.99)
             states, diff = get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat)
 
-            pdb.set_trace()
+            #pdb.set_trace()
 
             plt.plot(diff)
-            plt.show()
+            #plt.show()
             #diff_arr = np.zeros(len(expert_svf_dict.keys()))
             plt.savefig('./experiments/results/svf_visual/'+agent_file_name+'.jpg')
 
@@ -663,6 +676,6 @@ if __name__ == '__main__':
     #feat = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles'])
     expert_folder = './experiments/trajs/ac_loc_glob_rectified_win_3_static_map3/'
     agent_policy = './experiments/results/Testing_new_env_quadra-reg-0-seed-6651-lr-0.001/saved-models/'
-    
+    agent_reward = './experiments/results/Testing_new_env_quadra-reg-0-seed-6651-lr-0.001/saved-models-rewards/'
 
-    compare_svf(expert_folder, agent_policy, env=env, feat=feat)
+    compare_svf(expert_folder, agent_policy, env_reward=agent_reward, env=env, feat=feat)
