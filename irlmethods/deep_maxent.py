@@ -25,27 +25,46 @@ import utils  # NOQA: E402
 from irlmethods import irlUtils
 # from irlmethods.irlUtils import getStateVisitationFreq  # NOQA: E402
 from neural_nets.base_network import BaseNN
+from torch.nn.utils import clip_grad_norm_
 
+from torch.optim.lr_scheduler import StepLR
 from rlmethods.b_actor_critic import Policy
+
+
+#adding tensorboard for visualization
+from tensorboardX import SummaryWriter
+
+#writer = SummaryWriter('../test_meIRL/tensorboard_log')
 
 
 class RewardNet(BaseNN):
     """Reward network"""
 
-    def __init__(self, state_dims):
+    def __init__(self, state_dims, hidden_dims=[128]):
         super(RewardNet, self).__init__()
 
-        self.body = nn.Sequential(
-            nn.Linear(state_dims, 128),
-            nn.ReLU(),
+        self.input = nn.Sequential(
+            nn.Linear(state_dims, hidden_dims[0]),
+            nn.ELU(),
         )
-
+        self.hidden_layers = []
+        for i in range(1,len(hidden_dims)):
+            self.hidden_layers.append(nn.Sequential(
+                                                    nn.Linear(hidden_dims[i-1], hidden_dims[i]),
+                                                    nn.ELU(),
+                                                    )
+                                      )
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.head = nn.Sequential(
-            nn.Linear(128, 1),
+            nn.Linear(hidden_dims[-1], 1),
+            nn.Tanh(),
         )
 
     def forward(self, x):
-        x = self.body(x)
+        x = self.input(x)
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
+
         x = self.head(x)
 
         return x
@@ -69,11 +88,16 @@ class DeepMaxEnt():
             env=None,
             iterations=10,
             log_intervals=1,
-            on_server = True,
+            on_server=True,
             save_folder=None,
-            rl_max_episodes = 30,
-            graft = True,
-            regularizer=0.1
+            rl_max_episodes=30,
+            graft=True,
+            hidden_dims=[128],
+            regularizer=0.1,
+            learning_rate=1e-3,
+            scale_svf=True,
+            seed=10, 
+            clipping_value=None
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -81,47 +105,76 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episodes = rl_max_episodes
+        self.rl_max_episodes = self.rl.max_ep_length
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
         # needs to be made independant somehow
         # self.env.step = utils.step_torch_state()(self.env.step)
         # self.env.reset = utils.reset_torch_state()(self.env.reset)
+        '''
         if self.env.is_onehot:
             self.state_size = self.env.reset().shape[0]
         else:
-            self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
+        '''
+        self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
-        self.reward = RewardNet(self.state_size)
-        self.optimizer = optim.Adam(self.reward.parameters(), lr=1e-3, weight_decay=0.045)
+        self.reward = RewardNet(self.state_size, hidden_dims)
+        #############debug###########
+        #self.reward.load('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_8_no_sampling_SVF2019-08-22 08:56:38-reg-0-seed-110-lr-0.0001/saved-models-rewards/3.pt')
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+
+        self.reward = self.reward.to(self.device)
+
+        self.hidden_dims = hidden_dims
+
+        self.optimizer = optim.SGD(self.reward.parameters(), lr=learning_rate)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+
         self.EPS = np.finfo(np.float32).eps.item()
         self.log_intervals = log_intervals
 
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+        self.seed = seed
+        self.scale_svf = scale_svf
+ 
         self.dtype = torch.float32
 
-        self.reward = self.reward.to(self.device)
 
         #making it run on server
         self.on_server = on_server
 
         self.regularizer = regularizer
         #folders for saving purposes
-        self.plot_save_folder = './plots/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
 
-        self.reward_network_save_folder = './saved-models-rewards/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
-        self.policy_network_save_folder = './saved-models/'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+str(self.env.seed)+'/'
+        self.save_folder_tf = './'+save_folder+'-reg-'+str(self.regularizer)+\
+                                '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/tf_logs/'
+
+        self.plot_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+\
+                                '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
+
+        self.reward_network_save_folder = './'+save_folder+'-reg-'+\
+                                          str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
+                                          str(learning_rate)+'/saved-models-rewards/'
+        self.policy_network_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+                                          str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
             pass
         else:
+            print(self.plot_save_folder)
             os.mkdir(self.plot_save_folder)
 
+
+        self.clipping = clipping_value
+        self.writer = SummaryWriter(self.save_folder_tf)
+
     #******parts being operated on
+    ############ array based svf calculation. Not feasible for larger state spaces#######
+    #####################################################################################
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path, feat=self.rl.feature_extractor)
+
 
 
     def calc_svf_absolute(self, policy, rows=10, cols=10, 
@@ -135,7 +188,7 @@ class DeepMaxEnt():
 
 
     def agent_svf_sampling(self,num_of_samples = 10000 , env = None,
-                            policy_nn = None , reward_nn = None,
+                            policy_nn = None , reward_nn = None, 
                             episode_length = 20, feature_extractor = None):
 
         return irlUtils.get_svf_from_sampling(no_of_samples=num_of_samples,
@@ -144,29 +197,37 @@ class DeepMaxEnt():
                                             episode_length = episode_length,
                                             feature_extractor = feature_extractor)
 
-    #***********
+    
+    ####################################################################################
+    ####################################################################################
 
 
-    #***********
-    def expert_svf_dict(self,smoothing_window=None):
-        '''
-        return irlUtils.calculate_expert_svf(self.traj_path, feature_extractor= self.rl.feature_extractor)
+
+    #********************* dictionary based svf calculation***************************
+    ##################################################################################
+    def expert_svf_dict(self,smoothing_window=None,gamma=1):
+        
+        return irlUtils.calculate_expert_svf(self.traj_path, 
+                                             feature_extractor=self.rl.feature_extractor,
+                                             gamma=gamma)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
                                                             feature_extractor=self.rl.feature_extractor,
                                                             smoothing_window=smoothing_window)
         
+        '''
+    def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
+                                policy_nn=None, reward_nn=None, smoothing_window=None, 
+                                scale_svf=True, episode_length=20, gamma=0.99,
+                                feature_extractor=None):
 
-    def agent_svf_sampling_dict(self,num_of_samples=10000 , env=None,
-                                policy_nn=None, reward_nn=None, smoothing_window=None,
-                                episode_length=20, feature_extractor=None):
-
-        ''' 
+         
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
-                                            env=  env, policy_nn = policy_nn,
-                                            reward_nn = reward_nn ,
-                                            episode_length = episode_length,
-                                            feature_extractor = feature_extractor)
+                                            env=env, policy_nn=policy_nn,
+                                            reward_nn=reward_nn, scale_svf=scale_svf,
+                                            episode_length=episode_length,
+                                            gamma=gamma,
+                                            feature_extractor=feature_extractor)
         '''
         return irlUtils.calculate_svf_from_sampling_using_smoothing(no_of_samples=num_of_samples, 
                                                                     env=env, policy_nn=policy_nn, 
@@ -175,27 +236,45 @@ class DeepMaxEnt():
                                                                     feature_extractor=feature_extractor,
                                                                     window=smoothing_window)
 
-        
+        '''
     #***********
+    ####################################################################################
+    ####################################################################################
 
 
 
 
 
-
-    def calculate_grads(self, optimizer, stateRewards, freq_diff):
-        optimizer.zero_grad()
-        dotProd = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
+    def calculate_grads(self, stateRewards, freq_diff):
         
+        #calculates the gradients on the reward network
+        self.optimizer.zero_grad()
+        dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
+
+
         #adding L1 regularization
         lambda1 = self.regularizer
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
+        grad_mag = torch.tensor(0, dtype=torch.float).to(self.device)
+
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)
 
-        loss = dotProd+(lambda1*l1_reg)   
+        loss = dot_prod
         loss.backward()
-        return loss, dotProd, (lambda1*l1_reg), torch.norm(stateRewards.squeeze(), 1)
+
+        #clipping if asked for
+        if self.clipping is not None:
+            clip_grad_norm_(self.reward.parameters(), self.clipping)
+
+
+        for param in self.reward.parameters():
+            grad_mag +=torch.norm(param.grad, 1)
+
+        #print ('The magnitude of gradients after clipping:', grad_mag)
+        #print('The magnitude of the parameters :', l1_reg)
+        #pdb.set_trace()
+        return loss, dot_prod , l1_reg, grad_mag, torch.norm(stateRewards.squeeze(), 1)
 
 
     '''
@@ -215,7 +294,9 @@ class DeepMaxEnt():
 
 
     def per_state_reward(self, reward_function):
-
+        '''
+        calculates the rewards of all possible states. Suitable with small state spaces
+        '''
         all_state_list = []
         state_dict = self.rl.feature_extractor.state_str_arr_dict
 
@@ -232,13 +313,18 @@ class DeepMaxEnt():
 
 
     def get_rewards_of_states(self, reward_function, state_list):
-
+        '''
+        Calculates the rewards of the states provided in the state_list. 
+        More in line to handle bigger state spaces
+        '''
 
         state_tensors = torch.tensor(state_list, dtype=torch.float).to(self.device)
 
         return reward_function(state_tensors)
 
 
+
+    ''' Not being used for now.
     def plot(self, images, titles, save_path=None):
 
         nrows = max(1,int(len(images)/2)+1)
@@ -269,32 +355,54 @@ class DeepMaxEnt():
 
         for cb in colorbars:
             cb.remove()
+    '''
 
-    def plot_info(self,inp_list):
 
-        color_list = ['r','g','b','c','m']
+    def plot_info(self,inp_tuple):
+        #pass a tuple containing n number of lists , this function goes through all and plots them
         i = 0
-        for val in inp_list:
+        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
+        for list_val in inp_tuple:
             plt.figure(i)
-            plt.plot(val, color_list[i])
+            plt.plot(list_val,color_list[i])
             plt.draw()
-            plt.pause(0.0001)
+            plt.pause(.0001)
             i += 1
+            '''
+            plt.figure(1)
+            plt.plot(x_axis,svf_diff,'g')
+            plt.draw()
+            plt.pause(.0001)
+            plt.figure(2)
+            plt.plot(x_axis,dot_prod,'b')
+            plt.draw()
+            plt.pause(.0001)
+            '''
 
 
-    def resetTraining(self,inp_size,out_size, graft=True):
-
+    def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
+        '''
         if graft:
-            newNN = Policy(inp_size,out_size, body_net = self.reward.body)
+            newNN = Policy(inp_size, out_size, 
+                           hidden_dims=hidden_dims,
+                           input_net=self.reward.input,
+                           hidden_net=self.reward.hidden_layers)
         else:
-            newNN = Policy(inp_size,out_size)
-
+            newNN = Policy(inp_size, out_size, 
+                           hidden_dims=hidden_dims)
+        
         newNN.to(self.device)
         self.rl.policy = newNN
+        print('the rewards of the new policy :')
+        print(self.rl.policy.rewards)
+        '''
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
 
-    #############################################
-
+    #############################################################################
+    #############################################################################
+    #******************Following are a bunch of debugging methods****************
+    '''does not contribute to the main workings of the algorithm '''
+    
     def extract_svf_difference(self,svf_dict, svf_array):
         #here the dict is converted to array and the difference is taken
         #diff = array - dict
@@ -392,8 +500,10 @@ class DeepMaxEnt():
         return collections.OrderedDict(sorted(state_dict.items()))
 
 
+    ###############################################################################
+    ###############################################################################
 
-    #############################################
+
 
     def train(self):
         '''
@@ -419,27 +529,33 @@ class DeepMaxEnt():
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
 
-        smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
+        #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
-        expertdemo_svf = self.expert_svf_dict(smoothing_window=smoothing_window)
+        expertdemo_svf = self.expert_svf_dict(smoothing_window=None, gamma=1)
         print('Done reading expert-svf.')
+
         #expertdemo_svf = self.expert_svf_dict()
         #expert_svf_arr  = self.expert_svf()
+
         lossList = []
         dot_prod_list = []
         svf_diff_list = []
         l1_reg_list = []
         rewards_norm_list = []
 
+        #added new
+        model_performance_list = [] #list to store the raw score obtained by the current policy
+        model_performance_nn = []
+        reward_grad_norm_list = []
+
         for i in range(self.max_episodes):
             print('starting iteration %s ...'% str(i))
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size, self.action_size, self.graft)
+            self.resetTraining(self.state_size, self.action_size, self.hidden_dims, graft=self.graft)
 
             #save the reward network
-            #reward_network_folder = './saved-models-rewards/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
 
             pathlib.Path(self.reward_network_save_folder).mkdir(parents=True, exist_ok=True)
             self.reward.save(self.reward_network_save_folder)
@@ -455,14 +571,25 @@ class DeepMaxEnt():
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf = self.agent_svf_sampling_dict(num_of_samples=100,
+            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=500,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
+                                                             gamma=1,
+                                                             scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episodes,
-                                                             smoothing_window=smoothing_window)
+                                                             smoothing_window=None)
+
+
+            model_performance_list.append(true_reward)
+            self.writer.add_scalar('Log_info/model_performance_true', true_reward, i)
+            model_performance_nn.append(nn_reward)
+            self.writer.add_scalar('Log_info/model_performance_nn', nn_reward, i)
+    
             print('Completed agent-svf sampling.')
+            #print('True reward :', true_reward)
+            #print('NN reward :', nn_reward)
 
             #np.random.seed(11)
             #test_agent_svf = self.agent_svf_sampling(num_of_samples=300,
@@ -472,23 +599,15 @@ class DeepMaxEnt():
             #                                    feature_extractor = self.rl.feature_extractor,
             #                                    episode_length = self.rl_max_episodes)
             #save the policy network
+            
             #policy_network_folder = './saved-models/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(self.policy_network_save_folder).mkdir(parents=True, exist_ok=True)
             current_agent_policy.save(self.policy_network_save_folder)
             
 
-        
-            #***********changing this block
-            #diff_freq = -torch.from_numpy(expertdemo_svf - current_agent_svf).type(self.dtype)
-            #diff_freq = diff_freq.to(self.device)
-
-            # returns a tensor of size (no_of_states x 1)
-            #reward_per_state = self.per_state_reward(
-            #    self.reward)
-            #*******************************
-
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
-            svf_diff_list.append(np.dot(diff_freq,diff_freq))
+            self.writer.add_scalar('Log_info/svf_difference', np.linalg.norm(diff_freq,1), i)
+            svf_diff_list.append(np.linalg.norm(diff_freq,1))
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
@@ -496,94 +615,43 @@ class DeepMaxEnt():
 
             #all_state_rewards = self.per_state_reward(self.reward)
 
-
-
-            ####################################
             dot_prod_from_dict = torch.dot(state_rewards.squeeze(), diff_freq.squeeze())
 
-
-
-            #diff_freq_arr = -torch.from_numpy(expert_svf_arr - test_agent_svf).type(torch.FloatTensor).to(self.device)
-
-
-            #dot_prod_from_arr = torch.dot(all_state_rewards.squeeze(), diff_freq_arr.squeeze())
-
-            #state_list_from_arr = self.relevant_states(expert_svf_arr - test_agent_svf)
-
-            #st_counter = 0
-            #for i in range(len(states_visited)):
-
-            #    print('State :', states_visited[i], '  ', -diff_freq[i])
-            #    st_counter+=1
-
-            #print('Total states from dict :',st_counter)
-            #input('Press enter to continue: ')
-
-            #print("THE DOT PROD FROM ARR :", dot_prod_from_arr)
-            #print("The DOT PROD FROM DICT :", dot_prod_from_dict)
-
-            #input('Press enter to continue: ')
-
-            #############################3
-
-            # PLOT
-            '''
-            to_plot = []
-            to_plot.append(diff_freq.cpu().numpy().reshape((10,10)))
-            to_plot.append(expertdemo_svf.reshape((10,10)))
-            to_plot.append(current_agent_svf.reshape((10,10)))
-            to_plot.append(reward_per_state.cpu().detach().numpy().reshape((10,10)))
-
-            to_plot_descriptions = []
-            to_plot_descriptions.append('SVF difference (L)')
-            to_plot_descriptions.append('expert SVF')
-            to_plot_descriptions.append('policy SVF')
-            to_plot_descriptions.append('Reward per state')
-
-            self.plot(to_plot, to_plot_descriptions,
-                      save_path=self.plot_save_folder)
-            '''
             # GRAD AND BACKPROP
-            loss, dot_prod, l1val , rewards_norm = self.calculate_grads(self.optimizer, state_rewards, diff_freq)
+
+            loss, dot_prod, l1val, reward_nn_grad_magnitude, rewards_norm = self.calculate_grads(state_rewards,
+                                                                        diff_freq)
+
 
             lossList.append(loss)
+            self.writer.add_scalar('Log_info/loss', loss, i)
+
             dot_prod_list.append(dot_prod)
+            self.writer.add_scalar('Log_info/dot_product_val', dot_prod, i)
+
             l1_reg_list.append(l1val)
+            self.writer.add_scalar('Log_info/l1_parameters', l1val, i)
+
             rewards_norm_list.append(rewards_norm)
-            
+            self.writer.add_scalar('Log_info/reward_norm', rewards_norm, i)
+
+            reward_grad_norm_list.append(reward_nn_grad_magnitude)
+            self.writer.add_scalar('Log_info/reward_grad_norm', reward_nn_grad_magnitude, i)
+
+
             self.plot_info((lossList, svf_diff_list, 
-                            l1_reg_list, dot_prod_list, rewards_norm_list))
+                            l1_reg_list, dot_prod_list, rewards_norm_list, reward_grad_norm_list,
+                            model_performance_list, model_performance_nn))
+
+            #pdb.set_trace()
             self.optimizer.step()
+
+            #self.lr_scheduler.step()
 
             print('done')
 
 
-            #ext_svf, svf_from_dict, svf_from_arr = self.extract_svf_difference(current_agent_svf, test_agent_svf)
-            
-            #print('information from state dict:', current_agent_svf)
-            #print('information from svf:', self.array_to_state_dict(test_agent_svf))
-
-            #plt.figure(5)
-            #plt.clf()
-            #plt.plot(ext_svf, 'r')
-            #file_name = self.plot_save_folder+'svf_difference'+str(i)+'.jpg'
-            #plt.savefig(file_name)
-
-            #plt.figure(6)
-            #plt.clf()
-            #plt.plot(svf_from_dict, 'r')
-            #plt.plot(svf_from_arr, 'b')
-            #file_name = self.plot_save_folder+'indiv_svfs'+str(i)+'.jpg'
-            #plt.savefig(file_name)
-
-            #svf_diff_2 = self.extract_svf_difference_2(current_agent_svf, test_agent_svf)
-            #plt.figure(7)
-            #plt.clf()
-            #plt.plot(svf_diff_2, 'r')
-            #file_name = self.plot_save_folder+'svf_difference_another'+str(i)+'.jpg'
-            #plt.savefig(file_name)
-
-
+            #storing the plots in files
             if (i+1) % 3 == 0:
 
                 plt.figure(0)
@@ -606,6 +674,17 @@ class DeepMaxEnt():
                 file_name = self.plot_save_folder+'rewards-norm'+str(i)+'.jpg'
                 plt.savefig(file_name)
 
+                plt.figure(5)
+                file_name = self.plot_save_folder+'reward-net-grad-norm'+str(i)+'.jpg'
+                plt.savefig(file_name)
 
+                plt.figure(6)
+                file_name = self.plot_save_folder+'model-performance-true'+str(i)+'.jpg'
+                plt.savefig(file_name)
 
+                plt.figure(7)
+                file_name = self.plot_save_folder+'model-performance-nn'+str(i)+'.jpg'
+                plt.savefig(file_name)
+
+        self.writer.close()
         return self.reward

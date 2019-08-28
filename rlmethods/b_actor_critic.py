@@ -31,6 +31,28 @@ from neural_nets.base_network import BaseNN
 from rlmethods.rlutils import LossBasedTermination
 
 
+import gc
+
+import psutil
+process = psutil.Process(os.getpid())
+def display_memory_usage(memory_in_bytes):
+
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    mem_list = []
+    cur_mem = memory_in_bytes
+    while cur_mem > 1024:
+
+        mem_list.append(cur_mem%1024)
+        cur_mem /= 1024
+    
+    mem_list.append(cur_mem)
+    for i in range(len(mem_list)):
+
+        print(units[i] +':'+ str(mem_list[i])+', ', end='')
+
+    print('\n')
+
+
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -52,48 +74,66 @@ dtype = torch.float32
 class Policy(BaseNN):
     """Policy network"""
 
-    def __init__(self, state_dims, action_dims, body_net = None):
+    def __init__(self, state_dims, action_dims, hidden_dims=[128], 
+                 input_net=None, hidden_net=None):
         super(Policy, self).__init__()
-
-        if body_net:
-            self.graft(body_net)
+        self.hidden_layers = []
+        if input_net or hidden_net:
+            self.graft(input_net, hidden_net)
         else:
-            self.body = nn.Sequential(
-                nn.Linear(state_dims, 128),
-                nn.ReLU()
+            self.input = nn.Sequential(
+                nn.Linear(state_dims, hidden_dims[0]),
+                nn.ELU()
             )
+            for i in range(1, len(hidden_dims)):
+                self.hidden_layers.append(nn.Sequential(nn.Linear(hidden_dims[i-1], hidden_dims[i]),
+                                                    nn.ELU()
+                                                    )
+                                          )
 
-        self.action_head = nn.Linear(128, action_dims)
-        self.value_head = nn.Linear(128, 1)
-
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+        self.action_head = nn.Linear(hidden_dims[-1], action_dims)
+        self.value_head = nn.Linear(hidden_dims[-1], 1)
         self.saved_actions = []
         self.rewards = []
 
     def forward(self, x):
-        x = self.body(x)
+        x = self.input(x)
+
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
 
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
 
-    def graft(self, body):
+    def graft(self, input_net, hidden_net):
         """Grafts a deep copy of another neural network's body into this
         network. Requires optimizer to be reset after this operation is
         performed.
 
         :param body: body of the neural network you want grafted.
         """
-        assert body is not None, 'NN body being grafted is None!'
+        assert input_net is not None, 'NN body being grafted is None!'
 
-        self.body = copy.deepcopy(body)
+        self.input = copy.deepcopy(input_net)
+
+        assert hidden_net is not None, 'No hidden layers to graft!'
+        self.hidden_layers = []
+        for i in range(len(hidden_net)):
+
+            self.hidden_layers.append(copy.deepcopy(hidden_net[i]))
+
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+
 
 
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0, max_ep_length=200,
-                 reward_threshold_ratio=0.99 , plot_loss = False):
+                 log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128],
+                 reward_threshold_ratio=0.99 , plot_loss = False, save_folder=None):
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
@@ -112,16 +152,18 @@ class ActorCritic:
 
         self.termination = termination
 
+        '''
         if env.is_onehot:
             state_size = env.reset().shape[0]
         else:
-
-            state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
+        '''
+        state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
 
         print("Actor Critic initialized with state size ",state_size)
         # initialize a policy if none is passed.
+        self.hidden_dims = hidden_dims
         if policy is None:
-            self.policy = Policy(state_size, env.action_space.n)
+            self.policy = Policy(state_size, env.action_space.n, self.hidden_dims)
         else:
             self.policy = policy
 
@@ -132,14 +174,21 @@ class ActorCritic:
         self.policy = self.policy.to(self.device)
 
         # optimizer setup
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-4)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=0.001)
         self.EPS = np.finfo(np.float32).eps.item()
 
         #for plotting loss
         self.plot_loss = plot_loss
+        #stores two things, the plot for loss at the end of each RL iteration 
+        #the plot for the reward obtained throughout the training from each of the threads
 
-        if self.plot_loss:
-            self.loss_interval = 50
+        if save_folder is not None:
+            self.save_folder = save_folder+'/RL_Training'
+        else:
+            self.save_folder = None
+        
+        if self.plot_loss or self.save_folder:
+            self.loss_interval = 1
             self.loss_mean = []
             self.loss = []
 
@@ -151,7 +200,6 @@ class ActorCritic:
 
         :param state: Current state in environment.
         """
-
         probs, state_value = self.policy(state)
         m = Categorical(probs)
         action = m.sample()
@@ -159,6 +207,20 @@ class ActorCritic:
                                                      state_value))
 
         return action.item()
+
+
+    def select_action_play(self, state):
+        '''
+        use this function to play, as the other one keeps storing information which is not needed
+        when evaluating.
+        '''
+
+        probs, state_value = self.policy(state)
+        #m = Categorical(probs)
+        #action = m.sample()
+        val, ind = torch.max(probs,0)
+
+        return ind.item()
 
 
 
@@ -208,34 +270,39 @@ class ActorCritic:
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
 
-    def generate_trajectory(self, num_trajs, path):
+    def generate_trajectory(self, num_trajs, render):
 
+        reward_across_trajs = []
+        
         for traj_i in range(num_trajs):
 
             # action and states lists for current trajectory
             actions = []
+            '''
             if self.feature_extractor is None:
                 states = [self.env.reset()]
             else:
                 states = [self.feature_extractor.extract_features(self.env.reset())]
-
+            '''
+            state = self.feature_extractor.extract_features(self.env.reset())
             done = False
             t= 0
             run_reward = 0
-            while t < self.max_ep_length:
+            while not done and t < self.max_ep_length:
                 t+=1
-                action = self.select_action(states[-1])
-                actions.append(action)
-
-                state, rewards, done, _ = self.env.step(action)
+                action = self.select_action_play(state)
                 
+                state, rewards, done, _ = self.env.step(action)
+                if render:
+                    self.env.render()
                 run_reward+=rewards
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
-                states.append(state)
-                
-            print('Reward for the run :',run_reward)
 
+                #states.append(state)
+            
+            reward_across_trajs.append(run_reward)
+            '''
             if run_reward > 1: # not a bad run
 
                 actions_tensor = torch.tensor(actions)
@@ -250,6 +317,8 @@ class ActorCritic:
                            os.path.join(path, 'traj%s.states' % str(traj_i)))
             else:
                 print("Rejecting bad run.")
+            '''
+        return reward_across_trajs
 
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
@@ -292,7 +361,7 @@ class ActorCritic:
         loss.backward()
 
         #adding loss in the loss list
-        if self.plot_loss:
+        if self.plot_loss or self.save_folder:
             self.loss_mean.append(loss.item())
             if len(self.loss_mean)==self.loss_interval:
                 self.loss.append(statistics.mean(self.loss_mean))
@@ -302,13 +371,15 @@ class ActorCritic:
         self.optimizer.step()
 
         del self.policy.rewards[:]
-        del saved_actions[:]
+        del self.policy.saved_actions[:]
 
     def train(self, rewardNetwork=None, featureExtractor=None, irl=False):
         """Train actor critic method on given gym environment."""
-
+        #along with the policy, the train now returns the loss and the 
+        #rewards obtained in the form of a list
         running_reward = 0
-
+        running_reward_list =[]
+        plt.figure('Loss')
         for i_episode in count(1):
 
             if self.feature_extractor is not None:
@@ -351,23 +422,26 @@ class ActorCritic:
 
                 #now does not break when done
                 if done:
-                    #break
-                    pass
+                    break
+                    #pass
 
-            running_reward = running_reward * self.reward_threshold_ratio +\
-                ep_reward * (1-self.reward_threshold_ratio)
+            #running_reward = running_reward * self.reward_threshold_ratio +\
+            #    ep_reward * (1-self.reward_threshold_ratio)
+
+            running_reward += ep_reward
 
             self.finish_episode()
 
             # if not in an IRL setting, solve environment according to specs
             if not irl:
 
-                if i_episode > 10 and i_episode % self.log_interval == 0:
+                if i_episode >= 10 and i_episode % self.log_interval == 0:
                     
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward))
-
+                            i_episode, t, running_reward/self.log_interval))
+                        running_reward_list.append(running_reward/self.log_interval)
+                        running_reward = 0
                         if self.plot_loss:
 
                             plt.plot(self.loss)
@@ -400,11 +474,15 @@ class ActorCritic:
             else:
                 assert self.max_episodes > 0
 
-                if i_episode > 10 and  i_episode % self.log_interval == 0:
+                if i_episode >= 10 and  i_episode % self.log_interval == 0:
 
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward))
+                            i_episode, t, running_reward/self.log_interval))
+                        running_reward_list.append(running_reward/self.log_interval)
+
+                        running_reward = 0
+
                     else:
                         print(self.termination)
                         print('Ep {}\tLast length: {:5d}\
@@ -413,6 +491,10 @@ class ActorCritic:
                             i_episode, t, running_reward, 
                             self.termination.current_avg_loss))
 
+                    if self.plot_loss:
+                            plt.plot(self.loss)
+                            plt.draw()
+                            plt.pause(.0001)
 
                 # terminate if max episodes exceeded
                 if i_episode > self.max_episodes:
@@ -422,6 +504,14 @@ class ActorCritic:
                 if self.termination is not None:
                     if self.termination.check_termination():
                         break
+
+        loss_list = self.loss
+        self.loss = []
+        self.loss_mean = []
+
+        if self.save_folder:
+            self.plot_and_save_info((loss_list, running_reward_list), ('Loss', 'rewards_obtained'))
+
 
         return self.policy
 
@@ -482,6 +572,32 @@ class ActorCritic:
 
         return self.policy
 
+    def plot_and_save_info(self, inp_tuple, name_tuple):
+        #pass a tuple containing n number of lists , this function goes through all and plots them
+        i = 0
+        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
+        for list_val in inp_tuple:
+            plt.figure(i)
+            plt.plot(list_val,color_list[i])
+            plt.draw()
+            plt.pause(.0001)
+
+            #getting the file_name, counting the number of files that are already existing
+            folder = self.save_folder + '/' + name_tuple[i] +'/'
+            print('The folder :', folder)
+            pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+            plot_i = 0
+            while os.path.exists(os.path.join(folder, '%s.jpg' % plot_i)):
+                plot_i += 1
+
+            file_name = folder + str(plot_i)+'.jpg'
+            plt.savefig(file_name)
+            plt.close()
+            i += 1
+
+
+
+
 
 def train_spawnable(process_index, rl, *args):
     print("%d process spawned." % process_index)
@@ -499,3 +615,6 @@ if __name__ == '__main__':
                         log_interval=args.log_interval)
 
     model.train()
+
+
+    

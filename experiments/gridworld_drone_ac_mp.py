@@ -1,7 +1,7 @@
 import pdb
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
-from logger.logger import Logger
+
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
@@ -23,32 +23,24 @@ parser.add_argument('--dont-save', action='store_true',
 parser.add_argument('--render', action='store_true', help="show the env.")
 parser.add_argument('--num-trajs', type=int, default=10)
 parser.add_argument('--view-reward', action='store_true')
+
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
 parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
                      feature extractor to be used in the experiment.')
 
 
-
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt', 
+                    help='The location of the annotation file to be used to run the environment.')
 def main():
     
     args = parser.parse_args()
-
-    experiment_logger = Logger('temp_save.txt')
-
-
-    experiment_logger.log_header('Arguments for the experiment :')
-    experiment_logger.log_info(vars(args))
-    
     mp.set_start_method('spawn')
 
-    if args.render:
-        from envs.gridworld import GridWorld
-    else:
-        from envs.gridworld_clockless import GridWorldClockless as GridWorld
+    from envs.gridworld_drone import GridWorldDrone
 
 
     agent_width = 10
-    step_size = 10
+    step_size = 2
     obs_width = 10
     grid_size = 10
 
@@ -65,44 +57,52 @@ def main():
                                     step_size=step_size,
                                     agent_width=agent_width,
                                     obs_width=obs_width,
-                                    )
+                                    fieldList = ['agent_state','goal_state','obstacles'])
 
     if args.feat_extractor == 'LocalGlobal':
         feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
-                           )
+                           fieldList = ['agent_state','goal_state','obstacles'])
     
-    experiment_logger.log_header('Parameters of the feature extractor :')
-    experiment_logger.log_info(feat_ext.__dict__)
 
+    #featExtract = OneHot(grid_rows=10,grid_cols=10)
+    #featExtract = FrontBackSideSimple(thresh1 = 1,fieldList =  ['agent_state','goal_state','obstacles'])
+
+    #featExtract = SocialNav(fieldList = ['agent_state','goal_state'])
     '''
     np.asarray([2,2]),np.asarray([7,4]),np.asarray([3,5]),
                                 np.asarray([5,2]),np.asarray([8,3]),np.asarray([7,5]),
                                 np.asarray([3,3]),np.asarray([3,7]),np.asarray([5,7])
-                                '''
+                               
     env = GridWorld(display=args.render, is_onehot= False,is_random=True,
-                    rows=100, agent_width=agent_width,step_size=step_size,
+                    rows=10, agent_width=agent_width,step_size=step_size,
                     obs_width=obs_width,width=grid_size,
-                    cols=100,
-                    seed=7,
-                    buffer_from_obs=0,
-                    obstacles=3,
+                    cols=10,
+                    seed = 7,
+                    obstacles = '../envs/map3.jpg',
                                 
-                    goal_state=np.asarray([5,5]))
+                    goal_state = np.asarray([5,5]))
+    '''
 
-    experiment_logger.log_header('Environment details :')
-    experiment_logger.log_info(env.__dict__)
 
-    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=0.99,
-                        log_interval=100,max_ep_length=40, hidden_dims=args.policy_net_hidden_dims,
-                        max_episodes=4000)
+    env = GridWorldDrone(display=args.render, is_onehot = False, 
+                        seed=999, obstacles=None, 
+                        show_trail=False,
+                        is_random=False,
+                        annotation_file=args.annotation_file,
+                        subject=None,
+                        tick_speed=90, 
+                        obs_width=10,
+                        step_size=step_size,
+                        agent_width=agent_width,
+                        show_comparison=True,                       
+                        rows=576, cols=720, width=grid_size)
 
-    experiment_logger.log_header('Details of the RL method :')
-    experiment_logger.log_info(model.__dict__)
-    
-    pdb.set_trace()
+    model = ActorCritic(env, feat_extractor=featExtract,  gamma=0.99,
+                        log_interval=50,max_ep_length=500 , 
+                        max_episodes = 2000)
 
     if args.policy_path is not None:
         model.policy.load(args.policy_path)
@@ -122,10 +122,10 @@ def main():
             model.policy.save('./saved-models/')
 
     if args.play:
-        env.tickSpeed = 15
+        #env.tickSpeed = 15
         assert args.policy_path is not None, 'pass a policy to play from!'
 
-        model.generate_trajectory(args.num_trajs, './trajs/ac_fbs_simple4_static_map7/')
+        model.generate_trajectory(args.num_trajs, './trajs/ac_loc_glob_rectified_win_3_static_map3/')
 
     if args.play_user:
         env.tickSpeed = 200

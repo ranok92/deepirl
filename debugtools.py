@@ -15,12 +15,15 @@ from irlmethods.deep_maxent import RewardNet
 from featureExtractor.gridworld_featureExtractor import LocalGlobal,SocialNav,FrontBackSideSimple
 import math
 from envs.gridworld import GridWorld
+from envs.gridworld_clockless import GridWorldClockless
+from envs.gridworld_drone import GridWorldDrone
 import torch
 import pdb
 from utils import to_oh
 from irlmethods.irlUtils import toTorch
 
 from irlmethods.irlUtils import expert_svf, get_svf_from_sampling
+from irlmethods.irlUtils import get_states_and_freq_diff, calculate_expert_svf, calculate_svf_from_sampling
 import re
 numbers = re.compile(r'(\d+)')
 
@@ -229,7 +232,7 @@ def plot_reward_across_policy_models(foldername,
         reward_expert = []
         for policy_file in sorted(model_names,key=numericalSort):
 
-
+            print('asdfasfsa',policy_file)
 
             reward_per_model = get_rewards_for_model(policy_file,env = env,
                                 feature_extractor = feature_extractor,
@@ -399,7 +402,7 @@ def generate_agent_grid_visitation_map(policy_fname_list,feature_extractor = Non
 
 
 
-def compare_svf(expert_folder, agent_policy, feat = None):
+def compare_svf(expert_folder, agent_policy, env=None, feat=None):
     '''
     expert folder - folder containing expert trajectories
     agent_policy_folder/policy - a folder or a single policy
@@ -409,71 +412,193 @@ def compare_svf(expert_folder, agent_policy, feat = None):
 
     dot_product_loss = []
 
-    environment = GridWorld(display=False, reset_wrapper=reset_wrapper,
-                            step_wrapper=step_wrapper, is_random=True,
-                            obstacles=[np.array([1, 2]), np.array([2, 3]),
-                                       np.array([2, 2]), np.array([4, 4])],
-                            goal_state=np.array([5, 5]),
-                            is_onehot=False)
+    environment = env
     state_space = feat.extract_features(environment.reset()).shape[0]
 
     #plotting for the expert
-    expert = expert_svf(expert_folder, 
-                        feat=feat,
+    expert_svf_dict = calculate_expert_svf(expert_folder, 
+                        feature_extractor=feat,
                         gamma=0.99)
-    expert = np.squeeze(expert)
+    pdb.set_trace()
+    exp_arr = np.zeros(len(expert_svf_dict.keys()))
+    i = 0
+    exp_state_key = {}
+    for key in expert_svf_dict.keys():
+        exp_arr[i] = expert_svf_dict[key]
+        exp_state_key[key] = i
+        i+=1
+    '''####################
+    expert = np.squeeze(exp_arr)
 
     print('The expert shape', expert.shape)
 
     print('The sum :', np.sum(expert))
     plt.plot(expert)
-    expert_file_name = expert_folder.split('/')[-2]
-    plt.savefig('./experiments/svf_visual/'+expert_file_name+'.jpg')
-
-
+   
+    #plt.show()
+    #expert_file_name = expert_folder.split('/')[-2]
+    #plt.savefig('./experiments/svf_visual/'+expert_file_name+'.jpg')
+    '''###############
     #plotting for the agents
 
     if os.path.isfile(agent_policy):
-        policy = Policy(state_space, environment.action_space.n)
+        policy = Policy(state_space, environment.action_space.n, hidden_dims=[256])
         policy.load(agent_policy)
         policy.eval()
         policy.to(DEVICE)
 
         agent_file_name = agent_policy.strip().split('/')[-1].split('.')[0]
-        agent_svf = get_svf_from_sampling(no_of_samples=100, env=environment,
+        agent_svf_dict = calculate_svf_from_sampling(no_of_samples=1000, env=environment,
                                           policy_nn=policy, reward_nn=None,
                                           episode_length=20, feature_extractor=feat,
                                           gamma=.99)
-        plt.plot(agent_svf)
-        plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
-        plt.clf()
+        agent_arr = np.zeros(len(expert_svf_dict.keys()))
+        i = 0
+        for key in agent_svf_dict.keys():
+            if key in exp_state_key.keys():
+                agent_arr[exp_state_key[key]] = agent_svf_dict[key]
 
+        agent = np.squeeze(agent_arr)
+        #print(np.linalg.norm(np.asarray(diff), 1))
+        plt.plot(agent)
+        plt.show()
+
+        states, diff = get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat)
+        pdb.set_trace()
+
+        plt.plot(diff)
+        plt.show()
+        #plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
+        #plt.clf()
+        print(np.linalg.norm(np.asarray(diff),1))
     if os.path.isdir(agent_policy):
 
         #read files from the directory
         model_names = glob.glob(os.path.join(agent_policy, '*.pt'))
 
         for name in sorted(model_names, key=numericalSort):
-            policy = Policy(state_space, environment.action_space.n)
+
+            policy = Policy(state_space, environment.action_space.n, hidden_dims=[256])
             print('Loading file:', name)
             policy.load(name)
             policy.eval()
             policy.to(DEVICE)
 
             agent_file_name = name.split('/')[-1].split('.')[0]
-            agent_svf = get_svf_from_sampling(no_of_samples=100, env=environment,
+            agent_svf_dict = calculate_svf_from_sampling(no_of_samples=3000, env=environment,
                                               policy_nn=policy, reward_nn=None,
-                                              episode_length=20, feature_extractor=feat,
+                                              episode_length=30, feature_extractor=feat,
                                               gamma=.99)
+            states, diff = get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat)
 
-            dot_product_loss.append(np.dot(expert-agent_svf, expert-agent_svf))
-            plt.plot(agent_svf)
+            pdb.set_trace()
+
+            plt.plot(diff)
+            plt.show()
+            #diff_arr = np.zeros(len(expert_svf_dict.keys()))
+            plt.savefig('./experiments/results/svf_visual/'+agent_file_name+'.jpg')
+
+            '''
+            agent_arr = np.zeros(len(expert_svf_dict.keys()))
+            i = 0
+            for key in agent_svf_dict.keys():
+                if key in exp_state_key.keys():
+                    agent_arr[exp_state_key[key]] = agent_svf_dict[key]
+
+            agent = np.squeeze(agent_arr)
+            plt.plot(expert, 'r')
+
+            plt.plot(agent, 'b')
+            #plt.show()
             plt.savefig('./experiments/svf_visual/'+agent_file_name+'.jpg')
             plt.clf()
-
-        plt.plot(dot_product_loss)
+            '''
+            diff_arr = np.asarray(diff)
+            svf_diff = np.linalg.norm(diff, 1)
+            print('The SVF diff for this model:', svf_diff)
+            dot_product_loss.append(svf_diff)
+        
+        plt.plot(dot_product_loss, 'g')
         plt.savefig('./experiments/svf_visual/dot_prod.jpg')
    
+
+def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=False):
+    '''
+    Information it provides: 
+        1. A histogram of the direction in which the 
+    goal is with respect to the agent across all the states in all the 
+    trajectories.
+        2. A histogram of the distances in which the obstacles were wrt 
+    the agent in all the trajectories.
+        3. A histogram of the orientation in which the obstacles were wrt 
+    the agent in all the trajectories.
+        4. A histogram on the closeness indicator saying how fast the agent 
+    was moving towards the goal
+
+    **THIS METHOD IS SPECIFICALLY DESIGNED TO CATER TO THE NEEDS 
+    OF THE FEATURE EXTRACTOR FrontBackSideSimple (and FrontBackSide in future)
+    '''
+
+    #initialize the histograms
+    goal_orientation_hist = np.zeros(9)
+    obs_orientation_hist = np.zeros(4)
+    obs_dist_hist = np.zeros(5)
+    closeness_indicator_hist = np.zeros(3)
+
+    xaxis_9 = np.arange(9)
+    xaxis_4 = np.arange(4)
+    xaxis_3 = np.arange(3)
+    xaxis_5 = np.arange(5)
+
+    #read trajectories from the folder
+    actions = glob.glob(os.path.join(trajectory_folder, '*.acts'))
+    states = glob.glob(os.path.join(trajectory_folder, '*.states'))
+
+    counter = 0
+    for idx, state_file in enumerate(states):
+
+        torch_traj = torch.load(state_file, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        for i in range(traj_np.shape[0]):
+            goal_orientation_hist += traj_np[i][0:9]
+            closeness_indicator_hist += traj_np[i][9:12]
+
+            orientation_dist_arr = traj_np[i][12:-1].reshape([4,4])
+            obs_dist_hist[0:4] += orientation_dist_arr.sum(axis=1)
+            obs_dist_hist[4] += traj_np[i][-1] #adding the hit flag
+            obs_orientation_hist += orientation_dist_arr.sum(axis=0)
+            counter += 1
+
+    #normalizing the histograms based on the number of steps and the 
+    #number of trajectories available
+    goal_orientation_hist /= counter
+    obs_orientation_hist /= counter
+    closeness_indicator_hist /= counter
+    obs_dist_hist /= counter
+
+    #plot information
+    if plot_info:
+
+        plt.figure(0)
+        plt.title('Goal orientation information.')
+        plt.bar(xaxis_9, goal_orientation_hist)
+        plt.figure(1)
+        plt.title('Closeness inidicator information')
+        plt.bar(xaxis_3, closeness_indicator_hist)
+        plt.figure(2)
+        plt.title('Orientation information')
+        plt.bar(xaxis_4, obs_orientation_hist)
+        plt.figure(3)
+        plt.title('Distance from obstacles information')
+        plt.bar(xaxis_5, obs_dist_hist)
+
+        plt.show()
+
+    return goal_orientation_hist, closeness_indicator_hist,\
+           obs_orientation_hist, obs_dist_hist
+
+
 
 
 if __name__ == '__main__':
@@ -482,7 +607,7 @@ if __name__ == '__main__':
     c = 10
     #initialize environment
     
-    
+    '''
     env = GridWorld(display=False, is_onehot= False,is_random =False,
                 rows =10,
                 cols =10,
@@ -490,51 +615,54 @@ if __name__ == '__main__':
                 obstacles = [np.asarray([5,5])],
                             
                 goal_state = np.asarray([1,5]))
+    '''
+    annotation_file = './envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt'
+
+    step_size = 10
+    agent_width = 10
+    grid_size = 10
+    obs_width = agent_width
+    '''
+    env = GridWorldDrone(display=False, is_onehot = False, 
+                        seed=999, obstacles=None, 
+                        show_trail=False,
+                        is_random=False,
+                        annotation_file=annotation_file,
+                        subject=None,
+                        tick_speed=90, 
+                        obs_width=10,
+                        step_size=step_size,
+                        agent_width=agent_width,
+                        train_exact=True,
+                        show_comparison=True,                       
+                        rows=576, cols=720, width=grid_size)
+    '''
+
+    env = GridWorldClockless(display=False, is_random = True,
+                    rows = 100, cols = 100,
+                    agent_width=agent_width,
+                    step_size=step_size,
+                    obs_width=obs_width,
+                    width=grid_size,
+                    obstacles= './envs/map3.jpg',
+                    goal_state=None, 
+                    step_wrapper=step_wrapper,
+                    seed=6651,
+                    consider_heading=False,
+                    reset_wrapper=reset_wrapper,
+                    is_onehot = False)
     
+
     #initialize feature extractor
-    feat = LocalGlobal(window_size = 3 , fieldList = ['agent_state','goal_state','obstacles'])
+    feat = LocalGlobal(window_size=3, grid_size=grid_size,
+                       agent_width=agent_width, 
+                       obs_width=obs_width,
+                       step_size=step_size,
+                       )
     #feat = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat = FrontBackSideSimple(thresh1 = 1,thresh2 = 2,
-    #                            thresh3= 3, fieldList = ['agent_state','goal_state','obstacles'])
-    #initialize reward network
-    #print(env.reset())
-    '''
-    reward_network = RewardNet(feat.extract_features(env.reset()).shape[0])
-
-    reward_network.load('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001/35.pt')
-
-    reward_network.eval()
-    reward_network.to(DEVICE)
-    
-    #run function
-    actions = ['left','right','up','down']
-
-    for act in actions:
-        reward_values = visualize_rewards_in_environment(act,env,reward_network, feat)
-        plt.figure(act)
-        plt.imshow(reward_values)
-        plt.colorbar()
-        plt.show()
-   
-    
-    
-    plot_reward_across_policy_models("./experiments/saved-models/Run-info-fbs-simple-reg0.0005-extended/",
-                                expert = './experiments/saved-models/Run-info-fbs-simple-reg0.001/1.pt',
-
-    '''
-    #fbs_keep_left/30.pt
-
-    '''
-    policy_name_list = ["./experiments/saved-models/fbs_simple.pt",
-                        "./experiments/saved-models/Run_info_reg_001/60.pt"]
-                       
-
-
-    generate_agent_grid_visitation_map(policy_name_list,feature_extractor = feat, store=True)
+    #feat = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles'])
+    expert_folder = './experiments/trajs/ac_loc_glob_rectified_win_3_static_map3/'
+    agent_policy = './experiments/results/Testing_new_env_quadra-reg-0-seed-6651-lr-0.001/saved-models/'
     
 
-    visualize_rewards_from_reward_directory('./experiments/saved-models-rewards/Run-info-fbs-simple-reg0.001',feat,env)
-    '''
-    compare_svf('./experiments/trajs/ac_gridworld_rectified_loc_glob_window_3/',
-                './experiments/saved-models/loc_glob_simple_rectified--0.05/',
-                feat=feat)
+    compare_svf(expert_folder, agent_policy, env=env, feat=feat)

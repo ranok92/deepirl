@@ -1,14 +1,18 @@
 import pdb
-import os
 import argparse
 import matplotlib
 import numpy as np
-import sys  # NOQA
+import gym, sys, time, os
+
+import torch
+import numpy as np 
+
+import datetime
 sys.path.insert(0, '..')  # NOQA: E402
-from envs.gridworld_clockless import GridWorldClockless as GridWorld
 from logger.logger import Logger
 import utils
 
+from mountain_car import MCFeatures, MCFeaturesOnehot
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -38,17 +42,36 @@ parser.add_argument('--save-folder', type=str, default=None,
 parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The name of the directory in which \
                     the expert trajectories are stored.(Relative path)')
 
-parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
-                     feature extractor to be used in the experiment.')
-
 parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the reward network.')
 
+parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
+                     hidden layers of the policy network.')
+
+
 parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
 
-parser.add_argument('--obstacle-map', type=str, default=None, help='The map for the obstacles')
+
+parser.add_argument('--feat-extractor', type=str, default='MCFeatures', help='The feature extractor  \
+                    to be used in the experiment')
+
+parser.add_argument('--state-discretization', nargs="*", type=int, default=[128, 128], help='The number of discrete \
+                    parts you want to break the state')
+
+parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
+                    based on the reward the trajectory got.')
+
+parser.add_argument('--clipping-value', type=float, default=None, help='For gradient clipping of the \
+                    reward network.')
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
+
+'''
+python run_experiment.py --on-server --rl-episodes 1000 --rl-ep-length 200 --irl-itreations 200 --rl-log-intervals 100
+                        --seed 100 --exp-trajectory-path './exp_traj_mountain_car/' --reward-net-hidden-dims 256
+'''
+
+
 def main():
     args = parser.parse_args()
 
@@ -59,7 +82,14 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
-    to_save = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+    ###
+    ts = time.time()
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    ###
+    parent_dir = './results/'+str(args.save_folder)+st
+    to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
+              '-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+              #'-seed-'+str(args.seed)
     log_file = 'Experiment_info.txt'
     experiment_logger = Logger(to_save, log_file)
 
@@ -70,37 +100,17 @@ def main():
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
-    from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
 
-    agent_width = 10
-    step_size = 10
-    obs_width = 10
-    grid_size = 10
 
     
     #check for the feature extractor being used
     #initialize feature extractor
-    if args.feat_extractor == 'Onehot':
-        feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
-    if args.feat_extractor == 'SocialNav':
-        feat_ext = SocialNav()
-    if args.feat_extractor == 'FrontBackSideSimple':
-        feat_ext = FrontBackSideSimple(thresh1 = 1,
-                                    thresh2 = 2,
-                                    thresh3 = 3,
-                                    thresh4=4,
-                                    step_size=step_size,
-                                    agent_width=agent_width,
-                                    obs_width=obs_width,
-                                    )
+    if args.feat_extractor=='MCFeatures':
+        feat_ext = MCFeatures(args.state_discretization[0], args.state_discretization[1]) 
 
-    if args.feat_extractor == 'LocalGlobal':
-        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
-                           agent_width=agent_width, 
-                           obs_width=obs_width,
-                           step_size=step_size,
-                           )
-    
+    if args.feat_extractor=='MCFeaturesOnehot':
+        feat_ext = MCFeaturesOnehot(args.state_discretization[0], args.state_discretization[1])
+
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
 
@@ -121,22 +131,9 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    obstacles = '../envs/'+args.obstacle_map
-    env = GridWorld(display=args.render, is_random = True,
-                    rows = 10, cols = 10,
-                    agent_width=agent_width,
-                    step_size=step_size,
-                    obs_width=obs_width,
-                    width=grid_size,
-                    obstacles=obstacles,
-                    goal_state=goal_state, 
-                    step_wrapper=utils.step_wrapper,
-                    seed = args.seed,
-                    consider_heading=False,
-                    reset_wrapper=utils.reset_wrapper,
-                    is_onehot = False)
-
-
+    env = gym.make('MountainCar-v0')
+    env = env.unwrapped
+    #pdb.set_trace()
     experiment_logger.log_header('Environment details :')
     experiment_logger.log_info(env.__dict__)
 
@@ -147,13 +144,15 @@ def main():
     #initialize loss based termination
     # intialize RL method
     #CHANGE HERE
-    rlMethod = ActorCritic(env, gamma=0.99,
-                            log_interval = args.rl_log_intervals,
+    rlMethod = ActorCritic(env, gamma=1,
+                            log_interval=args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
-                            termination = None,
-                            hidden_dims=args.reward_net_hidden_dims,
-                            feat_extractor = feat_ext)
+                            termination=None,
+                            plot_loss=False,
+                            save_folder=to_save,
+                            hidden_dims=args.policy_net_hidden_dims,
+                            feat_extractor=feat_ext)
     print("RL method initialized.")
     print(rlMethod.policy)
     if args.policy_path is not None:
@@ -172,9 +171,12 @@ def main():
                            on_server=args.on_server,
                            regularizer = args.regularizer,
                            learning_rate = args.lr,
-                           graft=True,
-                           hidden_dims = args.reward_net_hidden_dims,
-                           save_folder=args.save_folder)
+                           graft=False,
+                           seed=args.seed,
+                           scale_svf=args.scale_svf,
+                           hidden_dims=args.reward_net_hidden_dims,
+                           clipping_value=args.clipping_value,
+                           save_folder=parent_dir)
     print("IRL method intialized.")
     experiment_logger.log_header('Details of the IRL method :')
     experiment_logger.log_info(irlMethod.__dict__)

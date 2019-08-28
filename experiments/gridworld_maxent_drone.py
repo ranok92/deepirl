@@ -1,14 +1,15 @@
 import pdb
 import os
+
 import argparse
 import matplotlib
 import numpy as np
 import sys  # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
-from envs.gridworld_clockless import GridWorldClockless as GridWorld
-from logger.logger import Logger
+from envs.gridworld_drone import GridWorldDrone as GridWorld
 import utils
 
+from logger.logger import Logger
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--policy-path', type=str, nargs='?', default=None)
@@ -44,9 +45,13 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the reward network.')
 
+parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
+                    be used to run the environment.')
+
+
 parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
 
-parser.add_argument('--obstacle-map', type=str, default=None, help='The map for the obstacles')
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -59,12 +64,14 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
-    to_save = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+    #####for the logger
+    base_folder = './results/'+str(args.save_folder)+'-reg-'+str(args.regularizer)+'-seed-'+str(args.seed)+'-lr-'+str(args.lr)
     log_file = 'Experiment_info.txt'
-    experiment_logger = Logger(to_save, log_file)
+    experiment_logger = Logger(base_folder, log_file)
 
     experiment_logger.log_header('Arguments for the experiment :')
     experiment_logger.log_info(vars(args))
+
 
     from rlmethods.rlutils import LossBasedTermination
     from rlmethods.b_actor_critic import ActorCritic
@@ -77,6 +84,11 @@ def main():
     obs_width = 10
     grid_size = 10
 
+
+    if args.feat_extractor is None:
+
+        print('Feature extractor missing.')
+        exit()
     
     #check for the feature extractor being used
     #initialize feature extractor
@@ -95,12 +107,13 @@ def main():
                                     )
 
     if args.feat_extractor == 'LocalGlobal':
-        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+        feat_ext = LocalGlobal(window_size=5, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
                            )
     
+
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
 
@@ -109,6 +122,15 @@ def main():
     if not args.dont_save and args.save_folder is None:
         print('Specify folder to save the results.')
         exit()
+
+    if args.annotation_file is None:
+        print('Specify annotation file for the environment.')
+        exit()
+
+    if args.exp_trajectory_path is None:
+        print('Specify expert trajectory folder.')
+        exit()
+
     #**set is_onehot to false
     goal_state = np.asarray([1,5])
     '''
@@ -121,20 +143,20 @@ def main():
                     goal_state = np.asarray([1,5]))
 
     '''
-    obstacles = '../envs/'+args.obstacle_map
+
     env = GridWorld(display=args.render, is_random = True,
-                    rows = 10, cols = 10,
+                    rows = 576, cols = 720,
                     agent_width=agent_width,
                     step_size=step_size,
                     obs_width=obs_width,
                     width=grid_size,
-                    obstacles=obstacles,
+                    annotation_file=args.annotation_file,
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed = args.seed,
-                    consider_heading=False,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot = False)
+    
 
 
     experiment_logger.log_header('Environment details :')
@@ -159,6 +181,7 @@ def main():
     if args.policy_path is not None:
         rlMethod.policy.load(args.policy_path)
 
+
     experiment_logger.log_header('Details of the RL method :')
     experiment_logger.log_info(rlMethod.__dict__)
     
@@ -167,19 +190,20 @@ def main():
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
+    folder_to_save = '/results/'+args.save_folder
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
-                           regularizer = args.regularizer,
-                           learning_rate = args.lr,
+                           regularizer=args.regularizer,
+                           learning_rate=args.lr,
                            graft=True,
                            hidden_dims = args.reward_net_hidden_dims,
-                           save_folder=args.save_folder)
+                           save_folder=folder_to_save)
     print("IRL method intialized.")
+    print(irlMethod.reward)
+
     experiment_logger.log_header('Details of the IRL method :')
     experiment_logger.log_info(irlMethod.__dict__)
-    
-    print(irlMethod.reward)
     rewardNetwork = irlMethod.train()
 
     if not args.dont_save:

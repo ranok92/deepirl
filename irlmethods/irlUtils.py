@@ -289,7 +289,7 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     return svf
 
 
-def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
+def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, gamma=0.99):
     '''
     Does the state visitation frequency calculation without creating a dictionary or storing the 
     entire state space.
@@ -302,7 +302,6 @@ def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
 
     # histogram to accumulate state visitations
     svf = {}
-
     for idx, state_file in enumerate(states):
 
 
@@ -312,24 +311,31 @@ def calculate_expert_svf(traj_path, feature_extractor=None, gamma=0.99):
 
         #iterating through each of the states 
         #in the trajectory
-        for i in range(traj_np.shape[0]):
+        #pdb.set_trace()
 
-            #this is for onehot
+        for i in range(traj_np.shape[0]):
             state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
                 svf[state_hash] = 1*math.pow(gamma,i)
             else:
                 svf[state_hash] += 1*math.pow(gamma,i)
+        for pad_i in range(i+1,max_time_steps):
+
+            state_hash = feature_extractor.hash_function(traj_np[i])
+            svf[state_hash] += 1*math.pow(gamma,pad_i)
+
 
     #normalize the svf
+    '''
     total_visitation = 0
     for state in svf.keys():
 
         total_visitation += svf[state]
-
+    '''
+    total_trajectories = len(states)
     for state in svf.keys():
 
-        svf[state] /= total_visitation
+        svf[state] /= total_trajectories
 
     return collections.OrderedDict(sorted(svf.items()))
 
@@ -603,36 +609,46 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
-                                gamma=0.99):
+                                gamma=0.99, scale_svf=True):
     
     '''
     calculating the state visitation frequency from sampling. This function
     returns a dictionary, where the keys consists of only the states that has been
     visited and their corresponding values are the visitation frequency
+
+    ##update
+    Also returns the mean true and mean reward according to the current reward network 
     '''
     eps = 0.000001
     if feature_extractor is None:
         print('Featrue extractor missing. Exiting.')
         return None
 
-    rewards = np.zeros(no_of_samples)
+    rewards_true = np.zeros(no_of_samples) #the true rewards
+    rewards = np.zeros(no_of_samples) #the reward according to the reward network if present
+
     norm_factor = np.zeros(no_of_samples)
 
     svf_dict_list = []
     for i in range(no_of_samples):
+
         run_reward = 0
+        run_reward_true = 0
         current_svf_dict = {}
+        done = False
         state = env.reset()
         #print('agent position:', state['agent_state'])
         state = feature_extractor.extract_features(state)
         current_svf_dict[feature_extractor.hash_function(state)] = 1
-
+        #print('episode len', episode_length)
         for t in range(episode_length):
 
             action = select_action(policy_nn, state)
+            action = action.item()
+            #print(action)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
-
+            run_reward_true += reward
             
             #get the state index
 
@@ -643,20 +659,30 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                 current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
                                                   
             if reward_nn is not None:
-                reward  = reward_nn(state)
+                nn_reward  = reward_nn(state)
+                run_reward+=nn_reward
 
-            run_reward+=reward
+            if done:
+                break
 
-        rewards[i] = run_reward
+        if reward_nn is not None:
+            rewards[i] = run_reward
+
+        rewards_true[i] = run_reward_true
         svf_dict_list.append(current_svf_dict)
 
     #rewards = rewards - np.min(rewards)+eps
     #changing it to the more generic exp
     #print('rewards non exp', rewards)
-    rewards = np.exp(rewards)
+    rewards_exp = np.exp(rewards)
     #print('Rewards :',rewards)
-    total_reward = sum(rewards)
-    weights = rewards/total_reward
+    total_reward_exp = sum(rewards_exp)
+
+    #putting a control on the reweighting as discussed.
+    if scale_svf:
+        weights = rewards_exp/total_reward_exp
+    else:
+        weights = np.ones(no_of_samples)/no_of_samples
     #print('weights from svf_dict:',weights)
     #plt.plot(weights)
     #plt.draw()
@@ -664,25 +690,55 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #merge the different dictionaries to a master dictionary and adjust the visitation 
     #frequencies according to the weights calculated
 
+    '''
     for i in range(len(svf_dict_list)):
 
         dictionary = svf_dict_list[i]
         for key in dictionary:
 
             norm_factor[i] += dictionary[key]
-
+    '''
+    norm_factor = np.ones(no_of_samples)
     master_dict = {}
     #print ('The norm factor :', norm_factor)
     for i in range(len(svf_dict_list)):
         dictionary = svf_dict_list[i]
         for key in dictionary:
-
+            #pdb.set_trace()
             if key not in master_dict:
                 master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
             else:
                 master_dict[key] += dictionary[key]*weights[i]/norm_factor[i]
 
-    return collections.OrderedDict(sorted(master_dict.items()))
+    '''
+    ######### for debugging purposes ##########
+    ######### plots the state visitation frequency based on the position ########
+    state_arr = np.zeros(128)
+
+    conv_arr = np.array([2**i for i in range(7,-1,-1)])
+    for key in master_dict.keys():
+
+        state = feature_extractor.recover_state_from_hash_value(key)
+        pos = state[0:8]
+        print(pos)
+        print(conv_arr)
+        state_arr[int(pos.dot(conv_arr))] += master_dict[key]
+
+    plt.close()
+    plt.plot(state_arr)
+    plt.show()
+    
+    
+    svf_sum = 0
+    for key in master_dict.keys():
+        svf_sum += master_dict[key]
+    
+    ################################################
+    '''
+    #pdb.set_trace()
+    #print(rewards)
+    #print(rewards_true)
+    return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
 
 
 
@@ -788,6 +844,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     and returns two ordered lists containing the states visited and the 
     difference in their visitation frequency.
     '''
+
     state_list = []
     diff_list = []
     expert_iterator = 0
@@ -796,9 +853,17 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     expert_key_list = list(expert_svf_dict.keys())
     agent_key_list = list(agent_svf_dict.keys())
 
+
+    tot = 0
+    for key in expert_key_list:
+        tot += expert_svf_dict[key]
+
+    ag_tot = 0
+    for key in agent_key_list:
+        ag_tot += agent_svf_dict[key]
+
     while True:
-
-
+        
         exp_state = expert_key_list[expert_iterator]
         agent_state = agent_key_list[agent_iterator]
         if exp_state == agent_state:
@@ -846,7 +911,6 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                     expert_iterator += 1
 
                 break
-
     return state_list , diff_list
 
         
@@ -856,7 +920,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
 if __name__ == '__main__':
 
 
-
+    '''
     r = 10
     c = 10
 
@@ -865,255 +929,38 @@ if __name__ == '__main__':
     #						   fieldList = ['agent_state','goal_state'])
     #feat = OneHot(grid_rows=10,grid_cols=10)
     np.random.seed(0)
-    feat = LocalGlobal(window_size=3, fieldList=['agent_state','goal_state','obstacles'])
+
+    step_size = 3
+    agent_width = 10
+    grid_size = 10
+    obs_width = agent_width  
+    expert_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/LocalGlobal_win5'
+
+    feat = LocalGlobal(window_size=5, grid_size=grid_size,
+                   agent_width=agent_width, 
+                   obs_width=obs_width,
+                   step_size=step_size,
+                   )
+
     env = GridWorld(display=False, reset_wrapper=reset_wrapper, is_random = False,
     				step_wrapper=step_wrapper,
     				obstacles=[np.array([2,3])],
     				goal_state=np.array([5,5]),
     				is_onehot=False)
+    '''
+
 
     
-    state_list = []
-    
-
-    state = feat.extract_features(env.reset())
-    state = np.array([0., 1. ,0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
-
-    print(state)
-    print('The state :',state[-9:].reshape([3,3]))    
-    window = np.array([[0,.1,0],[.1,.6,.1],[0,.1,0]])
-    v = smoothing_over_state_space(state,feat,window)
-    
-    print('The smooth list :')
-    for item in v:
-        loc_info = item[0][-9:].reshape([3,3])
-        print(loc_info, item[1])
-    input("Press a key to continue . . .")
-    
-    dir_path = '../experiments/trajs/ac_gridworld/'
-
-    
-    
-    state_space = feat.extract_features(env.reset()).shape[0]
-    policy = Policy(state_space, env.action_space.n)
-    policy.load('../experiments/saved-models/loc_glob_win_3.pt')
-    policy.eval()
-    policy.to(DEVICE)
-
     #calculating the SVF for policy
-    '''
-    np.random.seed(0)
-    svf = calculate_svf_from_sampling(no_of_samples=100, env=env,
-                                     policy_nn=policy, reward_nn=None,
-                                     episode_length=20, feature_extractor=feat,
-                                     gamma=0.99)
 
-
-    np.random.seed(0)
-    svf_3 = get_svf_from_sampling(no_of_samples=100, env=env,
-                                     policy_nn=policy, reward_nn=None,
-                                     episode_length=20, feature_extractor=feat,
-                                     gamma=0.99)
-    plt.show()
-
-    s = 0
-    counter = 0
-    for i in range(svf_3.shape[0]):
-        if svf_3[i]!=0:
-            counter += 1
-            print(i,svf_3[i])
-            s+=svf_3[i]
-
-    print('HITS :',counter,len(svf.keys()))
-    print('svf from svf_dict :',svf)
-    for key in svf.keys():
-
-        index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
-        print(index,' ',svf[key],' ',svf_3[index])
-
-
-    '''
     #calculating the svf for experts
-    
-    exp_svf = calculate_expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feature_extractor=feat)
+    feat = MCFeatures(128, 8)
 
+    exp_svf = calculate_expert_svf(expert_folder, max_time_step=300, feature_extractor=feat)
 
+    pdb.set_trace()
     print('printing from the expert :',exp_svf)
-    exp_svf_3 = expert_svf('../experiments/trajs/ac_gridworld_smooth_test/', feat=feat)
-    
-    window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
-    exp_smooth = calculate_expert_svf_with_smoothing('../experiments/trajs/ac_gridworld_smooth_test',
-                                                     feature_extractor=feat, 
-                                                     smoothing_window=window)
 
-    #for key in exp_svf.keys():
 
         #index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
         #print(index,' ',exp_svf[key],' ',exp_svf_3[0][index] , ' - ',exp_svf[key]-exp_svf_3[0][index]  )
-
-
-    stl1 = []
-    stl_smooth = []
-    comb_dict = {}
-
-    d1 = 0
-    d2 = 0
-    
-    d1key_list = exp_svf.keys()
-    d2key_list = exp_smooth.keys()
-    comb_dict = {}
-    for key in exp_svf.keys():
-
-        state = feat.recover_state_from_hash_value(key)
-        print(key)
-        print(state)
-        print(state[-9:].reshape([3,3]), exp_svf[key])
-        if key not in comb_dict.keys():
-            comb_dict[key] = 0
-
-
-    print ('Normal :', len(d1key_list))
-    print ('Smooth :', len(d2key_list))
-    input('Press')
-    print('############################')
-    for key in exp_smooth.keys():
-
-        print(key)
-        state = feat.recover_state_from_hash_value(key)
-        print(state)
-        print(state[-9:].reshape([3,3]), exp_smooth[key])
-        if key not in comb_dict.keys():
-            comb_dict[key] = 0
-
-    comb_dict = collections.OrderedDict(sorted(comb_dict.items()))
-
-    for key in exp_svf.keys():
-        comb_dict[key] = exp_svf[key]
-
-    for key in comb_dict.keys():
-        
-        stl1.append(comb_dict[key])
-        comb_dict[key] = 0
-    
-
-    for key in exp_smooth.keys():
-        comb_dict[key] = exp_smooth[key]
-
-    for key in comb_dict.keys():
-        #state = feat.recover_state_from_hash_value(key)
-        #print(state[-9:].reshape([3,3]), comb_dict[key])
-        stl_smooth.append(comb_dict[key])
-        comb_dict[key] = 0
-
-    plt.figure(0)
-    plt.plot(stl1,'r')
-    plt.draw()
-    plt.figure(1)
-    plt.plot(stl_smooth,'b')
-    plt.show()
-
-    input('Press key to continue')
-    #calculating the difference
-
-    states_visited , diff = get_states_and_freq_diff(exp_svf, svf, feat)
-
-    diff_3 = exp_svf_3 - svf_3
-    i = 0
-    for state in states_visited:
-
-        print('The difference from state_dict :', diff_3[0][feat.state_dictionary[np.array2string(state)]], ' ',diff[i] )
-        i+=1
-
-    '''
-    np.random.seed(0)
-    svf_2 = get_svf_from_sampling(no_of_samples=100, env=env,
-                                  policy_nn=policy, reward_nn=None,
-                                  episode_length=20, feature_extractor=feat,
-                                  gamma=0.99)
-
-
-
-    for i in range(svf_2.shape[0]):
-
-        if svf_2[i] > 0:
-            print(svf_2[i])
-    '''
-    #states, diff = get_states_and_freq_diff(svf,exp_svf,feat)
-    #for i in range(len(states)):
-    #    print('State :',states[i], ' : ', diff[i])
-
-
-    #debug_custom_path('../experiments/trajs/ac_gridworld_user_avoid',
-    # 					'distance',state_dict = feat.state_dictionary)
-
-    '''
-    reward = RewardNet(state_space)
-    reward.load('../experiments/saved-models-rewards/319.pt')
-    reward.eval()
-    reward.to(DEVICE)
-	'''
-
-    '''
-    exp_svf = expert_svf('../experiments/trajs/ac_gridworld_socialNav_no_obs/',
-     			state_dict = feat.state_dictionary)
-    exp_svf = np.squeeze(exp_svf)
-    print(exp_svf)
-	
-
-    
-    #for other feature extractors
-    xaxis = np.arange(len(feat.state_dictionary.keys()))
-    plt.figure("the expert")
-    plt.bar(xaxis,exp_svf)
-    #plt.imshow()
-
-
-    
-    #exp_svf = expert_svf_onehot('../experiments/trajs/ac_gridworld/')
-
-    #print ("The expert svf :", exp_svf)
-    
-    
-    statevisit = getStateVisitationFreq(policy , rows = r, cols = c,
-                                     num_actions = 5 , 
-                                     goal_state = np.asarray([5,5]),
-                                     episode_length = 20)
-
-	
-    statevisit3 = get_svf_from_sampling(no_of_samples = 3000 , env = env ,
-						 policy_nn = policy , reward_nn = None,
-						 episode_length = 20, feature_extractor = feat)
-
-    statevisit3 = np.squeeze(statevisit3)
-    plt.figure("the expert_samples")
-    plt.bar(xaxis,statevisit3)
-    #plt.imshow()
-    plt.show()
-
-
-    
-    statevisitMat = np.resize(statevisit,(r,c))
-    #statevisitMat2 = np.resize(statevisit2,(r,c))
-    statevisitMat3 = np.resize(statevisit3,(r,c))
-
-    #print ('svf :',statevisitMat2)
-    plt.clf()
-    plt.figure(0)
-    plt.imshow(statevisitMat)
-    plt.colorbar()
-    plt.show()
-   
-    plt.figure(2)
-    plt.imshow(statevisitMat3)
-    plt.colorbar()
-    plt.show()
-    fname = './plots/'+str(3)+'.png'
-    #plt.savefig(fname)
-    #plt.clf()
-    
-    #print(stateactiontable)
-    #print(np.sum(stateactiontable,axis=0))
-    #mat = createStateTransitionMatix(rows=5,cols=5)
-	'''
-
-    
