@@ -343,11 +343,13 @@ class ActorCritic:
             reward = r - value.item()
             policy_losses.append(-log_prob * reward)
 
-            r_tensor = torch.tensor([r])
+            r_tensor = torch.tensor([r]).type(torch.float)
 
             if torch.cuda.is_available():
                 r_tensor = r_tensor.cuda()
 
+            #print('value :',value.type(), 'r_tensor :', r_tensor.type())
+            #print('value :',value, 'r_tensor :', r_tensor)
             value_losses.append(F.smooth_l1_loss(value, r_tensor))
 
         self.optimizer.zero_grad()
@@ -373,7 +375,7 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-    def train(self, rewardNetwork=None, featureExtractor=None, irl=False):
+    def train(self, rewardNetwork=None, irl=False):
         """Train actor critic method on given gym environment."""
         #along with the policy, the train now returns the loss and the 
         #rewards obtained in the form of a list
@@ -408,6 +410,7 @@ class ActorCritic:
 
                 if rewardNetwork is None:
 
+                    #print(reward)
                     reward = reward
                 else:
                     reward = rewardNetwork(state)
