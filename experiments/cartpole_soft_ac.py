@@ -14,6 +14,7 @@ import gym
 parser = ArgumentParser()
 parser.add_argument('replay_buffer_size', type=int)
 parser.add_argument('replay_buffer_sample_size', type=int)
+parser.add_argument('--log-alpha', type=float, default=-2.995)
 
 args = parser.parse_args()
 
@@ -39,7 +40,7 @@ def play(rl, gw):
 
 def main():
 
-    tbx_writer = SummaryWriter()
+    tbx_writer = SummaryWriter(comment='alpha_'+str(args.log_alpha))
 
     env = gym.make('CartPole-v0')
 
@@ -49,7 +50,7 @@ def main():
         buffer_sample_size=args.replay_buffer_sample_size,
         tbx_writer = tbx_writer,
         tau=0.005,
-        log_alpha=-5.00,
+        log_alpha=args.log_alpha,
         entropy_tuning=False,
     )
 
