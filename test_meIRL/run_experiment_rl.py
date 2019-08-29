@@ -77,10 +77,10 @@ def main():
     if args.on_server:
         # matplotlib without monitor
         matplotlib.use('Agg')
-        from matplotlib import pyplot as plt
 
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
+    from matplotlib import pyplot as plt
 
     save_folder = None
     if not args.dont_save:
@@ -97,12 +97,7 @@ def main():
         from envs.gridworld import GridWorld
     else:
         from envs.gridworld_clockless import GridWorldClockless as GridWorld
-
-
-    agent_width = 10
-    step_size = 10
-    obs_width = 10
-    grid_size = 10
+        
 
     if args.feat_extractor=='MCFeatures':
         feat_ext = MCFeatures(args.state_discretization[0], args.state_discretization[1]) 
@@ -182,7 +177,7 @@ def main():
     if args.play:
         xaxis = []
         counter = 1
-
+        print(policy_file_list)
         for policy_file in policy_file_list:
 
             model.policy.load(policy_file)

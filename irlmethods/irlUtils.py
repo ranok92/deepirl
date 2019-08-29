@@ -36,20 +36,36 @@ All the methods here are created with environments with relatively small statesp
 It is also assumed that we know all the possible states.
 '''
 
+
 class RewardNet(BaseNN):
     """Reward network"""
 
-    def __init__(self, state_dims):
+    def __init__(self, state_dims, hidden_dims=[128]):
         super(RewardNet, self).__init__()
 
-        self.affine1 = nn.Linear(state_dims, 128)
-
-        self.reward_head = nn.Linear(128, 1)
+        self.input = nn.Sequential(
+            nn.Linear(state_dims, hidden_dims[0]),
+            nn.ELU(),
+        )
+        self.hidden_layers = []
+        for i in range(1,len(hidden_dims)):
+            self.hidden_layers.append(nn.Sequential(
+                                                    nn.Linear(hidden_dims[i-1], hidden_dims[i]),
+                                                    nn.ELU(),
+                                                    )
+                                      )
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dims[-1], 1),
+            nn.Tanh(),
+        )
 
     def forward(self, x):
-        x = F.elu(self.affine1(x))
+        x = self.input(x)
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
 
-        x = self.reward_head(x)
+        x = self.head(x)
 
         return x
 

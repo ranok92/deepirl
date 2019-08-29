@@ -8,9 +8,8 @@ from copy import copy
 sys.path.insert(0, '..')
 
 
-from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide, DroneFeatureSAM1
-
-
+from featureExtractor.gridworld_featureExtractor import LocalGlobal,FrontBackSide
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
 
 
 from itertools import count

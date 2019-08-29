@@ -8,7 +8,8 @@ import os
 sys.path.insert(0, '..')
 
 from envs.gridworld_clockless import MockActionspace, MockSpec
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple, DroneFeatureSAM1
+from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
 
 from itertools import count
 import utils  # NOQA: E402
@@ -52,6 +53,7 @@ class GridWorldDrone(GridWorld):
             step_wrapper=utils.identity_wrapper,
             reset_wrapper=utils.identity_wrapper,
             show_trail=False,
+            show_orientation=False,
             annotation_file=None,
             subject=None,
             obs_width=10,
@@ -128,6 +130,8 @@ class GridWorldDrone(GridWorld):
         ########### debugging ##############
 
         self.train_exact = train_exact
+
+        self.show_orientation = show_orientation
         '''
         self.ped_start_pos = {} # a dictionary that will store the starting positions of all the pedestrians
         self.ped_goal_pos = {} # a dictionary that will store the goal positions of all the pedestrians
@@ -393,6 +397,10 @@ class GridWorldDrone(GridWorld):
             for obs in self.obstacles:
                 pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2), \
                                 self.obs_width, self.obs_width])
+                if self.show_orientation:
+                    if obs['orientation'] is not None: 
+                        pygame.draw.line(self.gameDisplay, self.black, [obs['position'][1],obs['position'][0]], 
+                                         [obs['position'][1]+obs['orientation'][1]*10, obs['position'][0]+obs['orientation'][0]*10], 2)
         #render goal
         if self.goal_state is not None:
             pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-(self.cellWidth/2), self.goal_state[0]- \
@@ -401,12 +409,19 @@ class GridWorldDrone(GridWorld):
         if self.agent_state is not None:
             pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state['position'][1]-(self.agent_width/2), self.agent_state['position'][0]- \
                             (self.agent_width/2), self.agent_width, self.agent_width])
+
+            if self.show_orientation:
+                if self.agent_state['orientation'] is not None: 
+                        pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
+                                         [self.agent_state['position'][1]+self.agent_state['orientation'][1]*10, self.agent_state['position'][0]+self.agent_state['orientation'][0]*10], 2)
+
         if self.ghost_state is not None:
             pygame.draw.rect(self.gameDisplay, (220,220,220),[self.ghost_state[1]-(self.agent_width/2), self.ghost_state[0]- \
                             (self.agent_width/2), self.agent_width, self.agent_width], 1)
 
         if self.show_trail:
             self.draw_trajectory()
+
 
         pygame.display.update()
         return 0
@@ -738,9 +753,10 @@ class GridWorldDrone(GridWorld):
 
         #draw the stalk
         arrow_width  = self.cellWidth*.3 #in pixels
-        base_pos_pixel = (base_position+.5)*self.cellWidth
-        next_pos_pixel = (next_position+.5)*self.cellWidth
-       
+        base_pos_pixel = (base_position+.5)
+        next_pos_pixel = (next_position+.5)
+        pdb.set_trace()
+
         #draw the head
         ref_pos = base_pos_pixel+(next_pos_pixel-base_pos_pixel)*.35
 
@@ -759,7 +775,7 @@ class GridWorldDrone(GridWorld):
                             (ref_pos[1],ref_pos[0]-(arrow_width/2))  ),
                             0
                             )
-            
+        
         if base_position[1]==next_position[1]:
 
             gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
@@ -809,7 +825,7 @@ if __name__=="__main__":
                                    obs_width=10,
                                    step_size=10,
                                    grid_size=10) 
-    feat_drone = DroneFeatureSAM1()
+    feat_drone = DroneFeatureSAM1(step_size=40)
     window_size = 9
     #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
@@ -817,13 +833,14 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
-                        subject=None,
+                        subject=10,
                         tick_speed=30, 
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
                         show_comparison=False,
-                        train_exact=True,                       
+                        show_orientation=True,
+                        train_exact=False,                       
                         rows=576, cols=720, width=20)
     print ("here")
     
@@ -837,12 +854,15 @@ if __name__=="__main__":
             #action = input()
 
             state, reward , done, _ = world.step()
-            feat = feat_ext.extract_features(state)
+
+            feat_drone.overlay_bins(world.gameDisplay, state)
+            feat = feat_drone.extract_features(state)
+            
             #orientation = feat_drone.extract_features(state)
-            print('Global info:')
-            print(feat[0:9].reshape(3,3))
+            #print('Global info:')
+            #print(feat[0:9].reshape(3,3))
             print('Local info:')
-            print(feat[-17:-1].reshape(4,4))
+            #print(feat[-17:-1].reshape(4,4))
             #print(world.agent_state)
             #print (reward, done)
     
