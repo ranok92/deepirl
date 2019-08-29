@@ -78,6 +78,7 @@ def get_abs_orientation(agent_state, orientation_approximator):
         abs_approx_orientation = np.zeros(no_of_directions)
     orientation = agent_state['orientation']
     if orientation is None:
+        #straight up
         orientation = 1
     elif np.linalg.norm(orientation)==0:
         if no_of_directions==8:
@@ -367,7 +368,7 @@ w    '''
         outer_ring_count = 0
         for i in range(len(self.bins.keys())):
             avg_speed = 0
-            avg_orientation = 0
+            avg_orientation = np.zeros(2)
 
             speed_bin = np.zeros(len(self.speed_divisions)-1)
             orientation_bin = np.zeros(len(self.orientation_approximator_4))
@@ -396,19 +397,19 @@ w    '''
                 #if obs['orientation'] is not None:
                 new_obs = {'orientation': avg_orientation}
                 _, avg_orientation = get_abs_orientation(new_obs, self.orientation_approximator_4)
-                print('the avg orientation :', avg_orientation)
+                #print('the avg orientation :', avg_orientation)
                 orientation_bin[avg_orientation] = 1
 
                 #based on the obtained average speed and orientation bin them
-                print('Avg speed :', avg_speed, 'Speed bin :',speed_bin)
-                print('Avg orientation :', avg_orientation, 'Orientation bin :', orientation_bin)
+                #print('Avg speed :', avg_speed, 'Speed bin :',speed_bin)
+                #print('Avg orientation :', avg_orientation, 'Orientation bin :', orientation_bin)
             sam_vector[i][:] = np.concatenate((speed_bin, orientation_bin))
 
         density_inner_ring[discretize_information(inner_ring_count, 
                                                   self.inner_ring_density_division)] = 1
         density_outer_ring[discretize_information(outer_ring_count,
                                                   self.outer_ring_density_division)] = 1
-        pdb.set_trace()
+        #pdb.set_trace()
 
         return sam_vector, density_inner_ring, density_outer_ring
 
@@ -433,15 +434,15 @@ w    '''
         relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
 
 
-        print('The absolute approx orientation :', abs_approx_orientation)
-        print('The relative orientation', relative_orientation)
+        #print('The absolute approx orientation :', abs_approx_orientation)
+        ##print('The relative orientation', relative_orientation)
 
         #empty bins before populating
         for i in range(16):
             self.bins[str(i)] = []
 
 
-        print('Here')
+        #print('Here')
         self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
         sam_vector, inner_ring_density, outer_ring_density = self.compute_bin_info()
 
@@ -455,11 +456,12 @@ w    '''
             if len(self.bins[str(i)]) > 0:
                 flag = True
         if flag:    
-            pdb.set_trace()
+            #pdb.set_trace()
+            pass
         
         self.prev_frame_info = copy.deepcopy(state)
         #pdb.set_trace()
 
-        return extracted_feature
+        return reset_wrapper(extracted_feature)
 
 

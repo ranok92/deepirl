@@ -55,9 +55,6 @@ parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate fo
 parser.add_argument('--feat-extractor', type=str, default='MCFeatures', help='The feature extractor  \
                     to be used in the experiment')
 
-parser.add_argument('--state-discretization', nargs="*", type=int, default=[128, 128], help='The number of discrete \
-                    parts you want to break the state')
-
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
                     based on the reward the trajectory got.')
 
