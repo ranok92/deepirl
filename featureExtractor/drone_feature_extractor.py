@@ -202,7 +202,8 @@ w    '''
         self.num_of_speed_blocks = 3
         self.num_of_orient_blocks = 4
 
-        self.state_rep_size = 9+3+12
+        #state rep size = 16*8+9+3
+        self.state_rep_size = 162
         self.generate_hash_variable()
         #self.generate_state_dictionary()
         print('Done!')

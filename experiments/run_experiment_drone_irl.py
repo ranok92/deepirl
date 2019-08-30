@@ -10,6 +10,9 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
 import utils
 
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
+
 import datetime
 from logger.logger import Logger
 
