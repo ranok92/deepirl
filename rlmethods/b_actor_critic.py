@@ -569,7 +569,7 @@ class ActorCritic:
         # functionality MUST lie outside of any class. How to fix this?
         mp.spawn(
             train_spawnable,
-            args=(self, reward_net, feature_extractor, irl),
+            args=(self, reward_net, irl),
             nprocs=n_jobs
         )
 

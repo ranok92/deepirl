@@ -163,7 +163,7 @@ class DeepMaxEnt():
             pass
         else:
             print(self.plot_save_folder)
-            os.mkdir(self.plot_save_folder)
+            os.makedirs(self.plot_save_folder)
 
 
         self.clipping = clipping_value
@@ -563,9 +563,8 @@ class DeepMaxEnt():
             #torch.manual_seed(7)
             #np.random.seed(7)
             print('Starting RL training. . .')
-            current_agent_policy = self.rl.train_mp(
-                n_jobs=4,
-                reward_net=self.reward,
+            current_agent_policy = self.rl.train(
+                rewardNetwork=self.reward,
                 irl=True
             )
             print('Completed RL training.')

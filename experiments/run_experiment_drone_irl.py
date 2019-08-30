@@ -10,6 +10,7 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
 import utils
 
+import datetime
 from logger.logger import Logger
 
 parser = argparse.ArgumentParser()
@@ -189,6 +190,7 @@ def main():
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
                             termination = None,
+                            save_folder=to_save,
                             hidden_dims=args.reward_net_hidden_dims,
                             feat_extractor = feat_ext)
     print("RL method initialized.")
@@ -205,7 +207,7 @@ def main():
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
-    folder_to_save = '/results/'+args.save_folder
+    folder_to_save = 'results/'+args.save_folder
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
