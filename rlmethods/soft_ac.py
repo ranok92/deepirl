@@ -3,16 +3,14 @@ Soft actor critic per "Soft Actor-Critic Algorithms and Applications" Haarnoja
 et. al 2019.
 """
 import sys
-import pdb
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
+from torch.distributions import Categorical
 
 from tensorboardX import SummaryWriter
-import matplotlib.pyplot as plt
 
 sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
@@ -42,6 +40,22 @@ def move_average(source, target, tau=0.005):
         target_param.data.copy_(
             target_param.data * (1.0 - tau) + param.data * tau
         )
+
+def get_action_q(all_q_a, action_indices):
+    """Q network generates all Q values for all possible actions. Use this
+    function to get the Q value of a single specific action, whose index is
+    specific in action_indices. This works with batches.
+
+    :param all_q_a: NxA tensor of Q values for N rows of length A when A is
+    number of actions possible.
+    :param action_indices: 1xN tensor of shape (N,) of action indices.
+    """
+    index_tuple = (
+        torch.arange(len(action_indices)),
+        action_indices.type(torch.long)
+    )
+
+    return all_q_a[index_tuple]
 
 
 class QNetwork(BaseNN):
@@ -98,9 +112,10 @@ class PolicyNetwork(BaseNN):
         :param state: Input state vector.
         """
         probs = self.__call__(state)
-        dist = torch.distributions.Categorical(probs)
+        dist = Categorical(probs)
 
         return dist
+
 
 
 class SoftActorCritic:
@@ -121,7 +136,6 @@ class SoftActorCritic:
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
-        action_size = 1
 
         # buffer
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
@@ -192,7 +206,13 @@ class SoftActorCritic:
                 ))
                 current_state = next_state
 
+
     def tbx_logger(self, log_dict, training_i):
+        """Logs the tag-value pairs in log_dict using TensorboardX.
+
+        :param log_dict: {tag:value} dictionary to log.
+        :param training_i: Current training iteration.
+        """
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
@@ -219,28 +239,32 @@ class SoftActorCritic:
                 next_state_batch
             )
             next_q_a = self.avg_q_net(next_state_batch)
-            next_q = next_q_a[torch.arange(len(next_actions)), next_actions]
+            next_q = get_action_q(next_q_a, next_actions)
             next_state_values = next_q - alpha * log_next_actions
 
             # Calculate Q network target
-            q_target = reward_batch + self.gamma * dones.type(torch.float) * next_state_values.squeeze()
+            done_floats = dones.type(torch.float)
+            q_target = reward_batch
+            q_target += self.gamma * done_floats * next_state_values.squeeze()
 
         # q network loss
         q_a_values = self.q_net(state_batch)
-        q_values = q_a_values[torch.arange(len(action_batch)),
-                              action_batch.type(torch.long)]
-        q_loss = F.mse_loss(q_values, q_target.unsqueeze(1))
+
+        # Q net outputs values for all actions, so we index specific actions
+        # TODO: It should be possible to just do MSE over all q_a pairs.
+        q_values = get_action_q(q_a_values, action_batch)
+        q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        pi_actions, log_actions, action_dist = self.select_action(state_batch)
-        q_a_values_pi = self.q_net(state_batch)
-        q_values_pi = q_a_values_pi[torch.arange(len(pi_actions)), pi_actions]
-        q_distribution = torch.distributions.Categorical(F.softmax((1.0/alpha)*q_a_values_pi, dim=-1))
-        policy_loss = torch.distributions.kl.kl_divergence(action_dist, q_distribution).mean()
-        # q_values_pi = self.q_net(state_batch, pi_actions)
-        # policy_loss = (alpha * log_actions - q_values_pi.squeeze())
-        # policy_loss = policy_loss.mean()
+        _, log_actions, action_dist = self.select_action(state_batch)
+        q_a_pi = self.q_net(state_batch)
+        q_dist = Categorical(F.softmax((1.0/alpha)*q_a_pi, dim=-1))
 
+        # compute KL-divergence directly and manually for sanity
+        action_probs = action_dist.probs
+        q_probs = q_dist.probs
+        policy_loss = (action_probs * (action_probs / q_probs).log())
+        policy_loss = policy_loss.sum(dim=1).mean()
 
         # update parameters
         self.q_optim.zero_grad()
@@ -264,6 +288,7 @@ class SoftActorCritic:
         # Step average Q net
         move_average(self.q_net, self.avg_q_net, self.tau)
 
+
         # logging
         self.tbx_logger(
             {
@@ -274,18 +299,12 @@ class SoftActorCritic:
                 'Q/avg_q': q_values.mean().item(),
                 'Q/avg_reward': reward_batch.mean().item(),
                 'Q/avg_V': next_state_values.mean().item(),
-                'Q/entropy': q_distribution.entropy().mean(),
+                'Q/entropy': q_dist.entropy().mean(),
                 'pi/avg_entropy': action_dist.entropy().mean(),
                 'pi/avg_log_actions': log_actions.detach().mean().item(),
-                'pi/avg_q_values': q_values_pi.squeeze().detach().mean().item(),
                 'alpha': alpha.item(),
             },
             self.training_i
         )
-
-        # Things to do only once on the first iteration
-        # if self.training_i == 0:
-            # self.tbx_writer.add_graph(self.policy, state_batch)
-            # self.tbx_writer.add_graph(self.q_net, [state_batch, pi_actions])
 
         self.training_i += 1
