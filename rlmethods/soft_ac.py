@@ -244,7 +244,7 @@ class SoftActorCritic:
 
             # Calculate Q network target
             done_floats = dones.type(torch.float)
-            q_target = reward_batch
+            q_target = reward_batch.clone()
             q_target += self.gamma * done_floats * next_state_values.squeeze()
 
         # q network loss
