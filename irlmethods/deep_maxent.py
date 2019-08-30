@@ -147,16 +147,16 @@ class DeepMaxEnt():
         self.regularizer = regularizer
         #folders for saving purposes
 
-        self.save_folder_tf = './'+save_folder+'-reg-'+str(self.regularizer)+\
+        self.save_folder_tf = save_folder+'-reg-'+str(self.regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/tf_logs/'
 
-        self.plot_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+\
+        self.plot_save_folder = save_folder+'-reg-'+str(self.regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
 
-        self.reward_network_save_folder = './'+save_folder+'-reg-'+\
+        self.reward_network_save_folder = save_folder+'-reg-'+\
                                           str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
-        self.policy_network_save_folder = './'+save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+        self.policy_network_save_folder = save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
                                           str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
@@ -601,6 +601,7 @@ class DeepMaxEnt():
             
             #policy_network_folder = './saved-models/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(self.policy_network_save_folder).mkdir(parents=True, exist_ok=True)
+            print(self.policy_network_save_folder)
             current_agent_policy.save(self.policy_network_save_folder)
             
 

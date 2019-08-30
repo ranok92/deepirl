@@ -207,17 +207,17 @@ def main():
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
-    folder_to_save = 'results/'+args.save_folder
     irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
                            iterations=args.irl_iterations, log_intervals=5,
                            on_server=args.on_server,
                            regularizer=args.regularizer,
                            learning_rate=args.lr,
+                           seed=args.seed,
                            graft=False,
                            scale_svf=args.scale_svf,
                            hidden_dims = args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
-                           save_folder=folder_to_save)
+                           save_folder=parent_dir)
     print("IRL method intialized.")
     print(irlMethod.reward)
 
