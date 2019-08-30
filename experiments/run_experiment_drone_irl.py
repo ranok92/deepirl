@@ -99,7 +99,7 @@ def main():
     from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
 
     agent_width = 10
-    step_size = 10
+    step_size = 2
     obs_width = 10
     grid_size = 10
 
@@ -201,7 +201,7 @@ def main():
                             max_ep_length=args.rl_ep_length,
                             termination = None,
                             save_folder=to_save,
-                            hidden_dims=args.reward_net_hidden_dims,
+                            hidden_dims=args.policy_net_hidden_dims,
                             feat_extractor = feat_ext)
     print("RL method initialized.")
     print(rlMethod.policy)
