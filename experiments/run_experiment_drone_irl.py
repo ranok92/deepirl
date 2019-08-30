@@ -89,7 +89,7 @@ def main():
     experiment_logger.log_info(vars(args))
 
 
-    from rlmethods.rlutils import LossBasedTermination
+    #from rlmethods.rlutils import LossBasedTermination
     from rlmethods.b_actor_critic import ActorCritic
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
@@ -129,6 +129,13 @@ def main():
                            step_size=step_size,
                            )
     
+    if args.feat_extractor == 'DroneFeatureSAM1':
+
+        feat_ext = DroneFeatureSAM1(agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    step_size=step_size,
+                                    grid_size=grid_size,
+                                    thresh1=5, thresh2=10)
 
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
