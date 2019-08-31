@@ -28,6 +28,10 @@ def angle_between(v1, v2):
             >>> angle_between((1, 0, 0), (-1, 0, 0))
             3.141592653589793
     """
+    #this function is for [x, y] coordinates,
+    #the input vectors are [row, col]
+    v1_corr = np.array([v1[1], v1[0]])
+    v2_corr = np.array([v2[1], v2[0]])
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
@@ -82,7 +86,7 @@ def get_abs_orientation(agent_state, orientation_approximator):
         orientation = 1
     elif np.linalg.norm(orientation)==0:
         if no_of_directions==8:
-            orientation = 4
+            orientation = None
         else:
             orientation = -1
     else:
@@ -90,6 +94,7 @@ def get_abs_orientation(agent_state, orientation_approximator):
             #print('The orientation val')
             #print(orientation)
             angle_diff[i] = angle_between(orientation_approximator[i], orientation)
+
         orientation = np.argmin(angle_diff)
         if no_of_directions == 8:
             if orientation >=4:
@@ -185,13 +190,16 @@ class DroneFeatureSAM1():
 
         self.orientation_approximator_4 = [np.array([-2, 0]), np.array([0, 2]),
                                            np.array([2, 0]), np.array([0, -2])]
-
+        
         self.rel_orient_conv = [7*np.pi/4, 0, 
                                 np.pi/4, 6*np.pi/4, 
                                 np.pi/2, 5*np.pi/4,
                                 np.pi, 3*np.pi/4]
-        
-
+        '''
+        self.rel_orient_conv = [np.pi/4, 0, 7*np.pi/4,
+                                2*np.pi/4, 6*np.pi/4,
+                                3*np.pi/4, 4*np.pi/4, 5*np.pi/4]
+        '''
         self.speed_divisions = [0, 0.5, 1, 2, 3, 4]
         self.inner_ring_density_division = [0, 2, 3, 4]
         self.outer_ring_density_division = [0, 3, 5, 7]
@@ -285,6 +293,9 @@ class DroneFeatureSAM1():
     def populate_orientation_bin(self, agent_orientation_val, agent_state, obs_state_list):
         #given an obstacle, the agent state and orientation, 
         #populates the self.bins dictionary with the appropriate obstacles 
+        if agent_orientation_val >4:
+            agent_orientation_val-=1
+
         for obs_state in obs_state_list:
 
             distance = np.linalg.norm(obs_state['position'] - agent_state['position'])
@@ -309,9 +320,6 @@ class DroneFeatureSAM1():
 
                 #check for the orientation
                 #obtain relative orientation
-                if agent_orientation_val >4:
-                    agent_orientation_val-=1
-
                 #get the relative coordinates
                 rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
 
@@ -339,7 +347,6 @@ class DroneFeatureSAM1():
                 obs_state['orientation'] = rel_coord_orient_ref - rel_coord_obs
                 obs_state['position'] = rel_coord_obs
                 self.bins[str(bin_val)].append(obs_state)
-
         #if the obstacle does not classify to be considered
 
     def overlay_bins(self, pygame_surface, state):
@@ -472,7 +479,7 @@ class DroneFeatureSAM1():
             pass
         
         self.prev_frame_info = copy.deepcopy(state)
-        #pdb.set_trace()
+        pdb.set_trace()
 
         return reset_wrapper(extracted_feature)
 
@@ -494,8 +501,7 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
                          show_bins=show_bins,
                          obs_width=obs_width
                          )
-
-
+        self.thresh_speed = 0.5
         self.state_rep_size = 50
 
 
@@ -516,12 +522,20 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
             current_danger_level = 0
             for ped in range(len(self.bins[str(i)])):
                 #for each pedestrian
-                coll = self.compute_collision_likelihood(ped)
+                #pdb.set_trace()
+                coll = self.compute_collision_likelihood(self.bins[str(i)][ped])
                 if coll>current_danger_level:
                     current_danger_level = coll
 
             collision_information[i,current_danger_level] = 1
+        '''
+        if np.sum(collision_information[:,1])>0 or np.sum(collision_information[:,2]) > 0:
 
+            for i in range(collision_information.shape[0]):
+                print('Bin no :', i, ', collision_info : ', collision_information[i,:])
+            #print('Collision information :', collision_information)
+            #pdb.set_trace()
+        '''
         return collision_information
 
 
@@ -540,78 +554,13 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
             if np.linalg.norm(pedestrian['orientation']) > self.thresh_speed:
                 collision_prob = 2
         #lowest prob
-        elif ang > np.pi/8:
+        elif ang > np.pi/8 or pedestrian['speed'] == 0:
             collision_prob = 0
         #somewhere in between
         else:
             collision_prob = 1
-        pdb.set_trace()
 
         return collision_prob
-
-
-
-    def populate_orientation_bin(self, agent_orientation_val, agent_state, obs_state_list):
-        #given an obstacle, the agent state and orientation, 
-        #populates the self.bins dictionary with the appropriate obstacles 
-
-        for obs_state in obs_state_list:
-
-            distance = np.linalg.norm(obs_state['position'] - agent_state['position'])
-            #pdb.set_trace()
-            if obs_state['orientation'] is not None:
-                obs_orientation_ref_point = obs_state['position'] + obs_state['orientation']
-            else:
-                obs_orientation_ref_point = obs_state['position']
-
-            ring_1 = False
-            ring_2 = False
-            if distance < self.thresh2:
-                #classify obs as considerable
-                #check the distance
-
-                if distance < self.thresh1:
-                    #classify obstacle in the inner ring
-                    ring_1 = True
-                else:
-                    #classify obstacle in the outer ring
-                    ring_2 = True
-
-                #check for the orientation
-                #obtain relative orientation
-                if agent_orientation_val >4:
-                    agent_orientation_val-=1
-
-                #get the relative coordinates
-                rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
-
-                #translate the point so that the agent sits at the center of the coordinates
-                #before rtotation
-                vec_to_obs = obs_state['position'] - agent_state['position']
-                vec_to_orient_ref = obs_orientation_ref_point - agent_state['position']
-
-                #rotate the coordinates to get the relative coordinates wrt the agent
-                rel_coord_obs = np.matmul(rot_matrix, vec_to_obs)
-                rel_coord_orient_ref = np.matmul(rot_matrix, vec_to_orient_ref)
-
-                angle_diff = np.zeros(8)
-                for i in range(len(self.orientation_approximator)):
-                    #print('The orientation val')
-                    #print(orientation)
-                    angle_diff[i] = angle_between(self.orientation_approximator[i], rel_coord_obs)            
-                bin_val = np.argmin(angle_diff)
-
-                if ring_2:
-                    bin_val += 8
-
-                #orientation of the obstacle needs to be changed as it will change with the 
-                #change in the relative angle. No need to change the speed.
-                obs_state['orientation'] = rel_coord_orient_ref - rel_coord_obs
-                obs_state['position'] = rel_coord_obs
-                self.bins[str(bin_val)].append(obs_state)
-
-        pdb.set_trace()
-
 
 
     def extract_features(self, state):
@@ -619,12 +568,12 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+
         relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
 
         for i in range(16):
             self.bins[str(i)] = []
 
-        madarchod = 100
         self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
 
         collision_info = self.compute_bin_info()
