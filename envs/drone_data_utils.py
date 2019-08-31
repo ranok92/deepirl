@@ -8,6 +8,8 @@ sys.path.insert(0, '..')
 from envs.gridworld_drone import GridWorldDrone
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
+
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
 from scipy.interpolate import splev, splprep
 
 import os
@@ -334,40 +336,40 @@ def record_trajectories(num_of_trajs,path):
 
             print('Bad example. Discarding!')
 
-'''
-folder_name = './expert_datasets/'
-dataset_name = 'university_students/annotation/'
-file_n = 'processed/students003_processed_5.txt'
+
+if __name__=='__main__':
 
 
-feature_extractor = 'LocalGlobal_win5/'
-to_save = 'traj_info/students003_processed_2/'
-file_name = folder_name + dataset_name + file_n
-
-folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
-feature_extactor = LocalGlobal(window_size=5, grid_size=10, agent_width=10, obs_width=10,
-                               fieldList = ['agent_state','goal_state','obstacles'])
+    
+    #********* section to extract trajectories **********
+    folder_name = './expert_datasets/'
+    dataset_name = 'university_students/annotation/'
+    file_n = 'processed/frame_skip_1/students003_processed.txt'
 
 
-print(extract_subjects_from_file(file_name))
-extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=True, display=True)
-#record_trajectories(10, './test/')
+    feature_extractor = 'DroneFeatureSAM1/'
+    to_save = 'traj_info/frame_skip_1/students003/'
+    file_name = folder_name + dataset_name + file_n
+
+    folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
+    feature_extactor = DroneFeatureSAM1(thresh1=5, thresh2=10,
+                                        agent_width=10, obs_width=10,
+                                        grid_size=10, step_size=2)
 
 
-data = [
-        [279.000000, -123.000000, 0, 87.397438], 
-        [218.000000, -123.000000, 25, 90.000000], 
-        [148.000000, -118.000000, 55, 84.382416],
-        [82.000000 ,-135.000000, 86, 106.460014], 
-        [15.000000, -151.000000, 113, 91.145760], 
-        [-61.000000, -157.000000, 143, 90.000000], 
-        [-139.000000, -160.000000, 173, 87.273689], 
-        [-224.000000, -175.000000, 209, 93.814072], 
-        [-346.000000, -190.000000, 265, 88.602821]] 
-'''
-file_name = '../envs/expert_datasets/university_students/annotation/students001.vsp'
+    print(extract_subjects_from_file(file_name))
+    extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=False, display=False)
+    #record_trajectories(10, './test/')
+    #***************************************************** 
 
-intval = preprocess_data_from_control_points(file_name, 1)
+    '''
+    #******** section for preprocessing data ************
+    file_name = '../envs/expert_datasets/university_students/annotation/students001.vsp'
+
+    intval = preprocess_data_from_control_points(file_name, 1)
+    
 
 
-#preprocess_data_from_stanford_drone_dataset('annotations.txt')
+    #preprocess_data_from_stanford_drone_dataset('annotations.txt')
+    #****************************************************
+    '''

@@ -9,7 +9,8 @@ sys.path.insert(0, '..')
 
 from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal
+
 
 from itertools import count
 import utils  # NOQA: E402
@@ -88,6 +89,7 @@ class GridWorldDrone(GridWorld):
             pygame.font.init()
             self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
             self.tickSpeed = tick_speed
+            
         self.show_comparison = show_comparison
 
         self.ghost = None
@@ -826,6 +828,8 @@ if __name__=="__main__":
                                    step_size=10,
                                    grid_size=10) 
     feat_drone = DroneFeatureSAM1(step_size=40)
+    feat_drone_2 = DroneFeatureMinimal(step_size=40)
+
     window_size = 9
     #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
     world = GridWorldDrone(display=True, is_onehot = False, 
@@ -833,7 +837,7 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
-                        subject=10,
+                        subject=141,
                         tick_speed=30, 
                         obs_width=10,
                         step_size=10,
@@ -856,8 +860,9 @@ if __name__=="__main__":
             state, reward , done, _ = world.step()
 
             feat_drone.overlay_bins(world.gameDisplay, state)
-            feat = feat_drone.extract_features(state)
             
+            feat = feat_drone.extract_features(state)
+            feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
             #print('Global info:')
             #print(feat[0:9].reshape(3,3))
