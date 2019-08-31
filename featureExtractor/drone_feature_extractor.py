@@ -470,20 +470,18 @@ class DroneFeatureSAM1():
                                            np.reshape(sam_vector,(-1)),
                                            inner_ring_density,
                                            outer_ring_density))
+        '''
         flag = False
         for i in range(16):
             if len(self.bins[str(i)]) > 0:
                 flag = True
         if flag:    
-            #pdb.set_trace()
+            pdb.set_trace()
             pass
-        
+        '''
         self.prev_frame_info = copy.deepcopy(state)
-        pdb.set_trace()
 
         return reset_wrapper(extracted_feature)
-
-
 
 
 
@@ -528,14 +526,14 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
                     current_danger_level = coll
 
             collision_information[i,current_danger_level] = 1
-        '''
+        
         if np.sum(collision_information[:,1])>0 or np.sum(collision_information[:,2]) > 0:
 
             for i in range(collision_information.shape[0]):
                 print('Bin no :', i, ', collision_info : ', collision_information[i,:])
-            #print('Collision information :', collision_information)
-            #pdb.set_trace()
-        '''
+
+            pdb.set_trace()
+        
         return collision_information
 
 
