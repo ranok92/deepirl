@@ -86,9 +86,9 @@ def get_abs_orientation(agent_state, orientation_approximator):
         orientation = 1
     elif np.linalg.norm(orientation)==0:
         if no_of_directions==8:
-            orientation = None
+            orientation = 1
         else:
-            orientation = -1
+            orientation = 1
     else:
         for i in range(len(orientation_approximator)):
             #print('The orientation val')

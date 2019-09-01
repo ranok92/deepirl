@@ -12,6 +12,10 @@ class Logger():
             pass
         else:
             os.makedirs(parent_folder)
+
+        self.black_list = ['annotation_dict',
+                           'annotation_list',
+                           'pedestrian_dict']
         #self.file_to_write = open(save_file,'w')
 
 		#sys.stdout = self.file_to_write
@@ -20,7 +24,8 @@ class Logger():
     def log_info(self, information_dict):
         with open(self.save_file, 'a') as self.file_to_write:
             for key in information_dict:
-                print("%s - %s" % (key, information_dict[key]), file=self.file_to_write)
+                if key not in self.black_list:
+                    print("%s - %s" % (key, information_dict[key]), file=self.file_to_write)
         self.file_to_write.close()
 
 
