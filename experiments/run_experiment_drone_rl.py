@@ -181,7 +181,7 @@ def main():
             model.train()
         else:
             from irlmethods.deep_maxent import RewardNet
-            state_size = featExtract.extract_features(env.reset()).shape[0]
+            state_size = feat_ext.extract_features(env.reset()).shape[0]
             reward_net = RewardNet(state_size, args.reward_net_hidden_dims)
             reward_net.load(args.reward_path)
             print(next(reward_net.parameters()).is_cuda)
