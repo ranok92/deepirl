@@ -5,14 +5,12 @@ sys.path.insert(0, '..')  # NOQA: E402
 import numpy as np
 import argparse
 import torch.multiprocessing as mp
-from rlmethods.b_actor_critic import ActorCritic
+import os
 
 from logger.logger import Logger
-from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 import matplotlib
 import datetime, time
 
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
 from utils import step_wrapper, reset_wrapper
 
 parser = argparse.ArgumentParser()
@@ -64,7 +62,10 @@ def main():
 
     mp.set_start_method('spawn')
 
+    from rlmethods.b_actor_critic import ActorCritic
     from envs.gridworld_drone import GridWorldDrone
+    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+    from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
     if not args.dont_save:
