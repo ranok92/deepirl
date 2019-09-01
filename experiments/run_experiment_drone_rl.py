@@ -9,7 +9,7 @@ from rlmethods.b_actor_critic import ActorCritic
 
 from logger.logger import Logger
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
-
+import matplotlib
 import datetime, time
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
@@ -29,6 +29,11 @@ parser.add_argument('--num-trajs', type=int, default=10)
 parser.add_argument('--view-reward', action='store_true')
 
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
+parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int, default=[128])
+
+parser.add_argument('--lr', type=float, default=0.001)
+parser.add_argument('--on-server', action='store_true')
+
 parser.add_argument('--feat-extractor', type=str, default=None, help='The name of the \
                      feature extractor to be used in the experiment.')
 parser.add_argument('--save-folder', type=str, default=None, help= 'The name of the folder to \
@@ -40,6 +45,8 @@ parser.add_argument('--annotation-file', type=str, default='../envs/expert_datas
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
 parser.add_argument('--max-ep-length', type=int, default=200, help='Max length of a single episode.')
 
+
+
 def main():
     
     #####for the logger
@@ -48,6 +55,13 @@ def main():
     ###################
 
     args = parser.parse_args()
+
+    if args.on_server:
+
+        matplotlib.use('Agg')
+        # pygame without monitor
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'
+
     mp.set_start_method('spawn')
 
     from envs.gridworld_drone import GridWorldDrone
@@ -136,6 +150,7 @@ def main():
                         log_interval=10,max_ep_length=args.max_ep_length,
                         hidden_dims=args.policy_net_hidden_dims,
                         save_folder=save_folder, 
+                        lr=args.lr,
                         max_episodes = args.total_episodes)
 
     #log RL info

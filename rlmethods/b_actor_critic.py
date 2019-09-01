@@ -132,7 +132,7 @@ class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128],
+                 log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128], lr=0.001,
                  reward_threshold_ratio=0.99 , plot_loss = False, save_folder=None):
         """__init__
 
@@ -174,7 +174,7 @@ class ActorCritic:
         self.policy = self.policy.to(self.device)
 
         # optimizer setup
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.EPS = np.finfo(np.float32).eps.item()
 
         #for plotting loss
