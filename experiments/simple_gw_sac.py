@@ -29,7 +29,7 @@ def play(rl, gw):
     while not done:
         _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
         action, _, _ = rl.select_action(_state)
-        next_state, reward, done, _ = gw.fgutep(action.item())
+        next_state, reward, done, _ = gw.step(action.item())
 
         # update environment variables
         total_reward += reward
@@ -57,9 +57,9 @@ def main():
     )
 
     for i in range(args.max_episodes):
-        soft_ac.train()
+        soft_ac.train_episode()
 
-        if i % 1000 == 0:
+        if (i+1) % 1000 == 0:
             rs = []
             for j in range(10):
                 rs.append(play(soft_ac, env))

@@ -51,7 +51,7 @@ def main():
     )
 
     for i in range(10**6):
-        soft_ac.train()
+        soft_ac.train_episode()
 
         if i % 1000 == 0:
             rs = []
