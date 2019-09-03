@@ -127,7 +127,7 @@ class SoftActorCritic:
             replay_buffer_size=10**6,
             buffer_sample_size=10**4,
             gamma=0.99,
-            learning_rate=3 * 10**-4,
+            learning_rate=3e-4,
             tbx_writer=None,
             entropy_tuning=False,
             tau=0.005,
@@ -150,7 +150,10 @@ class SoftActorCritic:
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.log_alpha = torch.tensor([log_alpha], requires_grad=True).to(DEVICE)
+        self.log_alpha = torch.tensor(
+            [log_alpha],
+            requires_grad=True
+        ).to(DEVICE)
         self.gamma = gamma
         self.entropy_target = -1
         self.tau = tau
@@ -216,7 +219,7 @@ class SoftActorCritic:
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
-    def train(self):
+    def train_episode(self):
         """Train Soft Actor Critic"""
 
         # Populate the buffer
@@ -308,3 +311,14 @@ class SoftActorCritic:
         )
 
         self.training_i += 1
+
+    def train(self, num_episodes):
+        """Run train_episode() for specified number of num_episodes.
+
+        :param num_episodes: Number of expisodes to train for.
+        :return trained policy
+        """
+        for _ in range(num_episodes):
+            self.train_episode()
+
+        return self.policy
