@@ -188,7 +188,7 @@ class ActorCritic:
             self.save_folder = None
         
         if self.plot_loss or self.save_folder:
-            self.loss_interval = 1
+            self.loss_interval = min(10, self.log_interval)
             self.loss_mean = []
             self.loss = []
 
@@ -580,7 +580,7 @@ class ActorCritic:
         i = 0
         color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
         for list_val in inp_tuple:
-            plt.figure(i)
+            plt.figure(name_tuple[i])
             plt.plot(list_val,color_list[i])
             plt.draw()
             plt.pause(.0001)

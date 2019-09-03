@@ -358,12 +358,12 @@ class DeepMaxEnt():
     '''
 
 
-    def plot_info(self,inp_tuple):
+    def plot_info(self,inp_tuple, name_tuple):
         #pass a tuple containing n number of lists , this function goes through all and plots them
         i = 0
         color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
         for list_val in inp_tuple:
-            plt.figure(i)
+            plt.figure(name_tuple[i])
             plt.plot(list_val,color_list[i])
             plt.draw()
             plt.pause(.0001)
@@ -378,6 +378,17 @@ class DeepMaxEnt():
             plt.draw()
             plt.pause(.0001)
             '''
+
+    def save_plot_information(self, iteration, inp_tuple, name_tuple):
+        '''
+        saves the information provided in the input tuple in their respective files
+        '''
+        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
+        for i in range(len(inp_tuple)):
+            plt.figure(name_tuple[i])
+            file_name = self.plot_save_folder+name_tuple[i]+str(iteration)+'.jpg'
+            plt.savefig(file_name)
+
 
 
     def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
@@ -640,8 +651,16 @@ class DeepMaxEnt():
 
 
             self.plot_info((lossList, svf_diff_list, 
-                            l1_reg_list, dot_prod_list, rewards_norm_list, reward_grad_norm_list,
-                            model_performance_list, model_performance_nn))
+                            l1_reg_list, dot_prod_list, rewards_norm_list, 
+                            reward_grad_norm_list, model_performance_list, 
+                            model_performance_nn),
+                            ('loss-iter', 'svf-diff', 'l1-reg', 
+                            'dot-prod', 'reward-norm',
+                            'reward-net-grad-norm', 'model-performance-true',
+                            'model-performance-nn')
+                            )
+
+
 
             #pdb.set_trace()
             self.optimizer.step()
@@ -654,37 +673,15 @@ class DeepMaxEnt():
             #storing the plots in files
             if (i+1) % 3 == 0:
 
-                plt.figure(0)
-                file_name = self.plot_save_folder+'loss-iter'+str(i)+'.jpg'
-                plt.savefig(file_name)
-                
-                plt.figure(1)
-                file_name = self.plot_save_folder+'svf-diff'+str(i)+'.jpg'
-                plt.savefig(file_name)
-                
-                plt.figure(2)
-                file_name = self.plot_save_folder+'l1-reg'+str(i)+'.jpg'
-                plt.savefig(file_name)
-                
-                plt.figure(3)
-                file_name = self.plot_save_folder+'dot-prod'+str(i)+'.jpg'
-                plt.savefig(file_name)
-                
-                plt.figure(4)
-                file_name = self.plot_save_folder+'rewards-norm'+str(i)+'.jpg'
-                plt.savefig(file_name)
-
-                plt.figure(5)
-                file_name = self.plot_save_folder+'reward-net-grad-norm'+str(i)+'.jpg'
-                plt.savefig(file_name)
-
-                plt.figure(6)
-                file_name = self.plot_save_folder+'model-performance-true'+str(i)+'.jpg'
-                plt.savefig(file_name)
-
-                plt.figure(7)
-                file_name = self.plot_save_folder+'model-performance-nn'+str(i)+'.jpg'
-                plt.savefig(file_name)
+                self.save_plot_information(i,
+                            (lossList, svf_diff_list, 
+                            l1_reg_list, dot_prod_list, rewards_norm_list, 
+                            reward_grad_norm_list, model_performance_list, 
+                            model_performance_nn),
+                            ('loss-iter', 'svf-diff', 'l1-reg', 'dot-prod', 'reward-norm',
+                              'reward-net-grad-norm', 'model-performance-true',
+                              'model-performance-nn')
+                            )
 
         self.writer.close()
         return self.reward
