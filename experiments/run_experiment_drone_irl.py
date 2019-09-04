@@ -57,7 +57,9 @@ parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[1
 parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
                     be used to run the environment.')
 
-parser.add_argument('--lr', type=float, default=1e-3, help='The learning rate for the reward network.')
+parser.add_argument('--lr-rl', type=float, default=1e-3, help='The learning rate for the policy network.')
+
+parser.add_argument('--lr-irl', type=float, default=1e-3, help='The learning rate for the reward network.')
 
 parser.add_argument('--clipping-value', type=float, default=None, help='For gradient clipping of the \
                     reward network.')
@@ -84,7 +86,7 @@ def main():
 
     parent_dir = './results/'+str(args.save_folder)+st
     to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
-                '-seed-'+str(args.seed)+'-lr-'+str(args.lr)
+                '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)
     log_file = 'Experiment_info.txt'
 
     experiment_logger = Logger(to_save, log_file)
@@ -170,8 +172,8 @@ def main():
 
     '''
 
-    env = GridWorld(display=args.render, is_random = True,
-                    rows = 576, cols = 720,
+    env = GridWorld(display=args.render, is_random=True,
+                    rows=576, cols=720,
                     agent_width=agent_width,
                     step_size=step_size,
                     obs_width=obs_width,
@@ -179,9 +181,10 @@ def main():
                     annotation_file=args.annotation_file,
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
-                    seed = args.seed,
+                    seed=args.seed,
+                    train_exact=False,
                     reset_wrapper=utils.reset_wrapper,
-                    is_onehot = False)
+                    is_onehot=False)
     
 
 
@@ -196,13 +199,14 @@ def main():
     # intialize RL method
     #CHANGE HERE
     rlMethod = ActorCritic(env, gamma=1,
-                            log_interval = args.rl_log_intervals,
+                            log_interval=args.rl_log_intervals,
                             max_episodes=args.rl_episodes,
                             max_ep_length=args.rl_ep_length,
-                            termination = None,
+                            termination=None,
                             save_folder=to_save,
+                            lr=args.lr_rl,
                             hidden_dims=args.policy_net_hidden_dims,
-                            feat_extractor = feat_ext)
+                            feat_extractor=feat_ext)
     print("RL method initialized.")
     print(rlMethod.policy)
     if args.policy_path is not None:
@@ -217,11 +221,13 @@ def main():
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
-    irlMethod = DeepMaxEnt(trajectory_path, rlmethod=rlMethod, env=env,
-                           iterations=args.irl_iterations, log_intervals=5,
+    irlMethod = DeepMaxEnt(trajectory_path, 
+                           rlmethod=rlMethod, 
+                           env=env,
+                           iterations=args.irl_iterations,
                            on_server=args.on_server,
                            regularizer=args.regularizer,
-                           learning_rate=args.lr,
+                           learning_rate=args.lr_irl,
                            seed=args.seed,
                            graft=False,
                            scale_svf=args.scale_svf,

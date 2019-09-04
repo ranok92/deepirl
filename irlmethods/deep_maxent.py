@@ -87,15 +87,13 @@ class DeepMaxEnt():
             rlmethod=None,
             env=None,
             iterations=10,
-            log_intervals=1,
             on_server=True,
             save_folder=None,
-            rl_max_episodes=30,
             graft=True,
             hidden_dims=[128],
             regularizer=0.1,
             learning_rate=1e-3,
-            scale_svf=True,
+            scale_svf=False,
             seed=10, 
             clipping_value=None
     ):
@@ -105,7 +103,7 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episodes = self.rl.max_ep_length
+        self.rl_max_episode_len = self.rl.max_ep_length
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
@@ -120,6 +118,7 @@ class DeepMaxEnt():
         self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
         self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
+
         #############debug###########
         #self.reward.load('/home/abhisek/Study/Robotics/deepirl/test_meIRL/results/Beluga/MountainCar_beluga_MCFeatures_128_8_no_sampling_SVF2019-08-22 08:56:38-reg-0-seed-110-lr-0.0001/saved-models-rewards/3.pt')
         self.device = torch.device(
@@ -129,11 +128,12 @@ class DeepMaxEnt():
 
         self.hidden_dims = hidden_dims
 
-        self.optimizer = optim.SGD(self.reward.parameters(), lr=learning_rate)
-        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+        self.learning_rate = learning_rate
+        self.optimizer = optim.SGD(self.reward.parameters(), lr=self.learning_rate)
+
+        #self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
         self.EPS = np.finfo(np.float32).eps.item()
-        self.log_intervals = log_intervals
 
         self.seed = seed
         self.scale_svf = scale_svf
@@ -156,6 +156,7 @@ class DeepMaxEnt():
         self.reward_network_save_folder = save_folder+'-reg-'+\
                                           str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
+
         self.policy_network_save_folder = save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
                                           str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
@@ -172,6 +173,8 @@ class DeepMaxEnt():
     #******parts being operated on
     ############ array based svf calculation. Not feasible for larger state spaces#######
     #####################################################################################
+
+    '''
     def expert_svf(self):
         return irlUtils.expert_svf(self.traj_path, feat=self.rl.feature_extractor)
 
@@ -197,7 +200,7 @@ class DeepMaxEnt():
                                             episode_length = episode_length,
                                             feature_extractor = feature_extractor)
 
-    
+    '''
     ####################################################################################
     ####################################################################################
 
@@ -205,10 +208,14 @@ class DeepMaxEnt():
 
     #********************* dictionary based svf calculation***************************
     ##################################################################################
-    def expert_svf_dict(self,smoothing_window=None,gamma=1):
+    def expert_svf_dict(self, max_time_steps,
+                        feature_extractor, 
+                        smoothing_window=None,
+                        gamma=1):
         
         return irlUtils.calculate_expert_svf(self.traj_path, 
-                                             feature_extractor=self.rl.feature_extractor,
+                                             max_time_steps=max_time_steps,
+                                             feature_extractor=feature_extractor,
                                              gamma=gamma)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
@@ -542,7 +549,10 @@ class DeepMaxEnt():
 
         #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
-        expertdemo_svf = self.expert_svf_dict(smoothing_window=None, gamma=1)
+        expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
+                                              self.rl.feature_extractor,
+                                              smoothing_window=None, 
+                                              gamma=1)
         print('Done reading expert-svf.')
 
         #expertdemo_svf = self.expert_svf_dict()
@@ -588,7 +598,7 @@ class DeepMaxEnt():
                                                              gamma=1,
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
-                                                             episode_length=self.rl_max_episodes,
+                                                             episode_length=self.rl_max_episode_len,
                                                              smoothing_window=None)
 
 
@@ -633,7 +643,7 @@ class DeepMaxEnt():
             loss, dot_prod, l1val, reward_nn_grad_magnitude, rewards_norm = self.calculate_grads(state_rewards,
                                                                         diff_freq)
 
-
+            #*************** adding to the tensorboard logger ************
             lossList.append(loss)
             self.writer.add_scalar('Log_info/loss', loss, i)
 
@@ -648,6 +658,8 @@ class DeepMaxEnt():
 
             reward_grad_norm_list.append(reward_nn_grad_magnitude)
             self.writer.add_scalar('Log_info/reward_grad_norm', reward_nn_grad_magnitude, i)
+
+            ###############################################################
 
 
             self.plot_info((lossList, svf_diff_list, 
