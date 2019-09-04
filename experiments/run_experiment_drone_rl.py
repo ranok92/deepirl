@@ -43,6 +43,7 @@ parser.add_argument('--annotation-file', type=str, default='../envs/expert_datas
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
 parser.add_argument('--max-ep-length', type=int, default=200, help='Max length of a single episode.')
 
+parser.add_argument('--train-exact', acton='store_true')
 
 
 def main():
@@ -126,7 +127,10 @@ def main():
         experiment_logger.log_info(feat_ext.__dict__)
 
     #initialize the environment
-
+    if args.train_exact:
+        train_exact=True
+    else:
+        train_exact=False
     env = GridWorldDrone(display=args.render, is_onehot = False, 
                         seed=999, obstacles=None, 
                         show_trail=False,
@@ -137,6 +141,7 @@ def main():
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
+                        train_exact=train_exact,
                         show_comparison=True,                       
                         rows=576, cols=720, width=grid_size)
 

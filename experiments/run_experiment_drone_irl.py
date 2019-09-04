@@ -67,6 +67,9 @@ parser.add_argument('--clipping-value', type=float, default=None, help='For grad
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
                     based on the reward the trajectory got.')
 
+parser.add_argument('--train-exact', action='store_true', default=None)
+
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -182,7 +185,7 @@ def main():
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
-                    train_exact=False,
+                    train_exact=args.train_exact,
                     reset_wrapper=utils.reset_wrapper,
                     is_onehot=False)
     
