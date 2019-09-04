@@ -174,7 +174,8 @@ class ActorCritic:
         self.policy = self.policy.to(self.device)
 
         # optimizer setup
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self.lr = lr
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         self.EPS = np.finfo(np.float32).eps.item()
 
         #for plotting loss

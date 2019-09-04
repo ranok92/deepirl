@@ -414,7 +414,7 @@ class DeepMaxEnt():
         print('the rewards of the new policy :')
         print(self.rl.policy.rewards)
         '''
-        self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=3e-4)
+        self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=self.rl.lr)
 
     #############################################################################
     #############################################################################
