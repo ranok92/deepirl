@@ -7,6 +7,7 @@ import argparse
 import torch.multiprocessing as mp
 import os
 
+import glob
 from logger.logger import Logger
 import matplotlib
 import datetime, time
@@ -43,8 +44,8 @@ parser.add_argument('--annotation-file', type=str, default='../envs/expert_datas
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
 parser.add_argument('--max-ep-length', type=int, default=200, help='Max length of a single episode.')
 
-parser.add_argument('--train-exact', acton='store_true')
-
+parser.add_argument('--train-exact', action='store_true')
+parser.add_argument('--seed', type=int, default=789)
 
 def main():
     
@@ -76,6 +77,7 @@ def main():
             exit()
 
         save_folder = './results/'+ args.save_folder +st + args.feat_extractor + \
+                      '-seed-'+str(args.seed) + \
                       '-total-ep-'+str(args.total_episodes)+'-max-ep-len-'+ str(args.max_ep_length)
 
         experiment_logger = Logger(save_folder,'experiment_info.txt')
@@ -84,7 +86,6 @@ def main():
     
 
     agent_width = 10
-    step_size = 2
     obs_width = 10
     grid_size = 10
 
@@ -107,14 +108,14 @@ def main():
         feat_ext = LocalGlobal(window_size=5, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
-                           step_size=step_size,
+                           step_size=10,
                            )
     
     if args.feat_extractor == 'DroneFeatureSAM1':
 
         feat_ext = DroneFeatureSAM1(agent_width=agent_width,
                                     obs_width=obs_width,
-                                    step_size=step_size,
+                                    step_size=2,
                                     grid_size=grid_size,
                                     thresh1=5, thresh2=10)
     
@@ -132,7 +133,7 @@ def main():
     else:
         train_exact=False
     env = GridWorldDrone(display=args.render, is_onehot = False, 
-                        seed=999, obstacles=None, 
+                        seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file=args.annotation_file,
