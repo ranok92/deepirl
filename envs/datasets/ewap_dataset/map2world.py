@@ -54,8 +54,6 @@ if __name__ == '__main__':
     shifted_map[0:] -= shifted_map[0, 0]
     shifted_map[1:] -= shifted_map[1, 0]
 
-    breakpoint()
-
     shifted_map = np.round(shifted_map).astype(np.int64)
 
     # construct new image
@@ -77,3 +75,6 @@ if __name__ == '__main__':
 
     # save shift amount, all positions in dataset must be shifted by this.
     np.savetxt(args.map_file.parents[0] / 'shift.txt', shift2save)
+
+    # save scale amount, all positions and velocities must be scaled by this.
+    np.savetxt(args.map_file.parents[0] / 'scale.txt', np.array([args.scale]))
