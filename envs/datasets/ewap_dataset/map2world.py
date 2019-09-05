@@ -39,14 +39,22 @@ if __name__ == '__main__':
 
     transformed_map = np.matmul(hmat, h_pixel_pos)
     transformed_map /= transformed_map[-1:]
-    transformed_map = transformed_map[:2:]
+    transformed_map = transformed_map[:2, :]
 
     # try to coerce transformed map into discrete image
     # arbitrary 1m/10 resolution below
     shifted_map = transformed_map.copy() * args.scale
 
+    # store shift amount for saving later
+    shift2save = np.array([
+        shifted_map[0, 0],
+        shifted_map[1, 0]
+    ])
+
     shifted_map[0:] -= shifted_map[0, 0]
     shifted_map[1:] -= shifted_map[1, 0]
+
+    breakpoint()
 
     shifted_map = np.round(shifted_map).astype(np.int64)
 
@@ -63,6 +71,9 @@ if __name__ == '__main__':
         new_image[tuple(rw_coords)] = orig_map[tuple(old_coords)]
 
     # save image
-    im2save = Image.fromarray(new_image.astype('uint8')*255)
+    im2save = Image.fromarray(new_image.astype('uint8') * 255)
     im2save = im2save.convert('1')
-    im2save.save(args.map_file.parents[0]/'hmap.png')
+    im2save.save(args.map_file.parents[0] / 'hmap.png')
+
+    # save shift amount, all positions in dataset must be shifted by this.
+    np.savetxt(args.map_file.parents[0] / 'shift.txt', shift2save)
