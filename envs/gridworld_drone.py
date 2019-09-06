@@ -163,15 +163,19 @@ class GridWorldDrone(GridWorld):
         '''
         Reads lines from an annotation file and creates a list
         '''
-        if not os.path.isfile(self.annotation_file):
-            print("The annotation file does not exist.")
-            return 0
+        if self.annotation_file is not None:
+            if not os.path.isfile(self.annotation_file):
+                print("The annotation file does not exist.")
+                return 0
 
-        with open(self.annotation_file) as f:
+            with open(self.annotation_file) as f:
 
-            for line in f:
-                line = line.strip().split(' ')
-                self.annotation_list.append(line)
+                for line in f:
+                    line = line.strip().split(' ')
+                    self.annotation_list.append(line)
+        else:
+
+            self.annotation_list = []
 
 
 
@@ -534,6 +538,8 @@ class GridWorldDrone(GridWorld):
             return self.reset_and_replace()
 
         else:
+            
+            self.skip_list = [i for i in range(len(self.pedestrian_dict.keys()))]
 
             self.current_frame = self.initial_frame
             self.pos_history = []
@@ -597,6 +603,7 @@ class GridWorldDrone(GridWorld):
 
             self.pos_history.append(self.agent_state)
 
+            self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
      
             pygame.display.set_caption('Your friendly grid environment')
             if self.display:
@@ -627,11 +634,14 @@ class GridWorldDrone(GridWorld):
         if self.display:
             if self.show_comparison:
                 self.ghost = cur_ped
-        self.skip_list = []
+
+        self.skip_list = [] 
         self.skip_list.append(cur_ped)
         self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
         #print('Current frame', self.current_frame)
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+        
+
         self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
@@ -827,8 +837,8 @@ if __name__=="__main__":
                                    obs_width=10,
                                    step_size=10,
                                    grid_size=10) 
-    feat_drone = DroneFeatureSAM1(step_size=40)
-    feat_drone_2 = DroneFeatureMinimal(step_size=40)
+    feat_drone = DroneFeatureSAM1(step_size=50)
+    #feat_drone_2 = DroneFeatureMinimal(step_size=50)
 
     window_size = 9
     #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
@@ -837,15 +847,17 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
-                        subject=141,
+                        subject=None,
                         tick_speed=30, 
                         obs_width=10,
                         step_size=10,
                         agent_width=10,
+                        stepReward=0.01,
                         show_comparison=False,
                         show_orientation=True,
                         train_exact=False,                       
-                        rows=576, cols=720, width=20)
+                        rows=200, cols=200, width=10)
+                        #rows=576, cols=720, width=20)
     print ("here")
     
     done = False
@@ -862,12 +874,14 @@ if __name__=="__main__":
             feat_drone.overlay_bins(world.gameDisplay, state)
             
             feat = feat_drone.extract_features(state)
-            feat2 = feat_drone_2.extract_features(state)
+
+            #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
-            #print('Global info:')
-            #print(feat[0:9].reshape(3,3))
-            print('Local info:')
-            #print(feat[-17:-1].reshape(4,4))
+            print('Global info:')
+            print(feat[0:9].reshape(3,3))
+            print('global info_goal:')
+            print(feat[9:12])
+            pdb.set_trace()
             #print(world.agent_state)
             #print (reward, done)
     
