@@ -80,7 +80,7 @@ class SimpleGridworld:
         self.grid[tuple(self.goal_pos)] = GOAL
 
         # generate player location
-        validity_condition = np.logical_or(
+        validity_condition = np.logical_and(
             self.grid != OBSTACLE,
             self.grid != GOAL
         )
