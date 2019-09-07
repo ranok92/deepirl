@@ -14,7 +14,7 @@ from scipy.interpolate import splev, splprep
 
 import os
 import pdb
-
+import pathlib
 
 '''
 information regarding datasets and annotations:
@@ -204,6 +204,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
     subject_list = extract_subjects_from_file(annotation_file)
     print(subject_list)
     disp = display
+    total_path_len = 0
     for sub in subject_list:
         trajectory_info = []
         print('Starting for subject :',sub)
@@ -221,7 +222,8 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
                         width=10)
 
         world.reset()
-
+        print('Path lenghth :',world.final_frame - world.current_frame)
+        total_path_len += world.final_frame - world.current_frame
         while world.current_frame < world.final_frame:
             state,_,_,_ = world.step()
             state = feature_extactor.extract_features(state)
@@ -244,6 +246,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
         state_tensors = torch.stack(trajectory_info)
         torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
 
+    print('The average path length :', total_path_len/len(subject_list))
 
 
 
@@ -264,21 +267,11 @@ def extract_subjects_from_file(annotation_file):
     return set(sub_list)
 
 
-def record_trajectories(num_of_trajs,path):
+def record_trajectories(num_of_trajs, env, feature_extractor, path):
     '''
     Let user play in an environment simulated from the data taken from a dataset
     '''
-    step_size = 10
-    agent_size = 10
-    grid_size = 10
-    obs_size = 10
-    window_size = 7
-    '''
-    feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
-                                    step_size=step_size, 
-                                    obs_width=obs_size,
-                                    grid_size=grid_size, 
-                                    fieldList=['agent_state', 'goal_state', 'obstacles'])
+
     '''
 
     feature_extractor = FrontBackSideSimple(thresh1=1, thresh2=2,
@@ -286,16 +279,10 @@ def record_trajectories(num_of_trajs,path):
                                       step_size=step_size, grid_size=grid_size,
                                       fieldList=['agent_state','goal_state','obstacles'])
 
+    '''
 
-    env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
-                         seed=10, obstacles=None, obs_width=obs_size,
-                         step_size=step_size, width=grid_size,
-                         show_trail=False,
-                         is_random=True,
-                         annotation_file='./expert_datasets/data_zara/annotation/processed/crowds_zara03_processed.txt',
-                         subject=None,
-                         rows=576, cols=720)
     i = 0
+    avg_len = 0
     while i < num_of_trajs:
         actions = []
         states = []
@@ -307,20 +294,34 @@ def record_trajectories(num_of_trajs,path):
         while not done:
 
             action = env.take_action_from_user()
-            actions.append(action)
+            if action !=8:
+                actions.append(action)
             next_state, reward, done, _ = env.step(action)
             run_reward += reward 
-            if not done:
-                next_state = feature_extractor.extract_features(next_state)
-                #for variants of localglobal
-                #print(next_state[-window_size**2:].reshape(window_size,window_size))
-                #print(next_state[0:9].reshape(3,3))
-                #for fbs simple
-                print(next_state[12:].reshape(3,4))
+            '''
+            if reward != 0:
+                print('current_reward :', reward)
+                print('Run reward :', run_reward)
+            '''
+            next_state = feature_extractor.extract_features(next_state)
+            #for variants of localglobal
+            #print(next_state[-window_size**2:].reshape(window_size,window_size))
+            
+            #for fbs simple
+            #print(next_state[12:].reshape(3,4))
+            if action!=8:
+                print(done)
+                print(next_state[0:9].reshape(3,3))
+                print(next_state[9:12])
                 states.append(next_state)
+
+
+        #print('RUn reward :',run_reward)
+
 
         if run_reward > 1:
 
+            avg_len += len(states)
             actions_tensor = torch.tensor(actions)
             states_tensor = torch.stack(states)
             pathlib.Path(path).mkdir(parents=True, exist_ok=True)
@@ -336,30 +337,65 @@ def record_trajectories(num_of_trajs,path):
 
             print('Bad example. Discarding!')
 
+    print('Avg length :', avg_len/num_of_trajs)
+
 
 if __name__=='__main__':
 
 
     
     #********* section to extract trajectories **********
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     file_n = 'processed/frame_skip_1/students003_processed.txt'
 
 
     feature_extractor = 'DroneFeatureSAM1/'
-    to_save = 'traj_info/frame_skip_1/students003/'
+    to_save = 'traj_info/frame_skip_1/students003/delete/'
     file_name = folder_name + dataset_name + file_n
 
     folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
     feature_extactor = DroneFeatureSAM1(thresh1=5, thresh2=10,
                                         agent_width=10, obs_width=10,
-                                        grid_size=10, step_size=2)
+                                        grid_size=10, step_size=3)
 
 
     print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=False, display=False)
-    #record_trajectories(10, './test/')
+    
+    '''
+    #****************************************************
+    #******** section to record trajectories
+
+    step_size = 5
+    agent_size = 10
+    grid_size = 10
+    obs_size = 10
+    window_size = 3
+    
+    num_trajs = 30
+    path_to_save = './LocalGlobal_win3_user_played_empty_slate'
+    feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
+                                    step_size=step_size, 
+                                    obs_width=obs_size,
+                                    grid_size=grid_size, 
+                                    )
+
+
+    env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
+                         seed=10, obstacles=None, obs_width=obs_size,
+                         step_size=step_size, width=grid_size,
+                         show_trail=False,
+                         is_random=True,
+                         stepReward=.001,
+                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
+                         subject=None,
+                         rows=200, cols=200)
+
+    
+    record_trajectories(num_trajs, env, feature_extractor, path_to_save)
+
     #***************************************************** 
 
     '''

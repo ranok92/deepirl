@@ -335,6 +335,7 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
                 svf[state_hash] = 1*math.pow(gamma,i)
             else:
                 svf[state_hash] += 1*math.pow(gamma,i)
+
         for pad_i in range(i+1,max_time_steps):
 
             state_hash = feature_extractor.hash_function(traj_np[i])
@@ -679,7 +680,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                 run_reward+=nn_reward
 
             if done:
-                break
+                pass
+                #break
 
         if reward_nn is not None:
             rewards[i] = run_reward
@@ -860,7 +862,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     and returns two ordered lists containing the states visited and the 
     difference in their visitation frequency.
     '''
-
+    
     state_list = []
     diff_list = []
     expert_iterator = 0
@@ -970,9 +972,18 @@ if __name__ == '__main__':
     #calculating the SVF for policy
 
     #calculating the svf for experts
-    feat = MCFeatures(128, 8)
 
-    exp_svf = calculate_expert_svf(expert_folder, max_time_step=300, feature_extractor=feat)
+    grid_size=agent_width=obs_width=10
+    step_size = 5
+    expert_folder = '../envs/expert_datasets/blank_slate/LocalGlobal_win3_user_played_empty_slate/'
+    feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+                   agent_width=agent_width, 
+                   obs_width=obs_width,
+                   step_size=step_size,
+                   )
+    
+
+    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=50, feature_extractor=feat_ext, gamma=1)
 
     pdb.set_trace()
     print('printing from the expert :',exp_svf)

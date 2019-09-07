@@ -271,7 +271,7 @@ class ActorCritic:
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
 
-    def generate_trajectory(self, num_trajs, render):
+    def generate_trajectory(self, num_trajs, render, path=None):
 
         reward_across_trajs = []
         
@@ -279,12 +279,12 @@ class ActorCritic:
 
             # action and states lists for current trajectory
             actions = []
-            '''
+            
             if self.feature_extractor is None:
                 states = [self.env.reset()]
             else:
                 states = [self.feature_extractor.extract_features(self.env.reset())]
-            '''
+            
             state = self.feature_extractor.extract_features(self.env.reset())
             done = False
             t= 0
@@ -300,25 +300,26 @@ class ActorCritic:
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
 
-                #states.append(state)
+                states.append(state)
             
             reward_across_trajs.append(run_reward)
-            '''
-            if run_reward > 1: # not a bad run
+            print(run_reward)
+            if path is not None:
+                if run_reward > 1: # not a bad run
 
-                actions_tensor = torch.tensor(actions)
-                states_tensor = torch.stack(states)
+                    actions_tensor = torch.tensor(actions)
+                    states_tensor = torch.stack(states)
 
-                pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+                    pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-                torch.save(actions_tensor,
-                           os.path.join(path, 'traj%s.acts' % str(traj_i)))
+                    torch.save(actions_tensor,
+                               os.path.join(path, 'traj%s.acts' % str(traj_i)))
 
-                torch.save(states_tensor,
-                           os.path.join(path, 'traj%s.states' % str(traj_i)))
-            else:
-                print("Rejecting bad run.")
-            '''
+                    torch.save(states_tensor,
+                               os.path.join(path, 'traj%s.states' % str(traj_i)))
+                else:
+                    print("Rejecting bad run.")
+            
         return reward_across_trajs
 
     def finish_episode(self):
@@ -334,8 +335,7 @@ class ActorCritic:
         for r in self.policy.rewards[::-1]:
             R = r + self.gamma * R
             rewards.insert(0, R)
-        rewards = torch.tensor(rewards)
-
+        rewards = torch.tensor(rewards, dtype=torch.float)
         # if single rewards, do not normalize mean distribution
         if len(rewards) > 1:
             rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
@@ -426,8 +426,8 @@ class ActorCritic:
 
                 #now does not break when done
                 if done:
-                    break
-                    #pass
+                    #break
+                    pass
 
             #running_reward = running_reward * self.reward_threshold_ratio +\
             #    ep_reward * (1-self.reward_threshold_ratio)
