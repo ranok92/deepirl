@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
 from torch.distributions import Categorical
+from torch.distributions.kl import kl_divergence
 
 from tensorboardX import SummaryWriter
 
@@ -17,6 +18,8 @@ from rlmethods.rlutils import ReplayBuffer  # NOQA
 from neural_nets.base_network import BaseNN  # NOQA
 
 DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
+MAX_FLOAT = torch.finfo(torch.float32).max
+FEPS = torch.finfo(torch.float32).eps
 
 
 def copy_params(source, target):
@@ -262,12 +265,8 @@ class SoftActorCritic:
         _, log_actions, action_dist = self.select_action(state_batch)
         q_a_pi = self.q_net(state_batch)
         q_dist = Categorical(F.softmax((1.0/alpha)*q_a_pi, dim=-1))
+        policy_loss = kl_divergence(action_dist, q_dist).mean()
 
-        # compute KL-divergence directly and manually for sanity
-        action_probs = action_dist.probs
-        q_probs = q_dist.probs
-        policy_loss = (action_probs * (action_probs / q_probs).log())
-        policy_loss = policy_loss.sum(dim=1).mean()
 
         # update parameters
         self.q_optim.zero_grad()
