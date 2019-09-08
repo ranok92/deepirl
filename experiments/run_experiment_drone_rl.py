@@ -70,7 +70,7 @@ def main():
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
-    if not args.dont_save:
+    if not args.dont_save and not args.play:
 
         if not args.save_folder:
             print('Provide save folder.')
@@ -85,6 +85,7 @@ def main():
         experiment_logger.log_info(vars(args))
     
 
+    step_size = 5
     agent_width = 10
     obs_width = 10
     grid_size = 10
@@ -105,10 +106,10 @@ def main():
                                     )
 
     if args.feat_extractor == 'LocalGlobal':
-        feat_ext = LocalGlobal(window_size=5, grid_size=grid_size,
+        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
-                           step_size=10,
+                           step_size=step_size,
                            )
     
     if args.feat_extractor == 'DroneFeatureSAM1':
@@ -122,7 +123,7 @@ def main():
 
     #log feature extractor info
 
-    if not args.dont_save:
+    if not args.dont_save and not args.play:
 
         experiment_logger.log_header('Parameters of the feature extractor :')
         experiment_logger.log_info(feat_ext.__dict__)
@@ -135,7 +136,7 @@ def main():
     env = GridWorldDrone(display=args.render, is_onehot = False, 
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
-                        is_random=False,
+                        is_random=True,
                         annotation_file=args.annotation_file,
                         subject=None,
                         tick_speed=90, 
@@ -143,11 +144,12 @@ def main():
                         step_size=step_size,
                         agent_width=agent_width,
                         train_exact=train_exact,
-                        show_comparison=True,                       
-                        rows=576, cols=720, width=grid_size)
+                        show_comparison=True,
+                        rows=200, cols=300, width=grid_size)                       
+                        #rows=576, cols=720, width=grid_size)
 
     #log environment info
-    if not args.dont_save:
+    if not args.dont_save and not args.play:
 
         experiment_logger.log_header('Environment details :')
         experiment_logger.log_info(env.__dict__)
@@ -161,7 +163,7 @@ def main():
                         max_episodes = args.total_episodes)
 
     #log RL info
-    if not args.dont_save:
+    if not args.dont_save and not args.play:
 
         experiment_logger.log_header('Details of the RL method :')
         experiment_logger.log_info(model.__dict__)
@@ -205,18 +207,25 @@ def main():
         for policy_file in policy_file_list:
 
             model.policy.load(policy_file)
+            policy_folder = policy_file.strip().split('/')[0:-2]
+            save_folder = ''
+            for p in policy_folder:
+                save_folder = save_folder + p + '/'
 
+            print('The final save folder ', save_folder)
             env.tickSpeed = 15
             assert args.policy_path is not None, 'pass a policy to play from!'
 
-            reward_across_models.append(model.generate_trajectory(args.num_trajs, args.render))
-
-        #model.generate_trajectory(args.num_trajs, save_folder+'/agent_generated_trajectories/')
+            #reward_across_models.append(model.generate_trajectory(args.num_trajs, args.render))
+            if args.dont_save:
+                model.generate_trajectory(args.num_trajs, args.render)
+            else:
+                model.generate_trajectory(args.num_trajs, args.render, path=save_folder+'/agent_generated_trajectories/')
 
     if args.play_user:
         env.tickSpeed = 200
 
-        model.generate_trajectory_user(args.num_trajs, './user_generated_trajectories/')
+        model.generate_trajectory_user(args.num_trajs, args.render , path='./user_generated_trajectories/')
 
 if __name__ == '__main__':
     main()

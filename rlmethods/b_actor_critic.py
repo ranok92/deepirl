@@ -290,7 +290,7 @@ class ActorCritic:
             t= 0
             run_reward = 0
             while not done and t < self.max_ep_length:
-                t+=1
+                
                 action = self.select_action_play(state)
                 
                 state, rewards, done, _ = self.env.step(action)
@@ -301,7 +301,7 @@ class ActorCritic:
                     state = self.feature_extractor.extract_features(state)
 
                 states.append(state)
-            
+                t+=1
             reward_across_trajs.append(run_reward)
             print(run_reward)
             if path is not None:
@@ -426,8 +426,8 @@ class ActorCritic:
 
                 #now does not break when done
                 if done:
-                    #break
-                    pass
+                    break
+                    #pass
 
             #running_reward = running_reward * self.reward_threshold_ratio +\
             #    ep_reward * (1-self.reward_threshold_ratio)

@@ -207,21 +207,21 @@ class LocalGlobal():
     def determine_index(self, diff_r, diff_c):
 
         thresh = int((self.agent_width+self.grid_size)/2)
-        if abs(diff_r) < thresh and diff_c > 0 and diff_c > thresh: #right
+        if abs(diff_r) < thresh and diff_c > 0 and abs(diff_c) >= thresh: #right
             index = 5
-        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) > thresh: #left
+        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) >= thresh: #left
             index = 3
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) < thresh: #down
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) < thresh: #down
             index = 7
-        elif abs(diff_r) > thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
+        elif abs(diff_r) >= thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
             index = 1
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) > thresh and diff_c > 0: #quad4
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) >= thresh and diff_c > 0: #quad4
             index = 8
-        elif diff_r < 0 and abs(diff_r) > thresh  and abs(diff_c) > thresh and diff_c > 0: #quad1
+        elif diff_r < 0 and abs(diff_r) >= thresh  and abs(diff_c) >= thresh and diff_c > 0: #quad1
             index = 2
-        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+        elif diff_r < 0 and abs(diff_r) >= thresh and diff_c < 0 and abs(diff_c) >= thresh: #quad2
             index = 0
-        elif abs(diff_r) > thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) > thresh: #quad3
+        elif abs(diff_r) >= thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) >= thresh: #quad3
             index = 6
         else:
             index = 4
@@ -499,26 +499,27 @@ class FrontBackSideSimple():
     def determine_index(self, diff_r, diff_c):
 
         thresh = int((self.agent_width+self.grid_size)/2)
-        if abs(diff_r) < thresh and diff_c > 0 and diff_c > thresh: #right
+        if abs(diff_r) < thresh and diff_c > 0 and abs(diff_c) >= thresh: #right
             index = 5
-        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) > thresh: #left
+        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) >= thresh: #left
             index = 3
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) < thresh: #down
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) < thresh: #down
             index = 7
-        elif abs(diff_r) > thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
+        elif abs(diff_r) >= thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
             index = 1
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) > thresh and diff_c > 0: #quad4
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) >= thresh and diff_c > 0: #quad4
             index = 8
-        elif diff_r < 0 and abs(diff_r) > thresh  and abs(diff_c) > thresh and diff_c > 0: #quad1
+        elif diff_r < 0 and abs(diff_r) >= thresh  and abs(diff_c) >= thresh and diff_c > 0: #quad1
             index = 2
-        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+        elif diff_r < 0 and abs(diff_r) >= thresh and diff_c < 0 and abs(diff_c) >= thresh: #quad2
             index = 0
-        elif abs(diff_r) > thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) > thresh: #quad3
+        elif abs(diff_r) >= thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) >= thresh: #quad3
             index = 6
         else:
             index = 4
 
         return index
+
 
 
     def closeness_indicator(self, agent_pos, goal_pos):
@@ -794,26 +795,27 @@ class FrontBackSide():
     def determine_index(self, diff_r, diff_c):
 
         thresh = int((self.agent_width+self.grid_size)/2)
-        if abs(diff_r) < thresh and diff_c > 0 and diff_c > thresh: #right
+        if abs(diff_r) < thresh and diff_c > 0 and abs(diff_c) >= thresh: #right
             index = 5
-        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) > thresh: #left
+        elif abs(diff_r) < thresh and diff_c < 0 and abs(diff_c) >= thresh: #left
             index = 3
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) < thresh: #down
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) < thresh: #down
             index = 7
-        elif abs(diff_r) > thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
+        elif abs(diff_r) >= thresh  and diff_r < 0 and abs(diff_c) < thresh: #up
             index = 1
-        elif abs(diff_r) > thresh and diff_r > 0 and abs(diff_c) > thresh and diff_c > 0: #quad4
+        elif abs(diff_r) >= thresh and diff_r > 0 and abs(diff_c) >= thresh and diff_c > 0: #quad4
             index = 8
-        elif diff_r < 0 and abs(diff_r) > thresh  and abs(diff_c) > thresh and diff_c > 0: #quad1
+        elif diff_r < 0 and abs(diff_r) >= thresh  and abs(diff_c) >= thresh and diff_c > 0: #quad1
             index = 2
-        elif diff_r < 0 and abs(diff_r) > thresh and diff_c < 0 and abs(diff_c) > thresh: #quad2
+        elif diff_r < 0 and abs(diff_r) >= thresh and diff_c < 0 and abs(diff_c) >= thresh: #quad2
             index = 0
-        elif abs(diff_r) > thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) > thresh: #quad3
+        elif abs(diff_r) >= thresh and diff_r > 0 and diff_c < 0 and abs(diff_c) >= thresh: #quad3
             index = 6
         else:
             index = 4
 
         return index
+
 
 
     def closeness_indicator(self, state_info):

@@ -680,8 +680,18 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                 run_reward+=nn_reward
 
             if done:
-                pass
-                #break
+                #pass
+                break
+
+        #for padding to keep the lengths same
+        for t_pad in range(episode_length-t-1):
+
+            if feature_extractor.hash_function(state) not in current_svf_dict.keys():
+                current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t+t_pad+1)
+            else:
+                current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t+t_pad+1) 
+                     
+
 
         if reward_nn is not None:
             rewards[i] = run_reward
@@ -983,7 +993,14 @@ if __name__ == '__main__':
                    )
     
 
-    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=50, feature_extractor=feat_ext, gamma=1)
+    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
+
+    expert_folder_2 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories/'
+    exp_svf_2 = calculate_expert_svf(expert_folder_2, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
+    
+    expert_folder_3 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories_sample1/'
+    exp_svf_3 = calculate_expert_svf(expert_folder_3, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
+
 
     pdb.set_trace()
     print('printing from the expert :',exp_svf)
