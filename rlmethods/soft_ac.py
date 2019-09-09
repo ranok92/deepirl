@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.optim import Adam
 from torch.distributions import Categorical
 from torch.distributions.kl import kl_divergence
+import numpy as np
 
 from tensorboardX import SummaryWriter
 
@@ -43,6 +44,7 @@ def move_average(source, target, tau=0.005):
         target_param.data.copy_(
             target_param.data * (1.0 - tau) + param.data * tau
         )
+
 
 def get_action_q(all_q_a, action_indices):
     """Q network generates all Q values for all possible actions. Use this
@@ -120,7 +122,6 @@ class PolicyNetwork(BaseNN):
         return dist
 
 
-
 class SoftActorCritic:
     """Implementation of soft actor critic."""
 
@@ -163,6 +164,7 @@ class SoftActorCritic:
 
         # training meta
         self.training_i = 0
+        self.play_i = 0
         self.entropy_tuning = entropy_tuning
 
         # optimizers
@@ -191,27 +193,8 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        done = True
-
         while not self.replay_buffer.is_full():
-            if done:
-                current_state = self.env.reset()
-                done = False
-
-            while not done:
-                _state = torch.from_numpy(current_state).type(
-                    torch.float).to(DEVICE)
-                action, _, _ = self.select_action(_state)
-                next_state, reward, done, _ = self.env.step(action.item())
-                self.replay_buffer.push((
-                    current_state,
-                    action.cpu().numpy(),
-                    reward,
-                    next_state,
-                    not done
-                ))
-                current_state = next_state
-
+            self.play()
 
     def tbx_logger(self, log_dict, training_i):
         """Logs the tag-value pairs in log_dict using TensorboardX.
@@ -264,9 +247,8 @@ class SoftActorCritic:
         # policy loss
         _, log_actions, action_dist = self.select_action(state_batch)
         q_a_pi = self.q_net(state_batch)
-        q_dist = Categorical(F.softmax((1.0/alpha)*q_a_pi, dim=-1))
+        q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
         policy_loss = kl_divergence(action_dist, q_dist).mean()
-
 
         # update parameters
         self.q_optim.zero_grad()
@@ -290,7 +272,6 @@ class SoftActorCritic:
         # Step average Q net
         move_average(self.q_net, self.avg_q_net, self.tau)
 
-
         # logging
         self.tbx_logger(
             {
@@ -311,13 +292,61 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def train(self, num_episodes):
-        """Run train_episode() for specified number of num_episodes.
-
-        :param num_episodes: Number of expisodes to train for.
-        :return trained policy
+    def play(self):
         """
+        Play one complete episode in the environment's gridworld.
+        Automatically appends to replay buffer, and logs with Tensorboardx.
+        """
+
+        done = False
+        total_reward = np.zeros(1)
+        state = self.env.reset()
+        episode_length = 0
+
+        while not done:
+            # Env returns numpy state so convert to torch
+            torch_state = torch.from_numpy(state).type(torch.float32)
+            torch_state = torch_state.to(DEVICE)
+
+            action, _, _ = self.select_action(torch_state)
+            next_state, reward, done, _ = self.env.step(action.item())
+
+            self.replay_buffer.push((
+                state,
+                action.cpu().numpy(),
+                reward,
+                next_state,
+                not done
+            ))
+
+            state = next_state
+            total_reward += reward
+            episode_length += 1
+
+        self.tbx_writer.add_scalar(
+            'rewards/episode_reward',
+            total_reward.item(),
+            self.play_i
+        )
+
+        self.tbx_writer.add_scalar(
+            'rewards/episode_length',
+            episode_length,
+            self.play_i
+        )
+
+        self.play_i += 1
+
+    def train_and_play(self, num_episodes, play_interval):
+        """Train and play environment every play_interval, appending obtained
+        states, actions, rewards, and dones to the replay buffer.
+
+        :param num_episodes: number of episodes to train for.
+        :param play_interval: trainig episodes between each play session.
+        """
+
         for _ in range(num_episodes):
             self.train_episode()
 
-        return self.policy
+            if self.training_i % play_interval == 0:
+                self.play()
