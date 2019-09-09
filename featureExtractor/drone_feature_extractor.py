@@ -310,7 +310,7 @@ class DroneFeatureSAM1():
             if distance < self.thresh2:
                 #classify obs as considerable
                 #check the distance
-
+                temp_obs = {}
                 if distance < self.thresh1:
                     #classify obstacle in the inner ring
                     ring_1 = True
@@ -344,11 +344,14 @@ class DroneFeatureSAM1():
 
                 #orientation of the obstacle needs to be changed as it will change with the 
                 #change in the relative angle. No need to change the speed.
-                obs_state['orientation'] = rel_coord_orient_ref - rel_coord_obs
-                obs_state['position'] = rel_coord_obs
-                self.bins[str(bin_val)].append(obs_state)
-        #if the obstacle does not classify to be considered
+                
+                temp_obs['orientation'] = rel_coord_orient_ref - rel_coord_obs
+                temp_obs['position'] = rel_coord_obs
+                temp_obs['speed'] = obs_state['speed']
 
+                self.bins[str(bin_val)].append(temp_obs)
+        #if the obstacle does not classify to be considered
+    
     def overlay_bins(self, pygame_surface, state):
 
         #a visualizing tool to debug if the binning is being done properly
@@ -374,7 +377,7 @@ class DroneFeatureSAM1():
                              cur_line_end,2)
         pygame.display.update()
         #pdb.set_trace()
-
+    
 
 
     def compute_bin_info(self):
@@ -428,7 +431,6 @@ class DroneFeatureSAM1():
                                                   self.inner_ring_density_division)] = 1
         density_outer_ring[discretize_information(outer_ring_count,
                                                   self.outer_ring_density_division)] = 1
-        #pdb.set_trace()
 
         return sam_vector, density_inner_ring, density_outer_ring
 
@@ -447,6 +449,7 @@ class DroneFeatureSAM1():
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+        bs_copy = obstacles
         #print('The orientation :')
         #print(abs_approx_orientation.reshape(3,3))
 
@@ -463,6 +466,7 @@ class DroneFeatureSAM1():
 
         #print('Here')
         self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+        pdb.set_trace()
         sam_vector, inner_ring_density, outer_ring_density = self.compute_bin_info()
 
         extracted_feature = np.concatenate((abs_approx_orientation,
