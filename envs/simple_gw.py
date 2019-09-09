@@ -45,6 +45,9 @@ class SimpleGridworld:
         self.grid = np.zeros(size)
         self.obstacles_map = obstacles_map
 
+        self.obstacle_grid = np.zeros(size)
+        self.obstacle_grid = self.compute_obstacle_grid()
+
         # actions space mappings:
         # {0,1,2,3,4} = {up,left,down,right,stay}
         self.action_space = IterableDiscrete(5)
@@ -61,6 +64,16 @@ class SimpleGridworld:
         self.player_pos = goal_pos
         self.step_number = 0
 
+
+    def compute_obstacle_grid(self):
+        """
+        Returns a grid with obstacles defined in obstacle_map place in.
+        """
+        obs = np.zeros(self.grid.shape)
+        obs[self.obstacles_map.T[0], self.obstacles_map.T[1]] = OBSTACLE
+
+        return obs
+
     def reset(self):
         """
         Reset the gridworld, moving the player to random position on the
@@ -73,7 +86,7 @@ class SimpleGridworld:
         self.grid.fill(0)
 
         # fill obstacles (2 = obstacle)
-        self.grid[self.obstacles_map.T[0], self.obstacles_map.T[1]] = OBSTACLE
+        self.grid += self.obstacle_grid
 
         # set goal
         assert self.grid[tuple(self.goal_pos)] != OBSTACLE, "Goal is obstacle."
