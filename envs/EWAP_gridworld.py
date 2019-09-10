@@ -327,5 +327,7 @@ class EwapGridworld(SimpleGridworld):
     def dump_png(self, path='./png_dumps/'):
         impath = Path(path)
         image_name = str(self.png_number) + '.png'
-        plt.imsave(str((impath / image_name).resolve()), self.grid)
+        to_save = self.grid + self.goal_grid + self.obstacle_grid
+        to_save[tuple(self.player_pos)] = ROBOT
+        plt.imsave(str((impath / image_name).resolve()), to_save)
         self.png_number += 1
