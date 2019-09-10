@@ -67,6 +67,7 @@ class EwapDataset:
         """
         normalized_data = unnormalied_data.copy()
         normalized_data[:, 0] -= np.min(normalized_data[:, 0])
+        normalized_data[:, 0] = normalized_data[:,0] / 10
 
         return normalized_data
 
@@ -234,8 +235,8 @@ class EwapGridworld(SimpleGridworld):
             reward += -10.0
 
         # determine if moving closer to goal
-        current_distance = np.sum(np.abs(state[-4:-2]-state[-2:]))
-        next_distance = np.sum(np.abs(next_state[-4:-2]-next_state[-2:]))
+        current_distance = np.sum(np.abs(state[-4:-2] - state[-2:]))
+        next_distance = np.sum(np.abs(next_state[-4:-2] - next_state[-2:]))
 
         reward += 0.0001 * (next_distance < current_distance).astype(int)
         reward -= 0.0001 * (next_distance > current_distance).astype(int)
@@ -303,8 +304,6 @@ class EwapGridworld(SimpleGridworld):
         max_steps_elapsed = self.step_number > self.grid.size
 
         done = goal_reached or obstacle_hit or max_steps_elapsed or person_hit
-
-        self.dump_png()
 
         return next_state, reward, done, False
 
