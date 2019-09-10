@@ -74,6 +74,8 @@ class QNetwork(BaseNN):
         self.in_layer = nn.Linear(state_length, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden3 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden4 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, action_length)
 
     def forward(self, states):
@@ -81,6 +83,8 @@ class QNetwork(BaseNN):
         x = F.relu(self.in_layer(states))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
+        x = F.relu(self.hidden3(x))
+        x = F.relu(self.hidden4(x))
         x = self.head(x)
 
         return x
@@ -100,12 +104,16 @@ class PolicyNetwork(BaseNN):
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden3 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.hidden4 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, out_layer_width)
 
     def forward(self, x):
         x = F.relu(self.in_layer(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
+        x = F.relu(self.hidden3(x))
+        x = F.relu(self.hidden4(x))
         x = self.head(x)
         probs = F.softmax(x, dim=-1)
 
@@ -146,9 +154,9 @@ class SoftActorCritic:
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
-        self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
-        self.q_net = QNetwork(state_size, env.action_space.n, 256)
-        self.avg_q_net = QNetwork(state_size, env.action_space.n, 256)
+        self.policy = PolicyNetwork(state_size, 2048, env.action_space.n)
+        self.q_net = QNetwork(state_size, env.action_space.n, 2048)
+        self.avg_q_net = QNetwork(state_size, env.action_space.n, 2048)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
@@ -193,7 +201,7 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        while len(self.replay_buffer) < 10*self.buffer_sample_size:
+        while len(self.replay_buffer) < self.buffer_sample_size:
             self.play()
 
     def tbx_logger(self, log_dict, training_i):
