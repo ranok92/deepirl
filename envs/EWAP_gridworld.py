@@ -67,7 +67,7 @@ class EwapDataset:
         """
         normalized_data = unnormalied_data.copy()
         normalized_data[:, 0] -= np.min(normalized_data[:, 0])
-        normalized_data[:, 0] = normalized_data[:,0] / 10
+        normalized_data[:, 0] = normalized_data[:, 0] / 10
 
         return normalized_data
 
@@ -102,6 +102,16 @@ class EwapDataset:
         self.processed_data[:, 2] += pad_amount
         self.processed_data[:, 4] += pad_amount
 
+    def pedestrian_goal(self, pedestrian_id):
+        """Return goal of pedestrian with the given ID.
+
+        :param pedestrian_id: ID of pedestrian.
+        """
+        pedestrian_mask = (self.processed_data[:, 1] == pedestrian_id)
+        pedestrian_traj = self.processed_data[pedestrian_mask]
+
+        return (pedestrian_traj[-1, 2], pedestrian_traj[-1, 4])
+
 
 class EwapGridworld(SimpleGridworld):
     """
@@ -117,6 +127,7 @@ class EwapGridworld(SimpleGridworld):
 
     def __init__(
             self,
+            ped_id,
             sequence='seq_hotel',
             dataset_root='datasets/ewap_dataset',
             person_thickness=2,
@@ -126,6 +137,7 @@ class EwapGridworld(SimpleGridworld):
         Initialize EWAP gridworld. Make sure all files in the correct
         directories as specified above!
 
+        :param ped_id: ID of pedestrian whose goal we adopt.
         :param sequence: Sequence to base world on. example: 'seq_hotel'
         :param dataset_root: path to root of dataset directory.
         :param person_thickness: The dimensions of the nxn boxes that will
@@ -145,11 +157,15 @@ class EwapGridworld(SimpleGridworld):
         obstacle_array = np.where(self.dataset.obstacle_map == OBSTACLE)
         obstacle_array = np.array(obstacle_array).T
 
+        self.goals = self.dataset.pedestrian_goal(ped_id)
+
         super().__init__(
             self.dataset.obstacle_map.shape,
             obstacle_array,
-            (vision_radius + 1, vision_radius + 1)
+            self.goals
         )
+
+        self.adopt_goal(ped_id)
 
         # seperate for people position incase we want to do processing.
         self.person_map = self.grid.copy()
@@ -198,6 +214,11 @@ class EwapGridworld(SimpleGridworld):
                         frame_pedestrians[:, 4]] = PERSON
         self.person_map = self.thicken(self.person_map, self.person_thickness)
 
+    def adopt_goal(self, pedestrian_id):
+        self.goals = self.dataset.pedestrian_goal(pedestrian_id)
+        self.goal_grid[self.goals[0], self.goals[1]] = GOAL
+        self.goal_grid = self.thicken(self.goal_grid, self.person_thickness*5)
+
     def layer_map(self):
         """
         Layer the gridworld map in the proper order:
@@ -210,9 +231,6 @@ class EwapGridworld(SimpleGridworld):
         self.populate_person_map(self.step_number)
         self.grid += self.person_map
 
-        # set goal
-        self.grid[tuple(self.goal_pos)] = GOAL
-
     def reset(self):
         """
         reset gridworld to initial positon, with all trajectories starting
@@ -224,7 +242,6 @@ class EwapGridworld(SimpleGridworld):
 
         self.populate_person_map(self.step_number)
         self.grid += self.person_map
-        self.grid[tuple(self.goal_pos)] = GOAL
 
         return self.state_extractor().astype('float32')
 
@@ -232,7 +249,7 @@ class EwapGridworld(SimpleGridworld):
         reward = super().reward_function(state, action, next_state)
 
         if self.grid[tuple(self.player_pos)] == PERSON:
-            reward += -10.0
+            reward += -2.0
 
         # determine if moving closer to goal
         current_distance = np.sum(np.abs(state[-4:-2] - state[-2:]))
@@ -298,7 +315,7 @@ class EwapGridworld(SimpleGridworld):
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
-        goal_reached = (self.player_pos == self.goal_pos).all()
+        goal_reached = (self.goal_grid[tuple(self.player_pos)] == GOAL)
         obstacle_hit = (self.grid[tuple(self.player_pos)] == OBSTACLE)
         person_hit = (self.grid[tuple(self.player_pos)] == PERSON)
         max_steps_elapsed = self.step_number > self.grid.size

@@ -38,11 +38,12 @@ class SimpleGridworld:
         obstacles.
         :param player_pos: (row, column) coordinate of player starting
         position.
-        :param goal_pos: (row, column) coordinate of goal.
+        :param goal_pos: 2xN matrix of row, column coordinates of goal.
         """
 
         # top left of grid is 0,0 as per image standards
         self.grid = np.zeros(size)
+        self.goal_grid = np.zeros(size)
         self.obstacles_map = obstacles_map
 
         self.obstacle_grid = np.zeros(size)
@@ -90,12 +91,12 @@ class SimpleGridworld:
 
         # set goal
         assert self.grid[tuple(self.goal_pos)] != OBSTACLE, "Goal is obstacle."
-        self.grid[tuple(self.goal_pos)] = GOAL
+        self.goal_grid[self.goal_pos[0], self.goal_pos[1]] = GOAL
 
         # generate player location
         validity_condition = np.logical_and(
             self.grid != OBSTACLE,
-            self.grid != GOAL
+            self.goal_grid != GOAL
         )
         valid_spots = np.argwhere(validity_condition)
         self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
@@ -111,7 +112,7 @@ class SimpleGridworld:
         """
         reward = np.array(0.0)
 
-        if (self.player_pos == self.goal_pos).all():
+        if self.goal_grid[tuple(self.player_pos)] == GOAL:
             reward += 1.0
 
         if self.grid[tuple(self.player_pos)] == OBSTACLE:

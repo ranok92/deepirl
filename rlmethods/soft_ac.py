@@ -193,7 +193,7 @@ class SoftActorCritic:
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
-        while not self.replay_buffer.is_full():
+        while len(self.replay_buffer) < 10*self.buffer_sample_size:
             self.play()
 
     def tbx_logger(self, log_dict, training_i):

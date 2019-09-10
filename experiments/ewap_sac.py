@@ -25,7 +25,7 @@ def main():
 
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
-    env = EwapGridworld()
+    env = EwapGridworld(ped_id=6)
 
     soft_ac = SoftActorCritic(
         env,
