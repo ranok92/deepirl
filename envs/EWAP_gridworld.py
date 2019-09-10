@@ -158,20 +158,22 @@ class EwapGridworld(SimpleGridworld):
         obstacle_array = np.where(self.dataset.obstacle_map == OBSTACLE)
         obstacle_array = np.array(obstacle_array).T
 
-        self.goals = self.dataset.pedestrian_goal(ped_id)
+        goals = self.dataset.pedestrian_goal(ped_id)
 
         super().__init__(
             self.dataset.obstacle_map.shape,
             obstacle_array,
-            self.goals
+            goals
         )
 
+        # construct goal map
         self.adopt_goal(ped_id)
 
         # seperate for people position incase we want to do processing.
         self.person_map = self.grid.copy()
-
         self.person_map.fill(0)
+
+        # counters for debuggging data
         self.png_number = 0
 
     def thicken(self, grid, target_thickness):
@@ -216,22 +218,16 @@ class EwapGridworld(SimpleGridworld):
         self.person_map = self.thicken(self.person_map, self.person_thickness)
 
     def adopt_goal(self, pedestrian_id):
-        self.goals = self.dataset.pedestrian_goal(pedestrian_id)
-        self.goal_grid[self.goals[0], self.goals[1]] = GOAL
-        self.goal_grid = self.thicken(
-            self.goal_grid, self.person_thickness * 5)
+        """Change the goal to the one used by pedestrian.
 
-    def layer_map(self):
+        :param pedestrian_id: ID of pedestrian whose goal we adopt.
         """
-        Layer the gridworld map in the proper order:
-            static obstacles > pedestrians > goal position
-        """
-        self.grid.fill(0)
-        self.grid += self.obstacle_grid
+        self.goal_pos = self.dataset.pedestrian_goal(pedestrian_id)
+        self.goal_grid[self.goal_pos] = GOAL
 
-        # Add pedestrians
-        self.populate_person_map(self.step_number)
-        self.grid += self.person_map
+        # thicken the goal, making it area instead of pixel
+        goal_thickness = self.person_thickness * 5
+        self.goal_grid = self.thicken(self.goal_grid, goal_thickness)
 
     def reset(self):
         """
@@ -243,22 +239,20 @@ class EwapGridworld(SimpleGridworld):
         assert self.step_number == 0, 'Step number non-zero after reset!'
 
         self.populate_person_map(self.step_number)
-        self.grid += self.person_map
 
         return self.state_extractor().astype('float32')
 
     def reward_function(self, state, action, next_state):
-        reward = super().reward_function(state, action, next_state)
+        reward = np.array(0.0)
 
-        if self.grid[tuple(self.player_pos)] == PERSON:
+        if self.goal_grid[tuple(self.player_pos)] == GOAL:
+            reward += 1.0
+
+        if self.obstacle_grid[tuple(self.player_pos)] == OBSTACLE:
+            reward += -1.0
+
+        if self.person_map[tuple(self.player_pos)] == PERSON:
             reward += -2.0
-
-        # determine if moving closer to goal
-        current_distance = np.sum(np.abs(state[-4:-2] - state[-2:]))
-        next_distance = np.sum(np.abs(next_state[-4:-2] - next_state[-2:]))
-
-        reward += 0.0001 * (next_distance < current_distance).astype(int)
-        reward -= 0.0001 * (next_distance > current_distance).astype(int)
 
         return reward
 
@@ -267,21 +261,36 @@ class EwapGridworld(SimpleGridworld):
         Extract state for CURRENT internal state of gridworld.
         """
 
-        surroundings = self.grid[
-            self.player_pos[0] - self.vision_radius: self.player_pos[0] + self.vision_radius + 1,
-            self.player_pos[1] - self.vision_radius: self.player_pos[1] + self.vision_radius + 1,
-        ]
+        row_low = self.player_pos[0] - self.vision_radius
+        row_high = self.player_pos[0] + self.vision_radius + 1
+        col_low = self.player_pos[1] - self.vision_radius
+        col_high = self.player_pos[1] + self.vision_radius + 1
 
-        try:
-            assert surroundings.shape == (
-                2 * self.vision_radius + 1, 2 * self.vision_radius + 1)
-        except:
-            breakpoint()
+        obstacles = self.obstacle_grid[row_low: row_high, col_low: col_high]
+        people = self.person_map[row_low: row_high, col_low: col_high]
+        goals = self.goal_grid[row_low: row_high, col_low: col_high]
+
+        expected_shape = (
+            2 * self.vision_radius + 1,
+            2 * self.vision_radius + 1
+        )
+        assert obstacles.shape == expected_shape
+        assert people.shape == expected_shape
+        assert goals.shape == expected_shape
 
         # state vector is surroundings concatenated with player pos and goal
         # pos, hence the +4 size
-        state = np.zeros(surroundings.size + 4)
-        state[0: surroundings.size] = surroundings.flatten()
+        state = np.zeros(obstacles.size + people.size + goals.size + 4)
+        local_map = np.concatenate(
+            (
+                obstacles.flatten(),
+                people.flatten(),
+                goals.flatten()
+            )
+        )
+
+        # populate state vector
+        state[:-4] = local_map
         state[-4:-2] = self.player_pos
         state[-2:] = np.array(self.goal_pos)
 
@@ -307,8 +316,8 @@ class EwapGridworld(SimpleGridworld):
         next_pos = self.player_pos + action_vector
         self.step_number += 1
 
-        # advance simulation
-        self.layer_map()
+        # update pedestrian positions
+        self.populate_person_map(self.step_number)
 
         # extract next state
         self.player_pos = next_pos
@@ -317,19 +326,24 @@ class EwapGridworld(SimpleGridworld):
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
+        # temrination conditions
         goal_reached = (self.goal_grid[tuple(self.player_pos)] == GOAL)
-        obstacle_hit = (self.grid[tuple(self.player_pos)] == OBSTACLE)
-        person_hit = (self.grid[tuple(self.player_pos)] == PERSON)
-        max_steps_elapsed = self.step_number > self.grid.size
+        obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == OBSTACLE)
+        person_hit = (self.person_map[tuple(self.player_pos)] == PERSON)
+        max_steps_elapsed = self.step_number > self.grid.size / 4
 
         done = goal_reached or obstacle_hit or max_steps_elapsed or person_hit
 
         return next_state, reward, done, False
 
     def dump_png(self, path='./png_dumps/'):
+        """Saves a PNG image of current state.
+
+        :param path: path to save image to.
+        """
         impath = Path(path)
         image_name = str(self.png_number) + '.png'
-        to_save = self.grid + self.goal_grid + self.obstacle_grid
+        to_save = self.obstacles_map + self.goal_grid + self.obstacle_grid
         to_save[tuple(self.player_pos)] = ROBOT
         plt.imsave(str((impath / image_name).resolve()), to_save)
         self.png_number += 1
