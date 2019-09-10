@@ -3,8 +3,8 @@
 import os
 from pathlib import Path
 from matplotlib.image import imread
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 from .simple_gw import SimpleGridworld
 
@@ -131,7 +131,7 @@ class EwapGridworld(SimpleGridworld):
             sequence='seq_hotel',
             dataset_root='datasets/ewap_dataset',
             person_thickness=2,
-            vision_radius=4,
+            vision_radius=40,
     ):
         """
         Initialize EWAP gridworld. Make sure all files in the correct
@@ -150,7 +150,8 @@ class EwapGridworld(SimpleGridworld):
         )
 
         self.vision_radius = vision_radius
-        self.dataset.pad_dataset(vision_radius)
+        self.speed = 4
+        self.dataset.pad_dataset(vision_radius + 2 * self.speed)
 
         self.person_thickness = person_thickness
 
@@ -217,7 +218,8 @@ class EwapGridworld(SimpleGridworld):
     def adopt_goal(self, pedestrian_id):
         self.goals = self.dataset.pedestrian_goal(pedestrian_id)
         self.goal_grid[self.goals[0], self.goals[1]] = GOAL
-        self.goal_grid = self.thicken(self.goal_grid, self.person_thickness*5)
+        self.goal_grid = self.thicken(
+            self.goal_grid, self.person_thickness * 5)
 
     def layer_map(self):
         """
@@ -301,7 +303,7 @@ class EwapGridworld(SimpleGridworld):
         state = self.state_extractor().astype('float32')
 
         # advance player based on action
-        action_vector = self.action_dict[action]
+        action_vector = self.speed * self.action_dict[action]
         next_pos = self.player_pos + action_vector
         self.step_number += 1
 
