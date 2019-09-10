@@ -109,8 +109,9 @@ def get_abs_orientation(agent_state, orientation_approximator):
 
 def get_rel_orientation(prev_frame_info, agent_state, goal_state):
     #returns the relative orientation of the agent with the direction
-    #of the goal. Dim:4
-    relative_orientation_vector = np.zeros(3)
+    #of the goal. 
+    #Primarily for use in IRL 
+    relative_orientation_vector = np.zeros(4)
     vector_to_goal = goal_state - agent_state['position']
     if prev_frame_info is None:
         agent_orientation = np.array([-1, 0])
@@ -118,6 +119,49 @@ def get_rel_orientation(prev_frame_info, agent_state, goal_state):
         agent_orientation = agent_state['position'] - prev_frame_info['agent_state']['position']
     diff_in_angle = angle_between(vector_to_goal, agent_orientation)
     #pdb.set_trace()
+    if diff_in_angle < np.pi/8:
+        rel_orientation = 0
+
+    elif diff_in_angle < np.pi/4 and diff_in_angle >= np.pi/8:
+        rel_orientation = 1
+
+    elif diff_in_angle < np.pi*3/4 and diff_in_angle >= np.pi/4:
+        rel_orientation = 2
+
+    else:
+        rel_orientation = 3
+
+    relative_orientation_vector[rel_orientation] = 1
+    return relative_orientation_vector
+
+
+def get_rel_goal_orientation(orientation_approximator, rel_orient_conv, agent_state, agent_abs_orientation, goal_state):
+    #returns the relative orientation of the goal wrt to the agent
+    #Dim:8
+    
+    no_of_directions = len(orientation_approximator)
+    angle_diff = np.zeros(no_of_directions)
+    relative_orientation_vector = np.zeros(no_of_directions)
+
+    if agent_abs_orientation >4:
+        agent_abs_orientation-=1
+
+    rot_matrix = get_rot_matrix(rel_orient_conv[agent_abs_orientation])
+
+    #translate the point so that the agent sits at the center of the coordinates
+    #before rtotation
+    vec_to_goal = goal_state - agent_state['position']
+
+    #rotate the coordinates to get the relative coordinates wrt the agent
+    rel_coord_goal = np.matmul(rot_matrix, vec_to_goal)
+
+    relative_goal = {}
+    relative_goal['orientation'] = rel_coord_goal
+
+    relative_orientation_vector, _ = get_abs_orientation(relative_goal, orientation_approximator)
+
+
+    '''
     if diff_in_angle < np.pi/4:
         rel_orientation = 0
 
@@ -128,6 +172,7 @@ def get_rel_orientation(prev_frame_info, agent_state, goal_state):
         rel_orientation = 2
 
     relative_orientation_vector[rel_orientation] = 1 
+    '''
     return relative_orientation_vector
 
 def discretize_information(information, information_slabs):
@@ -142,6 +187,15 @@ def discretize_information(information, information_slabs):
     #if does not classify in any information slabs
     return None
 
+
+
+def calculate_social_forces(agent_state, obstacle_state, agent_width, obstacle_width,
+                            a, b, lambda_val):
+    #agent_state and obstacle_state are dictionaries with the following information:
+    #position, orientation and speed
+
+    r_i_j = agent_width/2 + obstacle_width/2
+    d_i_j = np.linalg.norm(agent_state['position'] - obstacle_state['position'])
 
 #################################################################################
 #################################################################################
@@ -449,12 +503,15 @@ class DroneFeatureSAM1():
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
-        bs_copy = obstacles
         #print('The orientation :')
         #print(abs_approx_orientation.reshape(3,3))
 
         relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
-
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
 
         #print('The absolute approx orientation :', abs_approx_orientation)
         ##print('The relative orientation', relative_orientation)
@@ -466,14 +523,15 @@ class DroneFeatureSAM1():
 
         #print('Here')
         self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
-        pdb.set_trace()
+        #pdb.set_trace()
         sam_vector, inner_ring_density, outer_ring_density = self.compute_bin_info()
 
         extracted_feature = np.concatenate((abs_approx_orientation,
-                                           relative_orientation,
-                                           np.reshape(sam_vector,(-1)),
-                                           inner_ring_density,
-                                           outer_ring_density))
+                                            relative_orientation_goal,
+                                            relative_orientation))
+                                           #np.reshape(sam_vector,(-1)),
+                                           #inner_ring_density,
+                                           #outer_ring_density))
         '''
         flag = False
         for i in range(16):
