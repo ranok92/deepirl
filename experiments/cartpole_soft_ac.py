@@ -18,25 +18,6 @@ parser.add_argument('--log-alpha', type=float, default=-2.995)
 
 args = parser.parse_args()
 
-def play(rl, gw):
-    done = False
-
-    state = gw.reset()
-    total_reward = 0
-    iters = 0
-    while not done:
-        _state = torch.from_numpy(state).type(torch.float).to(DEVICE)
-        action, _, _ = rl.select_action(_state)
-        next_state, reward, done, _ = gw.step(action.item())
-
-        # update environment variables
-        total_reward += reward
-        state = next_state
-
-        iters += 1
-
-    return total_reward
-
 
 def main():
 
@@ -54,20 +35,7 @@ def main():
         entropy_tuning=False,
     )
 
-    for i in range(10**6):
-        soft_ac.train_episode()
-
-        if i % 1000 == 0:
-            rs = []
-            for j in range(10):
-                rs.append(play(soft_ac, env))
-
-            tbx_writer.add_scalar('rewards/avg reward', np.mean(rs), i)
-            tbx_writer.add_scalar('rewards/max_reward', np.max(rs), i)
-
-        if i% 1000 == 0:
-            soft_ac.replay_buffer.buffer.clear()
-
+    soft_ac.train_and_play(10**4, 1)
 
 if __name__ == "__main__":
     main()
