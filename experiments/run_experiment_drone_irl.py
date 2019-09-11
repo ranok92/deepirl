@@ -68,7 +68,7 @@ parser.add_argument('--scale-svf', action='store_true', default=None, help='If t
                     based on the reward the trajectory got.')
 
 parser.add_argument('--train-exact', action='store_true', default=None)
-
+parser.add_argument('--subject', type=int, default=None)
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
@@ -181,6 +181,7 @@ def main():
                     step_size=step_size,
                     obs_width=obs_width,
                     width=grid_size,
+                    subject=args.subject,
                     annotation_file=args.annotation_file,
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,

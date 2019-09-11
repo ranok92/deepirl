@@ -15,7 +15,7 @@ from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeat
 from itertools import count
 import utils  # NOQA: E402
 from envs.gridworld import GridWorld
-
+import copy
 with utils.HiddenPrints():
     import pygame
 
@@ -352,10 +352,12 @@ class GridWorldDrone(GridWorld):
                 self.obstacles.append(obs)
 
             #populating the agent
-            if float(element[1]) == self.subject:
-                agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
-                self.agent_state = agent
-                self.state['agent_state'] = self.agent_state
+            #dont update the agent if training is going on
+            if not self.train_exact:
+                if float(element[1]) == self.subject:
+                    agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
+                    self.agent_state = agent
+                    self.state['agent_state'] = self.agent_state
 
             #populating the ghost
             if float(element[1]) == self.ghost:
@@ -437,11 +439,13 @@ class GridWorldDrone(GridWorld):
             #print('printing the keypress status',self.agent_action_keyboard)
             
         #print('Info from curent frame :',self.current_frame)
+        #pdb.set_trace()
 
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
-        if self.subject is None:
+        if self.subject is None or self.train_exact:
+
             if not self.release_control:
 
                 if action is not None:
@@ -470,6 +474,7 @@ class GridWorldDrone(GridWorld):
                 
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
+
             reward, done = self.calculate_reward()
 
 
@@ -489,7 +494,7 @@ class GridWorldDrone(GridWorld):
             #the rest of the information remains the same
 
             #added new
-            if self.subject is None:
+            if self.subject is None or self.train_exact:
                 if not self.release_control:
                     self.state['agent_state'] = self.agent_state
                     if action!=8:
@@ -507,7 +512,7 @@ class GridWorldDrone(GridWorld):
         
         self.current_frame += 1
 
-        if self.subject is None:
+        if self.subject is None or self.train_exact:
             if done:
                 self.release_control = True
 
@@ -623,14 +628,19 @@ class GridWorldDrone(GridWorld):
         Pro tip: Use this for testing the result.
         '''
         no_of_peds = len(self.pedestrian_dict.keys())
-        while True:
-         
-            cur_ped = np.random.randint(1,no_of_peds+1)
-            if str(cur_ped) in self.pedestrian_dict.keys():
-                break
-            else:
-                print('Selected pedestrian not available.')
-                #pdb.set_trace()
+        if self.subject is None:
+            while True:
+                
+                cur_ped = np.random.randint(1,no_of_peds+1)
+                if str(cur_ped) in self.pedestrian_dict.keys():
+                    break
+                else:
+                    print('Selected pedestrian not available.')
+                    #pdb.set_trace()
+        else:
+            
+            cur_ped = self.subject
+
         if self.display:
             if self.show_comparison:
                 self.ghost = cur_ped
@@ -638,11 +648,9 @@ class GridWorldDrone(GridWorld):
         self.skip_list = [] 
         self.skip_list.append(cur_ped)
         self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
-        #print('Current frame', self.current_frame)
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
-        
 
-        self.agent_state = self.pedestrian_dict[str(cur_ped)][str(self.current_frame)]
+        self.agent_state = copy.deepcopy(self.pedestrian_dict[str(cur_ped)][str(self.current_frame)])
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
 
