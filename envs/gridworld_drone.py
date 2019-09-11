@@ -544,7 +544,7 @@ class GridWorldDrone(GridWorld):
 
         else:
             
-            self.skip_list = [i for i in range(len(self.pedestrian_dict.keys()))]
+            #self.skip_list = [i for i in range(len(self.pedestrian_dict.keys()))]
 
             self.current_frame = self.initial_frame
             self.pos_history = []

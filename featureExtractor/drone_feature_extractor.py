@@ -254,7 +254,7 @@ class DroneFeatureSAM1():
                                 2*np.pi/4, 6*np.pi/4,
                                 3*np.pi/4, 4*np.pi/4, 5*np.pi/4]
         '''
-        self.speed_divisions = [0, 0.5, 1, 2, 3, 4]
+        self.speed_divisions = [0, 1, 2, 5]
         self.inner_ring_density_division = [0, 2, 3, 4]
         self.outer_ring_density_division = [0, 3, 5, 7]
         self.show_bins = show_bins
@@ -274,8 +274,10 @@ class DroneFeatureSAM1():
         self.num_of_speed_blocks = 3
         self.num_of_orient_blocks = 4
 
-        #state rep size = 16*8+9+3
-        self.state_rep_size = 162
+        #state rep size = 16*8+9+3+3
+
+        #state rep size = 9+9+4+16*8+3+3
+        self.state_rep_size = 140
         self.generate_hash_variable()
         #self.generate_state_dictionary()
         print('Done!')
@@ -528,10 +530,10 @@ class DroneFeatureSAM1():
 
         extracted_feature = np.concatenate((abs_approx_orientation,
                                             relative_orientation_goal,
-                                            relative_orientation))
-                                           #np.reshape(sam_vector,(-1)),
-                                           #inner_ring_density,
-                                           #outer_ring_density))
+                                            relative_orientation,
+                                            np.reshape(sam_vector,(-1)),
+                                            inner_ring_density,
+                                            outer_ring_density))
         '''
         flag = False
         for i in range(16):
