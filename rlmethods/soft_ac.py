@@ -74,8 +74,6 @@ class QNetwork(BaseNN):
         self.in_layer = nn.Linear(state_length, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.hidden3 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.hidden4 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, action_length)
 
     def forward(self, states):
@@ -83,8 +81,6 @@ class QNetwork(BaseNN):
         x = F.relu(self.in_layer(states))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
-        x = F.relu(self.hidden3(x))
-        x = F.relu(self.hidden4(x))
         x = self.head(x)
 
         return x
@@ -104,16 +100,12 @@ class PolicyNetwork(BaseNN):
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.hidden3 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.hidden4 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, out_layer_width)
 
     def forward(self, x):
         x = F.relu(self.in_layer(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
-        x = F.relu(self.hidden3(x))
-        x = F.relu(self.hidden4(x))
         x = self.head(x)
         probs = F.softmax(x, dim=-1)
 
