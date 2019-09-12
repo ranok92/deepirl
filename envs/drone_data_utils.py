@@ -194,7 +194,7 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
 
-def extract_trajectory(annotation_file, feature_extractor, folder_to_save, display=False, show_states=False):
+def extract_trajectory(annotation_file, feature_extractor, folder_to_save, display=False, show_states=False, subject=None):
 
 
     if not os.path.exists(folder_to_save):
@@ -205,6 +205,8 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
     print(subject_list)
     disp = display
     total_path_len = 0
+    if subject is not None:
+        subject_list = subject
     for sub in subject_list:
         trajectory_info = []
         print('Starting for subject :',sub)
@@ -215,6 +217,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
                         seed=10, obstacles=None, 
                         show_trail=False,
                         is_random=False,
+                        show_orientation=True,
                         annotation_file=annotation_file,
                         subject=sub,      
                         tick_speed=tick_speed,                  
@@ -226,23 +229,38 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
         total_path_len += world.final_frame - world.current_frame
         while world.current_frame < world.final_frame:
             state,_,_,_ = world.step()
-            state = feature_extactor.extract_features(state)
+
+            if disp:
+                feature_extractor.overlay_bins(world.gameDisplay, state)
+
+            state = feature_extractor.extract_features(state)
             state = torch.tensor(state)
             trajectory_info.append(state)
 
             if show_states:
-
+                '''
+                this one is for dronefeaturesam
                 general_dir = state[0:9].reshape(3,3)
                 print('General direction :\n', general_dir)
-                local_info = state[12:]
-                print('Proximity information :\n', state[9:12])
-                if local_info.shape==16: #fbs simple
-                    local_info_arr = local_info.reshape(4, 4)
-                else: #localglobal
-                    window_size = int(np.sqrt(local_info.shape))
-                    local_info_arr = local_info.reshape(window_size, window_size)
+           
+                print('Goal direction :\n', state[9:18].reshape(3,3))   
 
+                print('Towards goal :', state[18:22])
+                local_info_arr = state[22:134].reshape(16,-1)
                 print('The local information :\n', local_info_arr)
+
+                print('Inner ring :', state[134:137])
+                print('Outer ring :', state[137:])
+                '''
+
+                
+                #this one is for LocalGlobal
+                window_size = feature_extractor.window_size
+                print('The general direction :', state[0:9].reshape(3,3))
+                print('The proximity indicator :', state[9:12])
+                print('The local information :', state[12:].reshape(window_size, window_size))
+                pdb.set_trace()
+
         state_tensors = torch.stack(trajectory_info)
         torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
 
@@ -267,7 +285,7 @@ def extract_subjects_from_file(annotation_file):
     return set(sub_list)
 
 
-def record_trajectories(num_of_trajs, env, feature_extractor, path):
+def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list=None):
     '''
     Let user play in an environment simulated from the data taken from a dataset
     '''
@@ -286,7 +304,13 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path):
     while i < num_of_trajs:
         actions = []
         states = []
-        state = env.reset()
+        if subject_list is None:
+            state = env.reset()
+        else:
+            cur_ped_index = np.random.randint(len(subject_list))
+            cur_ped = subject_list[cur_ped_index]
+            env.subject = cur_ped
+            state = env.reset_and_replace()
         states = [feature_extractor.extract_features(state)]
 
         done = False
@@ -304,15 +328,19 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path):
                 print('Run reward :', run_reward)
             '''
             next_state = feature_extractor.extract_features(next_state)
+            #print('state dim :', next_state.shape)
             #for variants of localglobal
             #print(next_state[-window_size**2:].reshape(window_size,window_size))
             
             #for fbs simple
             #print(next_state[12:].reshape(3,4))
             if action!=8:
+                '''
                 print(done)
                 print(next_state[0:9].reshape(3,3))
-                print(next_state[9:12])
+                print(next_state[9:18].reshape(3,3))
+                print(next_state[18:])
+                '''
                 states.append(next_state)
 
 
@@ -351,38 +379,53 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed.txt'
 
 
-    feature_extractor = 'DroneFeatureSAM1/'
-    to_save = 'traj_info/frame_skip_1/students003/delete/'
+    feature_extractor = 'DroneFeatureSAM1_updated_subject_45/'
+    to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
     folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
-    feature_extactor = DroneFeatureSAM1(thresh1=5, thresh2=10,
+    
+    feature_extractor = DroneFeatureSAM1(thresh1=5, thresh2=15,
                                         agent_width=10, obs_width=10,
-                                        grid_size=10, step_size=3)
+                                        grid_size=10, step_size=5)
 
+    
+    grid_size=agent_width=obs_width = 10
+    step_size = 5
+    
+    feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
+                                    agent_width=agent_width, 
+                                    obs_width=obs_width,
+                                    step_size=step_size,
+                                    )
+    
 
     print(extract_subjects_from_file(file_name))
-    extract_trajectory(file_name, feature_extactor, folder_to_save, show_states=False, display=False)
-    
+    extract_trajectory(file_name, feature_extractor, folder_to_save, show_states=True, display=True, subject=[45])
     '''
+    
     #****************************************************
     #******** section to record trajectories
-
+    
     step_size = 5
     agent_size = 10
     grid_size = 10
     obs_size = 10
-    window_size = 3
+    window_size = 11
     
     num_trajs = 30
-    path_to_save = './LocalGlobal_win3_user_played_empty_slate'
+    path_to_save = './LocalGlobal_user_played_subject_45'
+    
     feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
                                     step_size=step_size, 
                                     obs_width=obs_size,
                                     grid_size=grid_size, 
                                     )
-
-
+    '''
+    feature_extractor = DroneFeatureSAM1(step_size=step_size,
+                                         thresh1= 3,
+                                         thresh2=5)
+    '''
     env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
                          seed=10, obstacles=None, obs_width=obs_size,
                          step_size=step_size, width=grid_size,
@@ -391,11 +434,13 @@ if __name__=='__main__':
                          stepReward=.001,
                          annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
                          subject=None,
-                         rows=200, cols=200)
+                         train_exact=True,
+                         rows=576, cols=720) 
+
 
     
-    record_trajectories(num_trajs, env, feature_extractor, path_to_save)
-
+    record_trajectories(num_trajs, env, feature_extractor, path_to_save, subject_list=[45])
+    
     #***************************************************** 
 
     '''

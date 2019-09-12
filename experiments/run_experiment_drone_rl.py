@@ -38,8 +38,9 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 parser.add_argument('--save-folder', type=str, default=None, help= 'The name of the folder to \
                     store experiment related information.')
 
-parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt', 
-                    help='The location of the annotation file to be used to run the environment.')
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_\
+                    students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
+                    be used to run the environment.')
 
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
 parser.add_argument('--max-ep-length', type=int, default=200, help='Max length of a single episode.')
@@ -47,6 +48,8 @@ parser.add_argument('--max-ep-length', type=int, default=200, help='Max length o
 parser.add_argument('--train-exact', action='store_true')
 parser.add_argument('--seed', type=int, default=789)
 
+parser.add_argument('--subject', type=int, default=None, help='The id of the pedestrian to replace during training or \
+                    testing.')
 def main():
     
     #####for the logger
@@ -66,7 +69,7 @@ def main():
 
     from rlmethods.b_actor_critic import ActorCritic
     from envs.gridworld_drone import GridWorldDrone
-    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
@@ -84,12 +87,13 @@ def main():
         experiment_logger.log_header('Arguments for the experiment :')
         experiment_logger.log_info(vars(args))
     
-
+    window_size = 9
     step_size = 5
     agent_width = 10
     obs_width = 10
     grid_size = 10
 
+    feat_ext = None
     #initialize the feature extractor to be used
     if args.feat_extractor == 'Onehot':
         feat_ext = OneHot(grid_rows = 10 , grid_cols = 10)
@@ -106,7 +110,7 @@ def main():
                                     )
 
     if args.feat_extractor == 'LocalGlobal':
-        feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+        feat_ext = LocalGlobal(window_size=11, grid_size=grid_size,
                            agent_width=agent_width, 
                            obs_width=obs_width,
                            step_size=step_size,
@@ -116,11 +120,22 @@ def main():
 
         feat_ext = DroneFeatureSAM1(agent_width=agent_width,
                                     obs_width=obs_width,
-                                    step_size=2,
+                                    step_size=step_size,
                                     grid_size=grid_size,
-                                    thresh1=5, thresh2=10)
+                                    thresh1=9, thresh2=20)
     
+    if args.feat_extractor == 'DroneFeatureOccup':
 
+        feat_ext = DroneFeatureOccup(agent_width=agent_width,
+                                     obs_width=obs_width,
+                                     step_size=step_size,
+                                     grid_size=grid_size,
+                                     window_size=window_size)
+
+
+    if feat_ext is None:
+        print('Please enter proper feature extractor!')
+        exit()
     #log feature extractor info
 
     if not args.dont_save and not args.play:
@@ -133,20 +148,21 @@ def main():
         train_exact=True
     else:
         train_exact=False
+
     env = GridWorldDrone(display=args.render, is_onehot = False, 
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=True,
                         annotation_file=args.annotation_file,
-                        subject=None,
+                        subject=args.subject,
                         tick_speed=90, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
                         train_exact=train_exact,
                         show_comparison=True,
-                        rows=200, cols=300, width=grid_size)                       
-                        #rows=576, cols=720, width=grid_size)
+                        #rows=200, cols=300, width=grid_size)                       
+                        rows=576, cols=720, width=grid_size)
 
     #log environment info
     if not args.dont_save and not args.play:
@@ -156,7 +172,7 @@ def main():
 
     #initialize RL 
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
-                        log_interval=10,max_ep_length=args.max_ep_length,
+                        log_interval=100,max_ep_length=args.max_ep_length,
                         hidden_dims=args.policy_net_hidden_dims,
                         save_folder=save_folder, 
                         lr=args.lr,
@@ -186,6 +202,8 @@ def main():
         
     if not args.play and not args.play_user:
         if args.reward_path is None:
+            if args.policy_path:
+                model.policy.load(args.policy_path)
             model.train()
         else:
             from irlmethods.deep_maxent import RewardNet

@@ -255,7 +255,7 @@ class DroneFeatureSAM1():
                                 3*np.pi/4, 4*np.pi/4, 5*np.pi/4]
         '''
         self.speed_divisions = [0, 1, 2, 5]
-        self.inner_ring_density_division = [0, 2, 3, 4]
+        self.inner_ring_density_division = [0, 1, 2, 4]
         self.outer_ring_density_division = [0, 3, 5, 7]
         self.show_bins = show_bins
         #self.bins is a dictionary, with keys containing the id of the bins and 
@@ -277,7 +277,7 @@ class DroneFeatureSAM1():
         #state rep size = 16*8+9+3+3
 
         #state rep size = 9+9+4+16*8+3+3
-        self.state_rep_size = 140
+        self.state_rep_size = 22 #140
         self.generate_hash_variable()
         #self.generate_state_dictionary()
         print('Done!')
@@ -349,6 +349,8 @@ class DroneFeatureSAM1():
     def populate_orientation_bin(self, agent_orientation_val, agent_state, obs_state_list):
         #given an obstacle, the agent state and orientation, 
         #populates the self.bins dictionary with the appropriate obstacles 
+        #self.bins is a dictionary where against each key of the dictionary 
+        #is a list of obstacles that are present in that particular bin
         if agent_orientation_val >4:
             agent_orientation_val-=1
 
@@ -650,6 +652,145 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
 
 
 
+class DroneFeatureOccup(DroneFeatureSAM1):
+
+    def __init__(self, thresh1=1, thresh2=2,
+            agent_width=10, step_size=10,
+            obs_width=10, grid_size=10, 
+            show_bins=False, window_size=5
+            ):
+        super().__init__(thresh1=thresh1,
+                         thresh2=thresh2,
+                         agent_width=agent_width,
+                         step_size=step_size,
+                         grid_size=grid_size,
+                         show_bins=show_bins,
+                         obs_width=obs_width
+                         )
+        self.window_size = window_size
+        self.thresh_speed = 0.5
+        self.state_rep_size = window_size**2 + 22
+        self.thresh2 = (step_size * window_size)/2
 
 
+    def check_overlap(self,temp_pos,obs_pos):
+        #if true, that means there is an overlap
+        boundary = None
+        if self.grid_size >= self.agent_width:
+            boundary = self.grid_size/2
+        else:
+            boundary = self.agent_width/2
 
+        distance_to_maintain = boundary+(self.obs_width/2)
+        #pdb.set_trace()
+        if abs(temp_pos[0] - obs_pos[0]) < distance_to_maintain and abs(temp_pos[1] - obs_pos[1]) < distance_to_maintain:
+
+            return True
+        else:
+            return False
+
+
+    def block_to_arrpos(self,r,c):
+
+        a = (self.window_size**2-1)/2
+        b = self.window_size
+        pos = a+(b*r)+c
+        return int(pos)
+
+    '''
+    def overlay_grid(self, pygame_surface, state):
+
+
+        center =  np.array([int(state['agent_state']['position'][1]),
+                  int(state['agent_state']['position'][0])])
+
+
+        window_rows = window_cols = self.window_size
+        line_orient = ['hor', 'ver']
+
+        grid_width = self.step_size
+
+        start_point = center - np.array([window_size/2 ])
+        for orient in line_orient:
+            for i in range(window_size):
+
+                start_point = 
+    '''
+
+
+    def compute_bin_info(self):
+
+        obstacles = []
+        #create a obstacle list from the self.bins
+        for bin_key in self.bins.keys():
+
+            for obs in self.bins[bin_key]:
+                obstacles.append(obs)
+
+        window_rows = window_cols = self.window_size
+        row_start = int((window_rows-1)/2)
+        col_start = int((window_cols-1)/2)
+
+        local_occup_grid = np.zeros(self.window_size**2)
+        agent_pos = np.array([0,0])
+
+        for i in range(len(obstacles)):
+
+            #as of now this just measures the distance from the center of the obstacle
+            #this distance has to be measured from the circumferance of the obstacle
+
+            #new method, simulate overlap for each of the neighbouring places
+            #for each of the obstacles
+            obs_pos = obstacles[i]['position']
+            obs_width = self.obs_width
+            for r in range(-row_start,row_start+1,1):
+                for c in range(-col_start,col_start+1,1):
+                    #c = x and r = y
+                    #pdb.set_trace()
+                    temp_pos = np.asarray([agent_pos[0] + r*self.step_size, 
+                                agent_pos[1] + c*self.step_size])
+                    if self.check_overlap(temp_pos,obs_pos):
+                        pos = self.block_to_arrpos(r,c)
+
+                        local_occup_grid[pos] = 1
+
+        return local_occup_grid
+
+
+    def extract_features(self, state):
+        #getting everything to come together to extract the features
+
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
+        abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+        #print('The orientation :')
+        #print(abs_approx_orientation.reshape(3,3))
+
+        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
+
+        #print('The absolute approx orientation :', abs_approx_orientation)
+        ##print('The relative orientation', relative_orientation)
+
+        #empty bins before populating
+        for i in range(16):
+            self.bins[str(i)] = []
+
+
+        #print('Here')
+        self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+        #pdb.set_trace()
+        local_occup_grid = self.compute_bin_info()
+
+        extracted_feature = np.concatenate((abs_approx_orientation,
+                                            relative_orientation_goal,
+                                            relative_orientation,
+                                            local_occup_grid))
+
+        self.prev_frame_info = copy.deepcopy(state)
+
+        return reset_wrapper(extracted_feature)

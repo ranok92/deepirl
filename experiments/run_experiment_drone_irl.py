@@ -54,7 +54,8 @@ parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[1
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the policy network.')
 
-parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_ \
+                    students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--lr-rl', type=float, default=1e-3, help='The learning rate for the policy network.')
