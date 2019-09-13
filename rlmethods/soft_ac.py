@@ -3,6 +3,7 @@ Soft actor critic per "Soft Actor-Critic Algorithms and Applications" Haarnoja
 et. al 2019.
 """
 import sys
+import copy
 
 import torch
 import torch.nn.functional as F
@@ -136,6 +137,8 @@ class SoftActorCritic:
             entropy_tuning=False,
             tau=0.005,
             log_alpha=-2.995,
+            policy_net=None,
+            q_net=None,
     ):
         self.env = env
         starting_state = self.env.reset()
@@ -146,9 +149,18 @@ class SoftActorCritic:
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
-        self.policy = PolicyNetwork(state_size, 2048, env.action_space.n)
+        if not policy_net:
+            self.policy = PolicyNetwork(state_size, 2048, env.action_space.n)
+        else:
+            self.policy = policy_net
+
         self.q_net = QNetwork(state_size, env.action_space.n, 2048)
-        self.avg_q_net = QNetwork(state_size, env.action_space.n, 2048)
+        if not policy_net:
+            self.q_net = QNetwork(state_size, env.action_space.n, 2048)
+        else:
+            self.policy = q_net
+
+        self.avg_q_net = copy.deepcopy(self.q_net)
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
