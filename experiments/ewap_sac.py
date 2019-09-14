@@ -138,7 +138,6 @@ def main():
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)
     conv_q_net = ConvQNet(state_size, env.action_space.n, 4096, map_side)
-    conv_pi = ConvPolicy(state_size, env.action_space.n, 4096, map_side)
 
     soft_ac = SoftActorCritic(
         env,
@@ -149,7 +148,6 @@ def main():
         log_alpha=args.log_alpha,
         entropy_tuning=False,
         q_net=conv_q_net,
-        policy_net=conv_pi,
     )
 
     soft_ac.train_and_play(args.max_episodes, args.play_interval)

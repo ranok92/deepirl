@@ -138,6 +138,7 @@ class SoftActorCritic:
             entropy_tuning=False,
             tau=0.005,
             log_alpha=-2.995,
+            policy_net=None,
             q_net=None,
     ):
         self.env = env
@@ -149,6 +150,11 @@ class SoftActorCritic:
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
+        if not policy_net:
+            self.policy = PolicyNetwork(state_size, 2048, env.action_space.n)
+        else:
+            self.policy = policy_net
+
         if not q_net:
             self.q_net = QNetwork(state_size, env.action_space.n, 2048)
         else:
@@ -172,6 +178,7 @@ class SoftActorCritic:
         self.entropy_tuning = entropy_tuning
 
         # optimizers
+        self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
         self.alpha_optim = Adam([self.log_alpha], lr=learning_rate)
 
@@ -181,16 +188,12 @@ class SoftActorCritic:
         else:
             self.tbx_writer = tbx_writer
 
-    def select_action(self, state, alpha):
+    def select_action(self, state):
         """Generate an action based on state vector using current policy.
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
-        softmax_over_actions = F.softmax(
-            (1.0/alpha) * self.q_net(state),
-            dim=-1
-        )
-        dist = Categorical(softmax_over_actions)
+        dist = self.policy.action_distribution(state)
         action = dist.sample()
 
         return action, dist.log_prob(action), dist
@@ -232,8 +235,7 @@ class SoftActorCritic:
         with torch.no_grad():
             # Figure out value function
             next_actions, log_next_actions, _ = self.select_action(
-                next_state_batch,
-                alpha
+                next_state_batch
             )
             next_q_a = self.avg_q_net(next_state_batch)
             next_q = get_action_q(next_q_a, next_actions)
@@ -253,12 +255,19 @@ class SoftActorCritic:
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        _, log_actions, action_dist = self.select_action(state_batch, alpha)
+        _, log_actions, action_dist = self.select_action(state_batch)
+        q_a_pi = self.q_net(state_batch)
+        q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
+        policy_loss = kl_divergence(action_dist, q_dist).mean()
 
         # update parameters
         self.q_optim.zero_grad()
         q_loss.backward()
         self.q_optim.step()
+
+        self.policy_optim.zero_grad()
+        policy_loss.backward()
+        self.policy_optim.step()
 
         # automatic entropy tuning
         alpha_loss = self.log_alpha * \
@@ -277,11 +286,13 @@ class SoftActorCritic:
         self.tbx_logger(
             {
                 'loss/Q loss': q_loss.item(),
+                'loss/pi loss': policy_loss.item(),
                 'loss/alpha loss': alpha_loss.item(),
                 'Q/avg_q_target': q_target.mean().item(),
                 'Q/avg_q': q_values.mean().item(),
                 'Q/avg_reward': reward_batch.mean().item(),
                 'Q/avg_V': next_state_values.mean().item(),
+                'Q/entropy': q_dist.entropy().mean(),
                 'pi/avg_entropy': action_dist.entropy().mean(),
                 'pi/avg_log_actions': log_actions.detach().mean().item(),
                 'alpha': alpha.item(),
@@ -307,8 +318,7 @@ class SoftActorCritic:
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE)
 
-            alpha = self.log_alpha.exp().detach()
-            action, _, _ = self.select_action(torch_state, alpha)
+            action, _, _ = self.select_action(torch_state)
             next_state, reward, done, _ = self.env.step(action.item())
 
             self.replay_buffer.push((
