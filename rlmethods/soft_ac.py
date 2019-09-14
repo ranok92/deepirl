@@ -20,6 +20,7 @@ from rlmethods.rlutils import ReplayBuffer  # NOQA
 from neural_nets.base_network import BaseNN  # NOQA
 
 DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
+
 MAX_FLOAT = torch.finfo(torch.float32).max
 FEPS = torch.finfo(torch.float32).eps
 
@@ -154,11 +155,10 @@ class SoftActorCritic:
         else:
             self.policy = policy_net
 
-        self.q_net = QNetwork(state_size, env.action_space.n, 2048)
-        if not policy_net:
+        if not q_net:
             self.q_net = QNetwork(state_size, env.action_space.n, 2048)
         else:
-            self.policy = q_net
+            self.q_net = q_net
 
         self.avg_q_net = copy.deepcopy(self.q_net)
 
@@ -166,10 +166,8 @@ class SoftActorCritic:
         copy_params(self.q_net, self.avg_q_net)
 
         # set hyperparameters
-        self.log_alpha = torch.tensor(
-            [log_alpha],
-            requires_grad=True
-        ).to(DEVICE)
+        self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
+        self.log_alpha = self.log_alpha.detach().requires_grad_(True)
         self.gamma = gamma
         self.entropy_target = -1
         self.tau = tau
