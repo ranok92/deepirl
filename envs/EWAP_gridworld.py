@@ -31,7 +31,6 @@ class EwapDataset:
         # get obstacle map
         obs_map_path = self.sequence_path / 'hmap.png'
         self.obstacle_map = imread(str(obs_map_path.resolve()))
-        self.obstacle_map *= OBSTACLE
 
         # get pedestrian position and velocity data (obsmat.txt)
         self.pedestrian_data = np.loadtxt(self.sequence_path / 'obsmat.txt')
@@ -95,7 +94,7 @@ class EwapDataset:
             self.obstacle_map,
             pad_amount + 1,  # for when agent runs into edges
             mode='constant',
-            constant_values=OBSTACLE
+            constant_values=1.0
         )
 
         # shift dataset to accomodate padding
@@ -132,6 +131,7 @@ class EwapGridworld(SimpleGridworld):
             dataset_root='datasets/ewap_dataset',
             person_thickness=2,
             vision_radius=40,
+            render=False,
     ):
         """
         Initialize EWAP gridworld. Make sure all files in the correct
@@ -155,7 +155,7 @@ class EwapGridworld(SimpleGridworld):
 
         self.person_thickness = person_thickness
 
-        obstacle_array = np.where(self.dataset.obstacle_map == OBSTACLE)
+        obstacle_array = np.where(self.dataset.obstacle_map == 1.0)
         obstacle_array = np.array(obstacle_array).T
 
         goals = self.dataset.pedestrian_goal(ped_id)
@@ -170,11 +170,37 @@ class EwapGridworld(SimpleGridworld):
         self.adopt_goal(ped_id)
 
         # seperate for people position incase we want to do processing.
-        self.person_map = self.grid.copy()
+        self.person_map = self.obstacle_grid.copy()
         self.person_map.fill(0)
 
         # counters for debuggging data
         self.png_number = 0
+
+        # rendering
+        self.render = render
+        if self.render:
+            self.enable_rendering()
+
+
+    def enable_rendering(self):
+        self.fig = plt.figure()
+        self.gridspec = self.fig.add_gridspec(4, 2)
+
+        # setup axis
+        ax_obs = self.fig.add_subplot(self.gridspec[0, 0])
+        ax_persons = self.fig.add_subplot(self.gridspec[0, 1])
+        ax_goal = self.fig.add_subplot(self.gridspec[1, 0])
+        ax_gridworld = self.fig.add_subplot(self.gridspec[2:, :])
+
+        dummy_surrounding = np.eye(2, 2)
+        self.im_obs = ax_obs.imshow(dummy_surrounding)
+        self.im_persons = ax_persons.imshow(dummy_surrounding)
+        self.im_goal = ax_goal.imshow(dummy_surrounding)
+        self.im_gridworld = ax_gridworld.imshow(self.obstacle_grid)
+        self.im_gridworld.set_clim(vmin=0, vmax=ROBOT)
+
+        self.fig.canvas.draw()
+        plt.pause(0.001)
 
     def thicken(self, grid, target_thickness):
         """
@@ -214,7 +240,7 @@ class EwapGridworld(SimpleGridworld):
         ]
 
         self.person_map[frame_pedestrians[:, 2],
-                        frame_pedestrians[:, 4]] = PERSON
+                        frame_pedestrians[:, 4]] = 1.0
         self.person_map = self.thicken(self.person_map, self.person_thickness)
 
     def adopt_goal(self, pedestrian_id):
@@ -223,7 +249,7 @@ class EwapGridworld(SimpleGridworld):
         :param pedestrian_id: ID of pedestrian whose goal we adopt.
         """
         self.goal_pos = self.dataset.pedestrian_goal(pedestrian_id)
-        self.goal_grid[self.goal_pos] = GOAL
+        self.goal_grid[self.goal_pos] = 1.0
 
         # thicken the goal, making it area instead of pixel
         goal_thickness = self.person_thickness * 5
@@ -245,13 +271,13 @@ class EwapGridworld(SimpleGridworld):
     def reward_function(self, state, action, next_state):
         reward = np.array(0.0)
 
-        if self.goal_grid[tuple(self.player_pos)] == GOAL:
+        if self.goal_grid[tuple(self.player_pos)] == 1.0:
             reward += 1.0
 
-        if self.obstacle_grid[tuple(self.player_pos)] == OBSTACLE:
+        if self.obstacle_grid[tuple(self.player_pos)] == 1.0:
             reward += -1.0
 
-        if self.person_map[tuple(self.player_pos)] == PERSON:
+        if self.person_map[tuple(self.player_pos)] == 1.0:
             reward += -2.0
 
         return reward
@@ -269,6 +295,11 @@ class EwapGridworld(SimpleGridworld):
         obstacles = self.obstacle_grid[row_low: row_high, col_low: col_high]
         people = self.person_map[row_low: row_high, col_low: col_high]
         goals = self.goal_grid[row_low: row_high, col_low: col_high]
+
+        if self.render:
+            self.im_obs.set_data(obstacles)
+            self.im_persons.set_data(people)
+            self.im_goal.set_data(goals)
 
         expected_shape = (
             2 * self.vision_radius + 1,
@@ -327,14 +358,41 @@ class EwapGridworld(SimpleGridworld):
         reward = self.reward_function(state, action, next_state)
 
         # temrination conditions
-        goal_reached = (self.goal_grid[tuple(self.player_pos)] == GOAL)
-        obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == OBSTACLE)
-        person_hit = (self.person_map[tuple(self.player_pos)] == PERSON)
+        goal_reached = (self.goal_grid[tuple(self.player_pos)] == 1.0)
+        obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == 1.0)
+        person_hit = (self.person_map[tuple(self.player_pos)] == 1.0)
         max_steps_elapsed = self.step_number > self.grid.size / 4
 
         done = goal_reached or obstacle_hit or max_steps_elapsed or person_hit
 
+        if self.render:
+            self.render_gridworld()
+
         return next_state, reward, done, False
+
+    def overlay(self, overlay, overlaid_on, const):
+        """Overlays value 'const' on numpy array 'overlaid_on' in indices where
+        'overlay' is non-zero.
+
+        :param overlay: numpy to overlay on another array.
+        :param overlaid_on: overlay is applied on this array.
+        :param const: constant to overlay with, e.g. const=2 will put 2s where
+        overlay is nonzero.
+        """
+        output = np.copy(overlaid_on)
+        output[overlay != 0.0] = const
+
+        return output
+
+    def render_gridworld(self):
+        to_render = self.obstacle_grid.copy() * OBSTACLE
+        to_render = self.overlay(self.person_map, to_render, PERSON)
+        to_render = self.overlay(self.goal_grid, to_render, GOAL)
+        to_render[tuple(self.player_pos)] = ROBOT
+
+        self.im_gridworld.set_data(to_render)
+        self.fig.canvas.draw()
+        plt.pause(0.00001)
 
     def dump_png(self, path='./png_dumps/'):
         """Saves a PNG image of current state.

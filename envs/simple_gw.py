@@ -71,7 +71,7 @@ class SimpleGridworld:
         Returns a grid with obstacles defined in obstacle_map place in.
         """
         obs = np.zeros(self.grid.shape)
-        obs[self.obstacles_map.T[0], self.obstacles_map.T[1]] = OBSTACLE
+        obs[self.obstacles_map.T[0], self.obstacles_map.T[1]] = 1.0
 
         return obs
 
@@ -90,13 +90,13 @@ class SimpleGridworld:
         self.grid += self.obstacle_grid
 
         # set goal
-        assert self.grid[tuple(self.goal_pos)] != OBSTACLE, "Goal is obstacle."
-        self.goal_grid[self.goal_pos[0], self.goal_pos[1]] = GOAL
+        assert self.grid[tuple(self.goal_pos)] != 1.0, "Goal is obstacle."
+        self.goal_grid[self.goal_pos[0], self.goal_pos[1]] = 1.0
 
         # generate player location
         validity_condition = np.logical_and(
-            self.grid != OBSTACLE,
-            self.goal_grid != GOAL
+            self.grid != 1.0,
+            self.goal_grid != 1.0
         )
         valid_spots = np.argwhere(validity_condition)
         self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
@@ -112,10 +112,10 @@ class SimpleGridworld:
         """
         reward = np.array(0.0)
 
-        if self.goal_grid[tuple(self.player_pos)] == GOAL:
+        if self.goal_grid[tuple(self.player_pos)] == 1.0:
             reward += 1.0
 
-        if self.grid[tuple(self.player_pos)] == OBSTACLE:
+        if self.grid[tuple(self.player_pos)] == 1.0:
             reward += -1.0
 
         return np.asarray(reward).astype('float32')
@@ -130,7 +130,7 @@ class SimpleGridworld:
             self.grid,
             pad_width,
             mode='constant',
-            constant_values=OBSTACLE
+            constant_values=1.0
         )
         padded_pos = self.player_pos + np.array([pad_width, pad_width])
 
@@ -169,7 +169,7 @@ class SimpleGridworld:
         reward = self.reward_function(state, action, next_state)
 
         goal_reached = (self.player_pos == self.goal_pos).all()
-        obstacle_hit = (self.grid[tuple(self.player_pos)] == OBSTACLE)
+        obstacle_hit = (self.grid[tuple(self.player_pos)] == 1.0)
         max_steps_elapsed = self.step_number > self.grid.size
 
         done = goal_reached or obstacle_hit or max_steps_elapsed

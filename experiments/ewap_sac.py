@@ -133,7 +133,7 @@ def main():
 
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
-    env = EwapGridworld(ped_id=6)
+    env = EwapGridworld(ped_id=6, render=True)
 
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)
