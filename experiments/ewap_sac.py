@@ -21,6 +21,7 @@ parser.add_argument('replay_buffer_sample_size', type=int)
 parser.add_argument('--log-alpha', type=float, default=-2.995)
 parser.add_argument('--max-episodes', type=int, default=10**4)
 parser.add_argument('--play-interval', type=int, default=100)
+parser.add_argument('--render', action='store_true')
 
 args = parser.parse_args()
 
@@ -46,15 +47,19 @@ class ConvQNet(BaseNN):
         self.map_side = map_side
 
         # convolutional layers
-        self.conv_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv_persons = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv_goals = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv1_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv1_persons = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv1_goals = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv2_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv2_persons = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        self.conv2_goals = nn.Conv2d(1, 1, kernel_shape, padding=1)
 
         self.pool = nn.MaxPool2d(kernel_shape)
 
         # calculate length of vector input into fully connected layers
         len_kernel = kernel_shape[0] * kernel_shape[1]
-        fc_in_len = 4 + (3 * ((map_side**2) // len_kernel))
+        conv2_in_len = (map_side**2) // len_kernel
+        fc_in_len = 4 + (3 * (conv2_in_len // len_kernel))
 
         # create fully connected layers based on above
         self.fc1 = nn.Linear(fc_in_len, hidden_layer_width)
@@ -77,11 +82,16 @@ class ConvQNet(BaseNN):
         in_goals = in_goals.reshape(-1, 1, self.map_side, self.map_side)
 
         # convolutional processsing
-        out_obs = self.pool(F.relu(self.conv_obstacles(in_obs)))
+        out_obs = self.pool(F.relu(self.conv1_obstacles(in_obs)))
+        out_obs = self.pool(F.relu(self.conv2_obstacles(out_obs)))
         out_obs = out_obs.squeeze(dim=1)
-        out_persons = self.pool( F.relu(self.conv_persons(in_persons)))
+
+        out_persons = self.pool(F.relu(self.conv1_persons(in_persons)))
+        out_persons = self.pool(F.relu(self.conv2_persons(out_persons)))
         out_persons = out_persons.squeeze(dim=1)
-        out_goals = self.pool(F.relu(self.conv_goals(in_goals)))
+
+        out_goals = self.pool(F.relu(self.conv1_goals(in_goals)))
+        out_goals = self.pool(F.relu(self.conv2_goals(out_goals)))
         out_goals = out_goals.squeeze(dim=1)
 
         x = torch.cat(
@@ -99,6 +109,7 @@ class ConvQNet(BaseNN):
         x = self.out_layer(x)
 
         return x
+
 
 class ConvPolicy(ConvQNet):
     def __init__(
@@ -133,7 +144,7 @@ def main():
 
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
-    env = EwapGridworld(ped_id=6, render=True)
+    env = EwapGridworld(ped_id=6, render=args.render)
 
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)
