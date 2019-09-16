@@ -309,15 +309,24 @@ class SoftActorCritic:
 
             alpha = self.log_alpha.exp().detach()
             action, _, _ = self.select_action(torch_state, alpha)
-            next_state, reward, done, _ = self.env.step(action.item())
+            next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
 
-            self.replay_buffer.push((
-                state,
-                action.cpu().numpy(),
-                reward,
-                next_state,
-                not done
-            ))
+            if max_steps_elapsed:
+                self.replay_buffer.push((
+                    state,
+                    action.cpu().numpy(),
+                    reward,
+                    next_state,
+                    done
+                ))
+            else:
+                self.replay_buffer.push((
+                    state,
+                    action.cpu().numpy(),
+                    reward,
+                    next_state,
+                    not done
+                ))
 
             state = next_state
             total_reward += reward
@@ -345,8 +354,11 @@ class SoftActorCritic:
         :param play_interval: trainig episodes between each play session.
         """
 
-        for _ in range(num_episodes):
+        for i in range(num_episodes):
             self.train_episode()
 
             if self.training_i % play_interval == 0:
                 self.play()
+
+            if i % 50 == 0:
+                breakpoint()

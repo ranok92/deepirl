@@ -34,6 +34,7 @@ class ConvQNet(BaseNN):
             hidden_layer_width,
             map_side,
             kernel_shape=(3, 3),
+            pool_shape=(3, 3)
     ):
         """__init__
 
@@ -47,19 +48,20 @@ class ConvQNet(BaseNN):
         self.map_side = map_side
 
         # convolutional layers
-        self.conv1_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv1_persons = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv1_goals = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv2_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv2_persons = nn.Conv2d(1, 1, kernel_shape, padding=1)
-        self.conv2_goals = nn.Conv2d(1, 1, kernel_shape, padding=1)
+        padding = (kernel_shape[0] - 1) // 2
+        self.conv1_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv1_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv1_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv2_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv2_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv2_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
 
-        self.pool = nn.MaxPool2d(kernel_shape)
+        self.pool = nn.MaxPool2d(pool_shape)
 
         # calculate length of vector input into fully connected layers
-        len_kernel = kernel_shape[0] * kernel_shape[1]
-        conv2_in_len = (map_side**2) // len_kernel
-        fc_in_len = 4 + (3 * (conv2_in_len // len_kernel))
+        pool_reduction_factor = pool_shape[0] * pool_shape[1]
+        conv2_in_len = (map_side**2) // pool_reduction_factor
+        fc_in_len = 4 + (3 * (conv2_in_len // pool_reduction_factor))
 
         # create fully connected layers based on above
         self.fc1 = nn.Linear(fc_in_len, hidden_layer_width)
@@ -111,44 +113,21 @@ class ConvQNet(BaseNN):
         return x
 
 
-class ConvPolicy(ConvQNet):
-    def __init__(
-            self,
-            state_length,
-            action_length,
-            hidden_layer_width,
-            map_side,
-            kernel_shape=(3, 3),
-    ):
-        super().__init__(
-            state_length,
-            action_length,
-            hidden_layer_width,
-            map_side,
-            kernel_shape
-        )
-
-    def forward(self, state):
-        x = super().forward(state)
-
-        return F.softmax(x, dim=-1)
-
-    def action_distribution(self, state):
-        probs = self.__call__(state)
-        dist = Categorical(probs)
-
-        return dist
-
-
 def main():
 
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
-    env = EwapGridworld(ped_id=6, render=args.render)
+    env = EwapGridworld(ped_id=1, render=args.render)
 
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)
-    conv_q_net = ConvQNet(state_size, env.action_space.n, 4096, map_side)
+    conv_q_net = ConvQNet(
+        state_size,
+        env.action_space.n,
+        4096,
+        map_side,
+        kernel_shape=(5, 5)
+    )
 
     soft_ac = SoftActorCritic(
         env,

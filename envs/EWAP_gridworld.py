@@ -111,6 +111,9 @@ class EwapDataset:
 
         return (pedestrian_traj[-1, 2], pedestrian_traj[-1, 4])
 
+    def get_max_frame(self):
+        return np.max(self.processed_data[:, 0])
+
 
 class EwapGridworld(SimpleGridworld):
     """
@@ -173,6 +176,9 @@ class EwapGridworld(SimpleGridworld):
         self.person_map = self.obstacle_grid.copy()
         self.person_map.fill(0)
 
+        # Play only until video exists
+        self.max_steps = self.dataset.get_max_frame()
+
         # counters for debuggging data
         self.png_number = 0
 
@@ -183,6 +189,8 @@ class EwapGridworld(SimpleGridworld):
 
 
     def enable_rendering(self):
+        self.render = True
+
         self.fig = plt.figure()
         self.gridspec = self.fig.add_gridspec(4, 2)
 
@@ -201,6 +209,9 @@ class EwapGridworld(SimpleGridworld):
 
         self.fig.canvas.draw()
         plt.pause(0.001)
+
+    def disable_rendering(self):
+        self.render = False
 
     def thicken(self, grid, target_thickness):
         """
@@ -279,6 +290,14 @@ class EwapGridworld(SimpleGridworld):
 
         if self.person_map[tuple(self.player_pos)] == 1.0:
             reward += -2.0
+
+        dist_to_goal = np.sum(np.abs(state[-2:] - state[-4:-2]))
+        next_dist_to_goal = np.sum(np.abs(next_state[-2:] - next_state[-4:-2]))
+
+        if next_dist_to_goal >= dist_to_goal:
+            reward -= 0.001
+        else:
+            reward += 0.001
 
         return reward
 
@@ -361,14 +380,14 @@ class EwapGridworld(SimpleGridworld):
         goal_reached = (self.goal_grid[tuple(self.player_pos)] == 1.0)
         obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == 1.0)
         person_hit = (self.person_map[tuple(self.player_pos)] == 1.0)
-        max_steps_elapsed = self.step_number > self.grid.size / 4
+        max_steps_elapsed = self.step_number > self.max_steps
 
         done = goal_reached or obstacle_hit or max_steps_elapsed or person_hit
 
         if self.render:
             self.render_gridworld()
 
-        return next_state, reward, done, False
+        return next_state, reward, done, max_steps_elapsed
 
     def overlay(self, overlay, overlaid_on, const):
         """Overlays value 'const' on numpy array 'overlaid_on' in indices where
