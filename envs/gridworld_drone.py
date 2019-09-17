@@ -9,7 +9,7 @@ sys.path.insert(0, '..')
 
 from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk
 
 
 from itertools import count
@@ -62,8 +62,9 @@ class GridWorldDrone(GridWorld):
             agent_width=10,
             show_comparison=False,
             tick_speed=30,
-            train_exact=False #this option trains the agent for the exact scenarios as seen by the expert
+            train_exact=False, #this option trains the agent for the exact scenarios as seen by the expert
                               #Not an ideal thing to train on. Introduced as a debugging measure.
+            consider_heading=False
     ):
         super().__init__(seed=seed,
                          rows=rows,
@@ -79,6 +80,7 @@ class GridWorldDrone(GridWorld):
                          reset_wrapper=reset_wrapper,
                          show_trail=show_trail,
                          obs_width=obs_width,
+                         consider_heading=consider_heading,
                          agent_width=agent_width,
                          step_size=step_size
                         )
@@ -116,7 +118,7 @@ class GridWorldDrone(GridWorld):
                             np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
 
         self.action_dict = {}
-
+        self.prev_action = None
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
@@ -439,7 +441,8 @@ class GridWorldDrone(GridWorld):
             #print('printing the keypress status',self.agent_action_keyboard)
             
         #print('Info from curent frame :',self.current_frame)
-        #pdb.set_trace()
+        #if action!=8:
+        #    pdb.set_trace()
 
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
@@ -451,6 +454,10 @@ class GridWorldDrone(GridWorld):
                 if action is not None:
                     if isinstance(action, int):
                         #print('its int', action)
+                        if action != 8 and self.consider_heading:
+                            action = (self.cur_heading_dir + action)%8
+                            self.cur_heading_dir =  action
+                        #self.cur_heading_dir = action
                         prev_position = self.agent_state['position']
                         self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
                                            self.step_size*self.actionArray[action],self.upper_limit_agent),self.lower_limit_agent)
@@ -458,12 +465,18 @@ class GridWorldDrone(GridWorld):
                         self.agent_state['orientation'] = self.agent_state['position'] - prev_position
                         self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
 
-
+                        
                     else:
                         #if the action is a torch
                         if len(action.shape)==1 and a.shape[0]==1: #check if it the tensor has a single value
                             if isinstance(action.item(), int):
                                 prev_position = self.agent_state['position']
+
+                                if action!=8 and self.consider_heading:
+                                    action = (self.cur_heading_dir + action)%8
+                                    self.cur_heading_dir =  action
+                                #self.cur_heading_dir = action
+                                
                                 self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
                                                                self.step_size*self.actionArray[action],
                                                                self.upper_limit_agent),self.lower_limit_agent)
@@ -471,13 +484,13 @@ class GridWorldDrone(GridWorld):
                                 self.agent_state['orientation'] = self.agent_state['position'] - prev_position
                                 self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
                     #print("Agent :",self.agent_state)
-                
+            
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
 
             reward, done = self.calculate_reward()
 
-
+        
         #if you are done ie hit an obstacle or the goal
         #you leave control of the agent and you are forced to
         #suffer/enjoy the consequences of your actions for the
@@ -608,8 +621,9 @@ class GridWorldDrone(GridWorld):
 
             self.pos_history.append(self.agent_state)
 
-            self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
-     
+            self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
+            self.cur_heading_dir = 0
+
             pygame.display.set_caption('Your friendly grid environment')
             if self.display:
                 self.render()
@@ -678,7 +692,8 @@ class GridWorldDrone(GridWorld):
 
         self.pos_history.append(self.agent_state)
 
- 
+        self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
+        self.cur_heading_dir = 0
         
         if self.display:
             pygame.display.set_caption('Your friendly grid environment')
@@ -748,6 +763,7 @@ class GridWorldDrone(GridWorld):
             def_arr = np.array([1,1])
             action = sign_arr*def_arr
 
+            #action = (self.prev_action + action)%8
             '''
             if np.hypot(x,y)>_max_agent_speed:
                 normalizer = _max_agent_speed/(np.hypot(x,y))
@@ -755,7 +771,14 @@ class GridWorldDrone(GridWorld):
             else:
                 normalizer = 1
             '''
-            return self.action_dict[np.array2string(sign_arr*def_arr)]
+            action = self.action_dict[np.array2string(sign_arr*def_arr)]
+            #pdb.set_trace()
+            print( 'absolute action ',action)
+            action = (action - self.cur_heading_dir)%8
+            print( ' relative action :',action)
+            #self.prev_action = action
+            #print('relative action :', action)
+            return action
 
         return self.action_dict[np.array2string(np.array([0,0]))]
 
@@ -841,31 +864,51 @@ class GridWorldDrone(GridWorld):
 
 if __name__=="__main__":
 
+    '''
     feat_ext = FrontBackSideSimple(agent_width=10,
                                    obs_width=10,
                                    step_size=10,
                                    grid_size=10) 
+    
     feat_drone = DroneFeatureSAM1(step_size=50)
-    #feat_drone_2 = DroneFeatureMinimal(step_size=50)
+    window_size = 15
+    feat_drone_2 = DroneFeatureOccup(step_size=10, window_size=window_size)
+    '''
 
-    window_size = 9
-    #feat_ext = LocalGlobal(window_size=window_size, grid_size = 10, fieldList=['agent_state', 'goal_state','obstacles'])
+    feat_drone = DroneFeatureSAM1(step_size=2,
+                                  thresh1=10,
+                                  thresh2=20)
+    
+    feat_drone = DroneFeatureRisk(step_size=3,
+                                  thresh1=10,
+                                  thresh2=20)
     world = GridWorldDrone(display=True, is_onehot = False, 
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
+                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
                         subject=None,
                         tick_speed=30, 
                         obs_width=10,
-                        step_size=10,
+                        step_size=2,
                         agent_width=10,
                         stepReward=0.01,
                         show_comparison=False,
                         show_orientation=True,
-                        train_exact=False,                       
-                        rows=200, cols=200, width=10)
-                        #rows=576, cols=720, width=20)
+                        train_exact=False, 
+                        consider_heading=False,                      
+                        #rows=200, cols=200, width=10)
+                        rows=576, cols=720, width=20)
+
+    '''
+    feat_ext = LocalGlobal(window_size=9, 
+                           grid_size = 10,
+                           step_size = 15,
+                           agent_width=10,
+                           overlay_bins=True,
+                           pygame_surface=world.gameDisplay,
+                           obs_width=10)
+'''
     print ("here")
     
     done = False
@@ -877,19 +920,28 @@ if __name__=="__main__":
         while world.current_frame < fin_frame and not done:
             #action = input()
 
-            state, reward , done, _ = world.step()
+            action = world.take_action_from_user()
+            #print(action)
+            state, reward , done, _ = world.step(action)
 
+            #print(state['agent_state']['orientation'])
             feat_drone.overlay_bins(world.gameDisplay, state)
             
-            feat = feat_drone.extract_features(state)
+            #feat = feat_drone.extract_features(state)
 
             #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
+            '''
             print('Global info:')
-            print(feat[0:9].reshape(3,3))
+            print(feat[0:9].reshape(3, 3))
             print('global info_goal:')
-            print(feat[9:12])
+            print(feat[9:18].reshape(3, 3))
+
+            print('Occupancy grid info:')
+            print(feat[22:].reshape(window_size, window_size))
+            
             pdb.set_trace()
+            '''
             #print(world.agent_state)
             #print (reward, done)
     

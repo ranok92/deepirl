@@ -394,7 +394,7 @@ class GridWorldClockless:
 
 
         self.cur_heading_dir = 0
-        self.distanceFromgoal = np.sum(np.abs(self.agent_state['position']-self.goal_state))
+        self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.release_control = False
         if self.is_onehot:
             self.state = self.onehotrep()
@@ -427,10 +427,17 @@ class GridWorldClockless:
         
         if not self.release_control:
 
-            if self.consider_heading and action != 4:
-
-                action = self.rel_action_table[self.cur_heading_dir,action]
-                self.state['agent_head_dir'] = action 
+            
+            if self.consider_heading and action != 8:
+            ##### this block is when the action space is 4 #####
+                #action = self.rel_action_table[self.cur_heading_dir,action]
+                #self.state['agent_head_dir'] = action 
+                #self.cur_heading_dir = action
+            #####################################################
+            #if heading is considered and the action is not 'stay in the previous position'
+            #change the action taking into account the previous heading direction
+            #and also update the heading direction based on the current action               
+                action = (self.cur_heading_dir + action)%8
                 self.cur_heading_dir = action
 
             self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
@@ -508,7 +515,7 @@ class GridWorldClockless:
 
         else:
 
-            newdist = np.sum(np.abs(self.agent_state['position']-self.goal_state))
+            newdist = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
 
             reward = (self.distanceFromgoal - newdist)*self.stepReward
 
