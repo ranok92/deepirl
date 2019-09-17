@@ -249,7 +249,7 @@ class SoftActorCritic:
 
         # Q net outputs values for all actions, so we index specific actions
         # TODO: It should be possible to just do MSE over all q_a pairs.
-        q_values = get_action_q(q_a_values, action_batch)
+        q_values = get_action_q(q_a_values, action_batch.squeeze())
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
@@ -359,6 +359,3 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play()
-
-            if i % 50 == 0:
-                breakpoint()
