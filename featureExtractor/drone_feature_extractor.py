@@ -29,9 +29,9 @@ def angle_between(v1, v2):
             3.141592653589793
     """
     #this function is for [x, y] coordinates,
-    #the input vectors are [row, col]
-    v1_corr = np.array([v1[1], v1[0]])
-    v2_corr = np.array([v2[1], v2[0]])
+    #the input vectors v1 and v2 are [row, col]
+    v1_corr = np.array([v1[1], -v1[0]])
+    v2_corr = np.array([v2[1], -v2[0]])
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
@@ -277,7 +277,7 @@ class DroneFeatureSAM1():
         #state rep size = 16*8+9+3+3
 
         #state rep size = 9+9+4+16*8+3+3
-        self.state_rep_size = 22 #140
+        self.state_rep_size = 140
         self.generate_hash_variable()
         #self.generate_state_dictionary()
         print('Done!')
@@ -530,7 +530,7 @@ class DroneFeatureSAM1():
         #pdb.set_trace()
         sam_vector, inner_ring_density, outer_ring_density = self.compute_bin_info()
 
-        extracted_feature = np.concatenate((abs_approx_orientation,
+        extracted_feature = np.concatenate((#abs_approx_orientation,
                                             relative_orientation_goal,
                                             relative_orientation,
                                             np.reshape(sam_vector,(-1)),
@@ -598,7 +598,7 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
             for i in range(collision_information.shape[0]):
                 print('Bin no :', i, ', collision_info : ', collision_information[i,:])
 
-            pdb.set_trace()
+            #pdb.set_trace()
         
         return collision_information
 
@@ -794,3 +794,90 @@ class DroneFeatureOccup(DroneFeatureSAM1):
         self.prev_frame_info = copy.deepcopy(state)
 
         return reset_wrapper(extracted_feature)
+
+
+
+class DroneFeatureRisk(DroneFeatureSAM1):
+
+    def __init__(self, thresh1=1, thresh2=2,
+            agent_width=10, step_size=10,
+            obs_width=10, goal_size=10, show_bins=False
+            ):
+
+        super().__init__(thresh1=thresh1,
+                         thresh2=thresh2,
+                         agent_width=agent_width,
+                         step_size=step_size,
+                         grid_size=goal_size,
+                         show_bins=show_bins,
+                         obs_width=obs_width
+                         )
+
+        self.rel_speed_divisions = [-1,0,1]
+        self.rel_distance_divisions = [ 1, 3, 5]
+
+    def compute_bin_info(self, agent_orientation_val, agent_state):
+
+        risk_vector = np.zeros((len(self.bins.keys()),3))
+        #rotate the agent's orientation to match that of the obstacles
+
+        #pdb.set_trace()
+        if agent_orientation_val>4:
+            agent_orientation_val-=1
+
+        rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
+        if agent_state['orientation'] is None:
+            agent_state['orientation'] = np.array([1, 0])
+        rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
+
+        for key in self.bins.keys():
+
+            risk_val = 0
+            obs_list = self.bins[key]
+
+            print('Bin :', key)
+            for obs in obs_list:
+
+                #relative orientation of the obstacle wrt the agent
+                rel_orient = obs['orientation'] - rotated_agent_orientation
+                #relative position of the agent wrt the obstacle
+                rel_dist = -obs['position']
+
+                ang = angle_between(rel_orient, rel_dist)
+
+                if ang < np.pi/4:
+                    print('Moving towards')
+                else:
+                    print('Moving away')
+                
+                pdb.set_trace()
+
+
+
+        return 0
+
+    def extract_features(self, state):
+
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
+        abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+
+        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
+
+        for i in range(16):
+            self.bins[str(i)] = []
+
+        print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
+        print('relative orientation :', relative_orientation_goal.reshape((3,3)))
+        self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+
+        collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
+
+        self.prev_frame_info = copy.deepcopy(state)
+
+        return 0
