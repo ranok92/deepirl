@@ -50,6 +50,10 @@ parser.add_argument('--seed', type=int, default=789)
 
 parser.add_argument('--subject', type=int, default=None, help='The id of the pedestrian to replace during training or \
                     testing.')
+
+parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The name of the directory in which \
+                    the expert trajectories are stored.(Relative path)')
+
 def main():
     
     #####for the logger
@@ -69,7 +73,7 @@ def main():
 
     from rlmethods.b_actor_critic import ActorCritic
     from envs.gridworld_drone import GridWorldDrone
-    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup
+    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
@@ -88,7 +92,7 @@ def main():
         experiment_logger.log_info(vars(args))
     
     window_size = 9
-    step_size = 5
+    step_size = 3
     agent_width = 10
     obs_width = 10
     grid_size = 10
@@ -122,7 +126,7 @@ def main():
                                     obs_width=obs_width,
                                     step_size=step_size,
                                     grid_size=grid_size,
-                                    thresh1=9, thresh2=20)
+                                    thresh1=10, thresh2=20)
     
     if args.feat_extractor == 'DroneFeatureOccup':
 
@@ -131,6 +135,15 @@ def main():
                                      step_size=step_size,
                                      grid_size=grid_size,
                                      window_size=window_size)
+
+
+    if args.feat_extractor == 'DroneFeatureRisk':
+
+        feat_ext = DroneFeatureRisk(agent_width=agent_width,
+                                     obs_width=obs_width,
+                                     step_size=step_size,
+                                     grid_size=grid_size,
+                                     thresh1=10, thresh2=20)
 
 
     if feat_ext is None:
@@ -161,6 +174,7 @@ def main():
                         agent_width=agent_width,
                         train_exact=train_exact,
                         show_comparison=True,
+                        consider_heading=True,
                         #rows=200, cols=300, width=grid_size)                       
                         rows=576, cols=720, width=grid_size)
 
@@ -233,12 +247,29 @@ def main():
             print('The final save folder ', save_folder)
             env.tickSpeed = 15
             assert args.policy_path is not None, 'pass a policy to play from!'
-
+            if args.exp_trajectory_path is not None:
+                from irlmethods.irlUtils import calculate_expert_svf
+                expert_svf = calculate_expert_svf(args.exp_trajectory_path,
+                                                  max_time_steps=args.max_ep_length,
+                                                  feature_extractor=feat_ext,
+                                                  gamma=1)
             #reward_across_models.append(model.generate_trajectory(args.num_trajs, args.render))
-            if args.dont_save:
-                model.generate_trajectory(args.num_trajs, args.render)
+            if args.exp_trajectory_path is None:
+
+                if args.dont_save:
+                    model.generate_trajectory(args.num_trajs, args.render)
+                else:
+                    model.generate_trajectory(args.num_trajs, args.render, path=save_folder+'/agent_generated_trajectories/')
             else:
-                model.generate_trajectory(args.num_trajs, args.render, path=save_folder+'/agent_generated_trajectories/')
+
+                if args.dont_save:
+                    model.generate_trajectory(args.num_trajs, args.render,
+                                              expert_svf=expert_svf)
+                else:
+                    model.generate_trajectory(args.num_trajs, args.render, 
+                                              path=save_folder+'/agent_generated_trajectories/',
+                                              expert_svf=expert_svf)
+
 
     if args.play_user:
         env.tickSpeed = 200

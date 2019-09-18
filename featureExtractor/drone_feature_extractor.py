@@ -277,7 +277,7 @@ class DroneFeatureSAM1():
         #state rep size = 16*8+9+3+3
 
         #state rep size = 9+9+4+16*8+3+3
-        self.state_rep_size = 140
+        self.state_rep_size = 131
         self.generate_hash_variable()
         #self.generate_state_dictionary()
         print('Done!')
@@ -322,7 +322,6 @@ class DroneFeatureSAM1():
         if isinstance(state, torch.Tensor):
 
             state = state.cpu().numpy()
-
 
         return int(np.dot(self.hash_variable, state))
 
@@ -800,15 +799,17 @@ class DroneFeatureOccup(DroneFeatureSAM1):
 class DroneFeatureRisk(DroneFeatureSAM1):
 
     def __init__(self, thresh1=1, thresh2=2,
-            agent_width=10, step_size=10,
-            obs_width=10, goal_size=10, show_bins=False
-            ):
+                 agent_width=10, step_size=10,
+                 obs_width=10, grid_size=10,
+                 show_bins=False, 
+                 show_agent_persp=False
+                 ):
 
         super().__init__(thresh1=thresh1,
                          thresh2=thresh2,
                          agent_width=agent_width,
                          step_size=step_size,
-                         grid_size=goal_size,
+                         grid_size=grid_size,
                          show_bins=show_bins,
                          obs_width=obs_width
                          )
@@ -816,7 +817,40 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         self.rel_speed_divisions = [-1,0,1]
         self.rel_distance_divisions = [ 1, 3, 5]
 
-    def compute_bin_info(self, agent_orientation_val, agent_state):
+        #relative goal : 9
+        #relative step : 4
+        #risk information for 16 bins : 16*3
+        self.state_rep_size = 9+4+16*3
+        if show_agent_persp:
+            #initiate the game surface
+            self.agent_view = pygame.surface(self.thresh2, self.thresh2)
+
+    def show_agent_view(self, agent_orientation_val, agent_state, pygame_surface):
+
+        #draw the agent
+
+
+        #draw the bins
+
+
+        #draw the obstacles
+        if agent_orientation_val > 4:
+            agent_orientation_val -= 1
+
+        rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
+
+        if agent_state['orientation'] is None:
+            agent_state['orientation'] = np.array([1, 0])
+
+        rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
+        for key in self.bins.keys():
+
+            for obs in obs_list:
+
+                rel_orient = obs['orientation'] - rotated_agent_orientation
+
+
+    def compute_bin_info(self, agent_orientation_val, agent_state, pygame_surface=None):
 
         risk_vector = np.zeros((len(self.bins.keys()),3))
         #rotate the agent's orientation to match that of the obstacles
@@ -835,7 +869,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             risk_val = 0
             obs_list = self.bins[key]
 
-            print('Bin :', key)
+            #print('Bin :', key)
             for obs in obs_list:
 
                 #relative orientation of the obstacle wrt the agent
@@ -846,15 +880,24 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 ang = angle_between(rel_orient, rel_dist)
 
                 if ang < np.pi/4:
-                    print('Moving towards')
+                    #print('Moving towards')
+                    #high risk
+                    risk_val = max(risk_val, 2) 
+                elif ang < np.pi/2:
+                    #print('Moving away')
+                    #medium risk
+                    risk_val = max(risk_val, 1)
                 else:
-                    print('Moving away')
-                
-                pdb.set_trace()
+                    #low risk
+                    pass
 
+                #pdb.set_trace()
 
+            risk_vector[int(key)][risk_val] = 1
 
-        return 0
+        #print(risk_vector.reshape(16,3))
+        #pdb.set_trace()
+        return risk_vector
 
     def extract_features(self, state):
 
@@ -872,12 +915,17 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         for i in range(16):
             self.bins[str(i)] = []
 
-        print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
-        print('relative orientation :', relative_orientation_goal.reshape((3,3)))
+        #print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
+        #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
         self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
 
         collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
 
         self.prev_frame_info = copy.deepcopy(state)
 
-        return 0
+        extracted_feature = np.concatenate((relative_orientation,
+                                            relative_orientation_goal,
+                                            collision_info.reshape((-1))
+                                            ))
+        #spdb.set_trace()
+        return reset_wrapper(extracted_feature)

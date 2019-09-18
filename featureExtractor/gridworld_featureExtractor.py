@@ -12,6 +12,7 @@ import numpy as np
 from utils import reset_wrapper, step_wrapper
 import os
 import copy
+import pygame
 '''
     Creating a new class?? Keeps these POINTS in mind.
     
@@ -59,8 +60,12 @@ class LocalGlobal():
     #structure of the features first 4 : general direction of the goal
     #                           next 3 : indicates whether the agent moved towards or away from goal
     #                           next n^2 : indicates local obstacle information
-    def __init__(self,window_size=5, grid_size = 1, step_size=None,
-                agent_width = 1, obs_width = 1):
+    def __init__(self,window_size=5, grid_size = 1, 
+                step_size=None,
+                agent_width = 1,
+                overlay_bins=False,
+                pygame_surface=None,
+                obs_width = 1):
 
         self.gl_size = 9
         self.rl_size = 3
@@ -73,13 +78,16 @@ class LocalGlobal():
         self.agent_width = agent_width
         self.obs_width = obs_width
         self.prev_dist = None
+
         #added new (26-3-19)
         #based on the state representation, this should contain a 
         #dictionary containing all possible states
         self.state_dictionary = {}
         self.state_str_arr_dict = {}
         self.inv_state_dictionary = {}
+        self.overlay_bins = overlay_bins
         self.hash_variable = None
+        self.game_display = pygame_surface
         self.generate_hash_variable()
         #self.generate_state_dictionary()
 
@@ -105,8 +113,56 @@ class LocalGlobal():
 
         os.system('pause')
 
-        
+    
+    '''
+    def overlay_bins(self, pygame_surface, state):
 
+        agent_state = state['agent_state']
+        window_size = self.window_size
+        block_width = self.grid_size
+        step = self.step_size
+        window_rows = window_cols = window_size
+        row_start =  int((window_rows-1)/2)
+        col_start = int((window_cols-1)/2)
+
+        agent_pos = agent_state['position']
+        goal_pos = goal_state
+
+        diff_r = goal_pos[0] - agent_pos[0]
+        diff_c = goal_pos[1] - agent_pos[1]
+
+        index = self.determine_index(diff_r, diff_c)
+        mod_state[index] = 1
+
+        feat = self.closeness_indicator(agent_state, goal_state)
+
+        mod_state[self.gl_size:self.gl_size+self.rl_size] = feat
+
+        for i in range(len(obstacles)):
+
+            #as of now this just measures the distance from the center of the obstacle
+            #this distance has to be measured from the circumferance of the obstacle
+
+            #new method, simulate overlap for each of the neighbouring places
+            #for each of the obstacles
+            obs_pos = obstacles[i]['position']
+            obs_width = self.obs_width
+            for r in range(-row_start,row_start+1,1):
+                for c in range(-col_start,col_start+1,1):
+                    #c = x and r = y
+                    #pdb.set_trace()
+                    temp_pos = np.asarray([agent_pos[0] + r*step, 
+                                agent_pos[1] + c*step])
+
+                    pygame.draw.rect(pygame_surface, (0,0,0),[temp_pos[1]-(self.agent_width/2), temp_pos[0]- \
+                                    (self.agent_width/2), self.agent_width, self.agent_width])
+                    if self.check_overlap(temp_pos,obs_pos):
+                        pos = self.block_to_arrpos(r,c)
+
+                        mod_state[pos+self.gl_size+self.rl_size]=1
+
+        return 0
+    '''
     def recover_state_from_hash_value(self, hash_value):
 
         size = self.gl_size+self.rl_size+self.window_size**2
@@ -311,10 +367,17 @@ class LocalGlobal():
                     #pdb.set_trace()
                     temp_pos = np.asarray([agent_pos[0] + r*step, 
                                 agent_pos[1] + c*step])
+
+                    if self.overlay_bins:
+                        pygame.draw.rect(self.game_display, (0,0,0),[temp_pos[1]-(self.agent_width/2), temp_pos[0]- \
+                                    (self.agent_width/2), self.agent_width, self.agent_width],1)
+   
                     if self.check_overlap(temp_pos,obs_pos):
                         pos = self.block_to_arrpos(r,c)
 
                         mod_state[pos+self.gl_size+self.rl_size]=1
+
+        pygame.display.update()
 
         return reset_wrapper(mod_state)
 
@@ -349,7 +412,35 @@ class LocalGlobal():
         return local_info_spatial
 
 
+class LocalGlobal_V2(LocalGlobal):
 
+    def __init(self, window_size, agent_width=10,
+               step_size=10, obs_width=10, grid_size=10,
+               overlay_bins=False, num_of_rings=2,
+               step_increase=1.2, agent_width_inc=2,
+               pygame_surface=None):
+
+        super().__init__(window_size=window_size,
+                         agent_width=agent_width,
+                         step_size=step_size,
+                         obs_width=obs_width,
+                         grid_size=grid_size,
+                         overlay_bins=overlay_bins,
+                         pygame_surface=pygame_surface
+                         )
+
+        self.num_of_rings = num_of_rings
+        self.step_increase = step_increase
+        self.agent_width_inc = agent_width_inc
+
+    def get_local_info(self, state):
+        
+        return 0
+
+
+    def extract_features(self,state):
+
+        return 0
 
 
 
