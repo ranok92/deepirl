@@ -821,6 +821,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         #relative step : 4
         #risk information for 16 bins : 16*3
         self.state_rep_size = 9+4+16*3
+        self.generate_hash_variable()
+
         if show_agent_persp:
             #initiate the game surface
             self.agent_view = pygame.surface(self.thresh2, self.thresh2)

@@ -10,7 +10,7 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
 import utils
 
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
 import datetime
@@ -146,6 +146,16 @@ def main():
                                     grid_size=grid_size,
                                     thresh1=5, thresh2=10)
 
+
+    if args.feat_extractor == 'DroneFeatureRisk':
+        
+        feat_ext = DroneFeatureRisk(agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    step_size=step_size,
+                                    grid_size=grid_size,
+                                    thresh1=15, thresh2=30)
+
+
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
 
@@ -189,6 +199,7 @@ def main():
                     seed=args.seed,
                     train_exact=args.train_exact,
                     reset_wrapper=utils.reset_wrapper,
+                    consider_heading=True,
                     is_onehot=False)
     
 
