@@ -321,13 +321,22 @@ class SoftActorCritic:
             action, _, _ = self.select_action(torch_state)
             next_state, reward, done, _ = self.env.step(action.item())
 
-            self.replay_buffer.push((
-                state,
-                action.cpu().numpy(),
-                reward,
-                next_state,
-                not done
-            ))
+            if max_steps_elapsed:
+                self.replay_buffer.push((
+                    state,
+                    action.cpu().numpy(),
+                    reward,
+                    next_state,
+                    done
+                ))
+            else:
+                self.replay_buffer.push((
+                    state,
+                    action.cpu().numpy(),
+                    reward,
+                    next_state,
+                    not done
+                ))
 
             state = next_state
             total_reward += reward

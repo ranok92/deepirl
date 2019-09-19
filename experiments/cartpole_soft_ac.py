@@ -4,8 +4,8 @@ import torch
 from tensorboardX import SummaryWriter
 sys.path.insert(0, '..')  # NOQA: E402
 
-from rlmethods.soft_ac import SoftActorCritic
-from rlmethods.soft_ac import DEVICE
+from rlmethods.soft_ac_pi import SoftActorCritic
+from rlmethods.soft_ac_pi import DEVICE
 from envs.simple_gw import SimpleGridworld
 from argparse import ArgumentParser
 
@@ -35,7 +35,7 @@ def main():
         entropy_tuning=False,
     )
 
-    soft_ac.train_and_play(10**4, 1)
+    soft_ac.train_and_play(5000, 1)
 
 if __name__ == "__main__":
     main()

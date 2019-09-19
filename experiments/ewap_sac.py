@@ -7,8 +7,8 @@ from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 sys.path.insert(0, '..')  # NOQA: E402
 
-from rlmethods.soft_ac import SoftActorCritic
-from rlmethods.soft_ac import DEVICE
+from rlmethods.soft_ac_pi import SoftActorCritic
+from rlmethods.soft_ac_pi import DEVICE
 from envs.EWAP_gridworld import EwapGridworld
 from argparse import ArgumentParser
 from neural_nets.base_network import BaseNN
@@ -112,21 +112,35 @@ class ConvQNet(BaseNN):
 
         return x
 
+class ConvPiNet(ConvQNet):
+    def action_distribution(self, state):
+        probs = F.softmax(self.__call__(state), dim=-1)
+        dist = Categorical(probs)
+
+        return dist
 
 def main():
-
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
     env = EwapGridworld(ped_id=1, render=args.render)
 
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)
+
     conv_q_net = ConvQNet(
         state_size,
         env.action_space.n,
         4096,
         map_side,
-        kernel_shape=(5, 5)
+        kernel_shape=(3, 3)
+    )
+
+    conv_policy_net = ConvPiNet(
+        state_size,
+        env.action_space.n,
+        4096,
+        map_side,
+        kernel_shape=(3, 3)
     )
 
     soft_ac = SoftActorCritic(
@@ -138,6 +152,7 @@ def main():
         log_alpha=args.log_alpha,
         entropy_tuning=False,
         q_net=conv_q_net,
+        policy_net=conv_policy_net
     )
 
     soft_ac.train_and_play(args.max_episodes, args.play_interval)
