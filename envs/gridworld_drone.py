@@ -458,9 +458,6 @@ class GridWorldDrone(GridWorld):
                     if isinstance(action, int):
                         #print('its int', action)
 
-                        if action==8:
-                            pdb.set_trace()
-                            
                         if action != 8 and self.consider_heading:
                             action = (self.cur_heading_dir + action)%8
                             self.cur_heading_dir =  action

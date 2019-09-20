@@ -820,7 +820,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         #relative goal : 9
         #relative step : 4
         #risk information for 16 bins : 16*3
-        self.state_rep_size = 9+4+16*3
+        self.state_rep_size = 9+4+16*3+5
         self.generate_hash_variable()
         self.prev_agent_orient = None
         if show_agent_persp:
@@ -852,30 +852,35 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 rel_orient = obs['orientation'] - rotated_agent_orientation
 
 
-    def change_in_orientation(self, agent_orientation_index):
+    def get_change_in_orientation(self, agent_orientation_index):
 
         change_vector = np.zeros(5)
-        if self.prev_agent_orient > 4:
-            self.prev_agent_orient -= 1
+        if self.prev_agent_orient is not None:
+            if self.prev_agent_orient > 4:
+                self.prev_agent_orient -= 1
 
-        if agent_orientation_index > 4:
-            agent_orientation_index -= 1
+            if agent_orientation_index > 4:
+                agent_orientation_index -= 1
 
-        if self.prev_agent_orient > agent_orientation_index:
-            max_val = self.prev_agent_orient
-            min_val = agent_orientation_index
+            if self.prev_agent_orient > agent_orientation_index:
+                max_val = self.prev_agent_orient
+                min_val = agent_orientation_index
+            else:
+                max_val = agent_orientation_index
+                min_val = self.prev_agent_orient
+
+            diff = max_val - min_val
+
+            if diff > 4:
+                diff = 8-diff
+            
+            change_vector[diff] = 1
+
+            return change_vector
         else:
-            max_val = agent_orientation_index
-            min_val = self.prev_agent_orient
+            change_vector[0] = 1
 
-        diff = max_val - min_val
-
-        if diff > 4:
-            diff = 8-diff
-        
-        change_vector[diff] = 1
-
-        return change_vector
+            return change_vector
 
 
 
@@ -942,7 +947,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                                                    agent_orientation_index,
                                                    goal_state)
 
-        change_in_orientation = get_change_in_orientation(agent_orientation_index)
+        change_in_orientation = self.get_change_in_orientation(agent_orientation_index)
 
         for i in range(16):
             self.bins[str(i)] = []
