@@ -11,7 +11,7 @@ import glob
 from logger.logger import Logger
 import matplotlib
 import datetime, time
-from debugtools import compile_results
+#from debugtools import compile_results
 from utils import step_wrapper, reset_wrapper
 
 parser = argparse.ArgumentParser()
@@ -270,7 +270,8 @@ def main():
                     rewards, state_info, sub_info  = model.generate_trajectory(args.num_trajs, args.render, 
                                               path=save_folder+'/agent_generated_trajectories/',
                                               expert_svf=expert_svf)
-
+        
+        from debugtools import compile_results
         compile_results(rewards, state_info, sub_info)
 
     if args.play_user:
