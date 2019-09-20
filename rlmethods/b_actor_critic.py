@@ -27,7 +27,6 @@ sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
 from neural_nets.base_network import BaseNN
-
 #from rlmethods.rlutils import LossBasedTermination
 
 
@@ -217,10 +216,12 @@ class ActorCritic:
         '''
 
         probs, state_value = self.policy(state)
+        #print(probs)
         #m = Categorical(probs)
         #action = m.sample()
         val, ind = torch.max(probs,0)
-
+        #print(ind.item())
+        #pdb.set_trace()
         return ind.item()
 
 
@@ -271,39 +272,70 @@ class ActorCritic:
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
 
-    def generate_trajectory(self, num_trajs, render, path=None):
+    def generate_trajectory(self, num_trajs, render, path=None, expert_svf=None):
 
         reward_across_trajs = []
-        
-        for traj_i in range(num_trajs):
+        frac_unknown_states_enc = []
+        subject_list = None
 
+        if self.env.train_exact:
+            subject_list = []
+        
+
+        for traj_i in range(num_trajs):
+           
             # action and states lists for current trajectory
             actions = []
-            
+
             if self.feature_extractor is None:
-                states = [self.env.reset()]
+                state = self.env.reset()
             else:
-                states = [self.feature_extractor.extract_features(self.env.reset())]
-            
-            state = self.feature_extractor.extract_features(self.env.reset())
+                state = self.feature_extractor.extract_features(self.env.reset())
+
+                if self.env.train_exact:
+                    subject_list.append(self.env.cur_ped)
+            states = [state]
+
             done = False
             t= 0
+            unknown_state_counter = 0
+            total_states = 0
             run_reward = 0
+            
             while not done and t < self.max_ep_length:
                 
                 action = self.select_action_play(state)
-                
+
+                if expert_svf is not None:
+                    if self.feature_extractor.hash_function(state) not in expert_svf.keys():
+                        #print(' Unknown state.')
+                        unknown_state_counter+=1
+                        #pdb.set_trace()
+                total_states+=1
                 state, rewards, done, _ = self.env.step(action)
                 if render:
                     self.env.render()
+                    self.feature_extractor.overlay_bins(self.env.gameDisplay, state)
                 run_reward+=rewards
+
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
+                '''
+                print(state[0:9].reshape((3,3)))
+                print(state[9:18].reshape((3,3)))
+                print(state[18:22])
+
+                print(state[22:134].reshape((16,7)))
+
+                print(state[134:137])
+                print(state[137:])
+                #pdb.set_trace()
+                '''
 
                 states.append(state)
                 t+=1
             reward_across_trajs.append(run_reward)
-            print(run_reward)
+            frac_unknown_states_enc.append(unknown_state_counter/total_states)
             if path is not None:
                 if run_reward > 1: # not a bad run
 
@@ -320,7 +352,7 @@ class ActorCritic:
                 else:
                     print("Rejecting bad run.")
             
-        return reward_across_trajs
+        return reward_across_trajs, frac_unknown_states_enc, subject_list
 
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting

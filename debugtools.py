@@ -613,6 +613,60 @@ def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=F
 
 
 
+def compile_results(reward_info, unknown_state_info, subject_info=None):
+
+    '''
+    reward_info : a list containing rewards obtained by the runs
+    unknown_state_info : a list of unknown states encountered in each run
+    subject_info : a list of subjects. The subject which the agent replaced during that
+                   run
+    '''
+    good_runs = []
+    meh_runs = []
+    crashed_runs = []
+    
+    sub_traj_dict = {}
+    if subject_info is not None:
+        counter = 0
+        for subject in subject_info:
+            if subject not in sub_traj_dict:
+                sub_traj_dict[subject] = {'reward' : [], 'unknown_state' : [], 
+                                         'avg_reward':0, 'avg_unknown_states':0}
+            sub_traj_dict[subject]['reward'].append(reward_info[counter])
+
+            if reward_info[counter] > 1:
+                good_runs.append(subject)
+            elif reward_info[counter] < 0:
+                crashed_runs.append(subject)
+            else:
+                meh_runs.append(subject)
+
+            sub_traj_dict[subject]['unknown_state'].append(unknown_state_info[counter])
+            counter+=1
+
+        for subject in sub_traj_dict:
+
+            sub_traj_dict[subject]['avg_reward'] = sum(sub_traj_dict[subject]['reward'])/len(sub_traj_dict[subject]['reward'])
+            sub_traj_dict[subject]['avg_unknown_states'] = sum(sub_traj_dict[subject]['unknown_state'])/len(sub_traj_dict[subject]['unknown_state'])
+        
+        print("##############################")
+        print('Run information Subject-wise:')
+
+        for sub in sub_traj_dict:
+            print('Subject :{}'.format(sub))
+            print('Run information :', sub_traj_dict[sub])
+        print("##############################")
+        print('Good runs:', good_runs)
+        print('Bad runs:', crashed_runs)
+        print('Meh runs:', meh_runs)
+        print('Fraction of good runs : {:.3f}'.format(len(good_runs)/(len(reward_info))))
+        print("##############################")
+
+    print('Overall results :')
+    avg_reward = sum(reward_info)/len(reward_info)
+    avg_unknown_states = sum(unknown_state_info)/len(reward_info)
+    print('Average reward obtained over {:d} runs : {:.3f}'.format(len(reward_info), avg_reward))
+    print('Average unknown states encountered over {:d} runs : {:.3f}'.format(len(reward_info), avg_unknown_states))
 
 if __name__ == '__main__':
 

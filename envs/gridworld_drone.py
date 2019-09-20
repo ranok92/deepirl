@@ -102,7 +102,10 @@ class GridWorldDrone(GridWorld):
         self.current_frame = 10
         self.final_frame = -1
         self.initial_frame = 999999999999 #a large number
+
         self.subject = subject
+        self.cur_ped = None 
+
         self.max_obstacles = None
         self.agent_action_flag = False
         self.obstacle_width = obs_width
@@ -454,6 +457,10 @@ class GridWorldDrone(GridWorld):
                 if action is not None:
                     if isinstance(action, int):
                         #print('its int', action)
+
+                        if action==8:
+                            pdb.set_trace()
+                            
                         if action != 8 and self.consider_heading:
                             action = (self.cur_heading_dir + action)%8
                             self.cur_heading_dir =  action
@@ -645,34 +652,34 @@ class GridWorldDrone(GridWorld):
         if self.subject is None:
             while True:
                 
-                cur_ped = np.random.randint(1,no_of_peds+1)
-                if str(cur_ped) in self.pedestrian_dict.keys():
+                self.cur_ped = np.random.randint(1,no_of_peds+1)
+                if str(self.cur_ped) in self.pedestrian_dict.keys():
                     break
                 else:
                     print('Selected pedestrian not available.')
                     #pdb.set_trace()
         else:
             
-            cur_ped = self.subject
+            self.cur_ped = self.subject
 
         if self.display:
             if self.show_comparison:
-                self.ghost = cur_ped
+                self.ghost = self.cur_ped
 
         self.skip_list = [] 
-        self.skip_list.append(cur_ped)
-        self.current_frame = int(self.pedestrian_dict[str(cur_ped)]['initial_frame']) #frame from the first entry of the list
+        self.skip_list.append(self.cur_ped)
+        self.current_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame']) #frame from the first entry of the list
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
-        self.agent_state = copy.deepcopy(self.pedestrian_dict[str(cur_ped)][str(self.current_frame)])
+        self.agent_state = copy.deepcopy(self.pedestrian_dict[str(self.cur_ped)][str(self.current_frame)])
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
 
-        final_frame = self.pedestrian_dict[str(cur_ped)]['final_frame']
+        final_frame = self.pedestrian_dict[str(self.cur_ped)]['final_frame']
         #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
 
-        self.goal_state = self.pedestrian_dict[str(cur_ped)][final_frame]['position']
+        self.goal_state = self.pedestrian_dict[str(self.cur_ped)][final_frame]['position']
 
         self.release_control = False
 
@@ -887,7 +894,7 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=None,
+                        subject=43,
                         tick_speed=30, 
                         obs_width=10,
                         step_size=2,
@@ -927,7 +934,7 @@ if __name__=="__main__":
             #print(state['agent_state']['orientation'])
             feat_drone.overlay_bins(world.gameDisplay, state)
             
-            #feat = feat_drone.extract_features(state)
+            feat = feat_drone.extract_features(state)
 
             #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)

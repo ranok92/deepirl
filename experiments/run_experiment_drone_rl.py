@@ -11,7 +11,7 @@ import glob
 from logger.logger import Logger
 import matplotlib
 import datetime, time
-
+from debugtools import compile_results
 from utils import step_wrapper, reset_wrapper
 
 parser = argparse.ArgumentParser()
@@ -92,7 +92,7 @@ def main():
         experiment_logger.log_info(vars(args))
     
     window_size = 9
-    step_size = 3
+    step_size = 2
     agent_width = 10
     obs_width = 10
     grid_size = 10
@@ -126,7 +126,7 @@ def main():
                                     obs_width=obs_width,
                                     step_size=step_size,
                                     grid_size=grid_size,
-                                    thresh1=10, thresh2=20)
+                                    thresh1=15, thresh2=30)
     
     if args.feat_extractor == 'DroneFeatureOccup':
 
@@ -143,7 +143,7 @@ def main():
                                      obs_width=obs_width,
                                      step_size=step_size,
                                      grid_size=grid_size,
-                                     thresh1=10, thresh2=20)
+                                     thresh1=15, thresh2=30)
 
 
     if feat_ext is None:
@@ -175,6 +175,7 @@ def main():
                         train_exact=train_exact,
                         show_comparison=True,
                         consider_heading=True,
+                        show_orientation=True,
                         #rows=200, cols=300, width=grid_size)                       
                         rows=576, cols=720, width=grid_size)
 
@@ -257,19 +258,20 @@ def main():
             if args.exp_trajectory_path is None:
 
                 if args.dont_save:
-                    model.generate_trajectory(args.num_trajs, args.render)
+                    rewards, state_info, sub_info = model.generate_trajectory(args.num_trajs, args.render)
                 else:
-                    model.generate_trajectory(args.num_trajs, args.render, path=save_folder+'/agent_generated_trajectories/')
+                    rewards, state_info, sub_info = model.generate_trajectory(args.num_trajs, args.render, path=save_folder+'/agent_generated_trajectories/')
             else:
 
                 if args.dont_save:
-                    model.generate_trajectory(args.num_trajs, args.render,
+                    rewards, state_info, sub_info  = model.generate_trajectory(args.num_trajs, args.render,
                                               expert_svf=expert_svf)
                 else:
-                    model.generate_trajectory(args.num_trajs, args.render, 
+                    rewards, state_info, sub_info  = model.generate_trajectory(args.num_trajs, args.render, 
                                               path=save_folder+'/agent_generated_trajectories/',
                                               expert_svf=expert_svf)
 
+        compile_results(rewards, state_info, sub_info)
 
     if args.play_user:
         env.tickSpeed = 200
