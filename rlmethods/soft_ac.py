@@ -136,6 +136,7 @@ class SoftActorCritic:
             learning_rate=3e-4,
             tbx_writer=None,
             entropy_tuning=False,
+            entropy_target=1.0,
             tau=0.005,
             log_alpha=-2.995,
             q_net=None,
@@ -163,7 +164,7 @@ class SoftActorCritic:
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
         self.gamma = gamma
-        self.entropy_target = 1.0
+        self.entropy_target = entropy_target
         self.tau = tau
 
         # training meta
@@ -173,7 +174,7 @@ class SoftActorCritic:
 
         # optimizers
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
-        self.alpha_optim = Adam([self.log_alpha], lr=learning_rate)
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
         # tensorboardX settings
         if not tbx_writer:
