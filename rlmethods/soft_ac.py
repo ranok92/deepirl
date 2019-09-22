@@ -163,7 +163,7 @@ class SoftActorCritic:
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
         self.gamma = gamma
-        self.entropy_target = -1
+        self.entropy_target = 1.0
         self.tau = tau
 
         # training meta
