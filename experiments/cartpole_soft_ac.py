@@ -4,8 +4,8 @@ import torch
 from tensorboardX import SummaryWriter
 sys.path.insert(0, '..')  # NOQA: E402
 
-from rlmethods.soft_ac_pi import SoftActorCritic
-from rlmethods.soft_ac_pi import DEVICE
+from rlmethods.soft_ac import SoftActorCritic
+from rlmethods.soft_ac import DEVICE
 from envs.simple_gw import SimpleGridworld
 from argparse import ArgumentParser
 
@@ -32,7 +32,8 @@ def main():
         tbx_writer = tbx_writer,
         tau=0.005,
         log_alpha=args.log_alpha,
-        entropy_tuning=False,
+        entropy_tuning=True,
+        entropy_target=0.008
     )
 
     soft_ac.train_and_play(5000, 1)

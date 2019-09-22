@@ -1,19 +1,16 @@
+"""Script for Q-based Soft Actor critic on the EWAP(BIWI) dataset."""
 import sys
-import numpy as np
+from argparse import ArgumentParser
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 sys.path.insert(0, '..')  # NOQA: E402
 
-from rlmethods.soft_ac_pi import SoftActorCritic
-from rlmethods.soft_ac_pi import DEVICE
+from rlmethods.soft_ac import SoftActorCritic
 from envs.EWAP_gridworld import EwapGridworld
-from argparse import ArgumentParser
 from neural_nets.base_network import BaseNN
 
-import gym
 
 parser = ArgumentParser()
 parser.add_argument('replay_buffer_size', type=int)
@@ -84,16 +81,16 @@ class ConvQNet(BaseNN):
         in_goals = in_goals.reshape(-1, 1, self.map_side, self.map_side)
 
         # convolutional processsing
-        out_obs = self.pool(F.relu(self.conv1_obstacles(in_obs)))
-        out_obs = self.pool(F.relu(self.conv2_obstacles(out_obs)))
+        out_obs = self.pool(F.leaky_relu(self.conv1_obstacles(in_obs)))
+        out_obs = self.pool(F.leaky_relu(self.conv2_obstacles(out_obs)))
         out_obs = out_obs.squeeze(dim=1)
 
-        out_persons = self.pool(F.relu(self.conv1_persons(in_persons)))
-        out_persons = self.pool(F.relu(self.conv2_persons(out_persons)))
+        out_persons = self.pool(F.leaky_relu(self.conv1_persons(in_persons)))
+        out_persons = self.pool(F.leaky_relu(self.conv2_persons(out_persons)))
         out_persons = out_persons.squeeze(dim=1)
 
-        out_goals = self.pool(F.relu(self.conv1_goals(in_goals)))
-        out_goals = self.pool(F.relu(self.conv2_goals(out_goals)))
+        out_goals = self.pool(F.leaky_relu(self.conv1_goals(in_goals)))
+        out_goals = self.pool(F.leaky_relu(self.conv2_goals(out_goals)))
         out_goals = out_goals.squeeze(dim=1)
 
         x = torch.cat(
@@ -106,20 +103,15 @@ class ConvQNet(BaseNN):
             dim=1
         )
 
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
         x = self.out_layer(x)
 
         return x
 
-class ConvPiNet(ConvQNet):
-    def action_distribution(self, state):
-        probs = F.softmax(self.__call__(state), dim=-1)
-        dist = Categorical(probs)
-
-        return dist
-
 def main():
+    """Main function, run experiment."""
+
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
     env = EwapGridworld(ped_id=1, render=args.render)
@@ -135,14 +127,6 @@ def main():
         kernel_shape=(3, 3)
     )
 
-    conv_policy_net = ConvPiNet(
-        state_size,
-        env.action_space.n,
-        4096,
-        map_side,
-        kernel_shape=(3, 3)
-    )
-
     soft_ac = SoftActorCritic(
         env,
         replay_buffer_size=args.replay_buffer_size,
@@ -150,9 +134,8 @@ def main():
         tbx_writer=tbx_writer,
         tau=0.005,
         log_alpha=args.log_alpha,
-        entropy_tuning=False,
+        entropy_tuning=True,
         q_net=conv_q_net,
-        policy_net=conv_policy_net
     )
 
     soft_ac.train_and_play(args.max_episodes, args.play_interval)
