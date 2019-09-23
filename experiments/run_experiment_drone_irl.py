@@ -10,7 +10,7 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
 import utils
 
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
 import datetime
@@ -150,6 +150,14 @@ def main():
     if args.feat_extractor == 'DroneFeatureRisk':
         
         feat_ext = DroneFeatureRisk(agent_width=agent_width,
+                                    obs_width=obs_width,
+                                    step_size=step_size,
+                                    grid_size=grid_size,
+                                    thresh1=15, thresh2=30)
+
+    if args.feat_extractor == 'DroneFeatureRisk_v2':
+        
+        feat_ext = DroneFeatureRisk_v2(agent_width=agent_width,
                                     obs_width=obs_width,
                                     step_size=step_size,
                                     grid_size=grid_size,

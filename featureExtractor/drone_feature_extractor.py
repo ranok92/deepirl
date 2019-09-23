@@ -816,11 +816,12 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
         self.rel_speed_divisions = [-1,0,1]
         self.rel_distance_divisions = [ 1, 3, 5]
-
-        #relative goal : 9
-        #relative step : 4
-        #risk information for 16 bins : 16*3
-        self.state_rep_size = 9+4+16*3+5
+        '''
+        relative goal : 9
+        relative step : 4
+        risk information for 16 bins : 16*3
+        '''
+        self.state_rep_size = 9+4+16*3
         self.generate_hash_variable()
         self.prev_agent_orient = None
         if show_agent_persp:
@@ -962,8 +963,73 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         self.prev_agent_orient = agent_orientation_index
         extracted_feature = np.concatenate((relative_orientation,
                                             relative_orientation_goal,
+                                            collision_info.reshape((-1))
+                                            ))
+        #spdb.set_trace()
+        return reset_wrapper(extracted_feature)
+
+
+class DroneFeatureRisk_v2(DroneFeatureRisk):
+
+    def __init__(self, thresh1=1, thresh2=2,
+                 agent_width=10, step_size=10,
+                 obs_width=10, grid_size=10,
+                 show_bins=False, 
+                 show_agent_persp=False
+                 ):
+
+        super().__init__(thresh1=thresh1,
+                         thresh2=thresh2,
+                         agent_width=agent_width,
+                         obs_width=obs_width,
+                         step_size=step_size,
+                         grid_size=grid_size,
+                         show_bins=show_bins,
+                         show_agent_persp=show_agent_persp
+                         )
+
+        #change the state representation size accordingly
+        '''
+        relative_orientation 9
+        relative_orientation_goal 4 
+        change_in_orientation 5
+        collision_info 48
+        '''
+        self.state_rep_size = 9+4+5+16*3
+        self.generate_hash_variable()
+
+
+    def extract_features(self, state):
+
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
+        abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+
+        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
+
+        change_in_orientation = self.get_change_in_orientation(agent_orientation_index)
+
+        for i in range(16):
+            self.bins[str(i)] = []
+
+        #print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
+        #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
+        self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+
+        collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
+
+        self.prev_frame_info = copy.deepcopy(state)
+        self.prev_agent_orient = agent_orientation_index
+        extracted_feature = np.concatenate((relative_orientation,
+                                            relative_orientation_goal,
                                             change_in_orientation,
                                             collision_info.reshape((-1))
                                             ))
         #spdb.set_trace()
         return reset_wrapper(extracted_feature)
+
