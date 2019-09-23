@@ -16,6 +16,7 @@ parser = ArgumentParser()
 parser.add_argument('replay_buffer_size', type=int)
 parser.add_argument('replay_buffer_sample_size', type=int)
 parser.add_argument('--log-alpha', type=float, default=-2.995)
+parser.add_argument('--entropy-target', type=float, default=1.0)
 parser.add_argument('--max-episodes', type=int, default=10**4)
 parser.add_argument('--play-interval', type=int, default=100)
 parser.add_argument('--render', action='store_true')
@@ -136,6 +137,7 @@ def main():
         log_alpha=args.log_alpha,
         entropy_tuning=True,
         q_net=conv_q_net,
+        entropy_target=args.entropy_target
     )
 
     soft_ac.train_and_play(args.max_episodes, args.play_interval)
