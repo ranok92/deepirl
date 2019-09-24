@@ -256,10 +256,12 @@ class SoftActorCritic:
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        _, log_actions, action_dist = self.select_action(state_batch)
+        actions , log_actions, action_dist = self.select_action(state_batch)
         q_a_pi = self.q_net(state_batch)
-        q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
-        policy_loss = kl_divergence(action_dist, q_dist).mean()
+        q_pi = get_action_q(q_a_pi, actions)
+        policy_loss = (alpha*log_actions - q_pi).mean()
+        # q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
+        # policy_loss = kl_divergence(action_dist, q_dist).mean()
 
         # update parameters
         self.q_optim.zero_grad()
