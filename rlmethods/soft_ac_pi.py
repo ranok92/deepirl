@@ -136,6 +136,7 @@ class SoftActorCritic:
             learning_rate=3e-4,
             tbx_writer=None,
             entropy_tuning=False,
+            entropy_target=1.0,
             tau=0.005,
             log_alpha=-2.995,
             policy_net=None,
@@ -169,7 +170,7 @@ class SoftActorCritic:
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
         self.gamma = gamma
-        self.entropy_target = -1
+        self.entropy_target = entropy_target
         self.tau = tau
 
         # training meta
@@ -180,7 +181,7 @@ class SoftActorCritic:
         # optimizers
         self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
-        self.alpha_optim = Adam([self.log_alpha], lr=learning_rate)
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
         # tensorboardX settings
         if not tbx_writer:
@@ -251,7 +252,7 @@ class SoftActorCritic:
 
         # Q net outputs values for all actions, so we index specific actions
         # TODO: It should be possible to just do MSE over all q_a pairs.
-        q_values = get_action_q(q_a_values, action_batch)
+        q_values = get_action_q(q_a_values, action_batch.squeeze())
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
@@ -319,7 +320,7 @@ class SoftActorCritic:
             torch_state = torch_state.to(DEVICE)
 
             action, _, _ = self.select_action(torch_state)
-            next_state, reward, done, _ = self.env.step(action.item())
+            next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
@@ -369,3 +370,5 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play()
+            if self.training_i % 15 == 0:
+                breakpoint()
