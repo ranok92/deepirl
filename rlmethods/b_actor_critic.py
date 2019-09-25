@@ -315,7 +315,7 @@ class ActorCritic:
                 state, rewards, done, _ = self.env.step(action)
                 if render:
                     self.env.render()
-                    self.feature_extractor.overlay_bins(self.env.gameDisplay, state)
+                    self.feature_extractor.overlay_bins(state)
                 run_reward+=rewards
 
                 if self.feature_extractor is not None:

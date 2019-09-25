@@ -10,6 +10,8 @@ sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
 from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
@@ -327,7 +329,7 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
 
         #iterating through each of the states 
         #in the trajectory
-        #pdb.set_trace()
+
 
         for i in range(traj_np.shape[0]):
             state_hash = feature_extractor.hash_function(traj_np[i])
@@ -374,7 +376,6 @@ def calculate_expert_svf_with_smoothing(traj_path,
         #load up a trajectory and convert it to numpy
         torch_traj = torch.load(state_file, map_location=DEVICE)
         traj_np = torch_traj.cpu().numpy()
-
         #iterating through each of the states 
         #in the trajectory
         for i in range(traj_np.shape[0]):
@@ -626,7 +627,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
-                                gamma=0.99, scale_svf=True):
+                                gamma=0.99, scale_svf=False):
     
     '''
     calculating the state visitation frequency from sampling. This function
@@ -984,25 +985,68 @@ if __name__ == '__main__':
     #calculating the svf for experts
 
     grid_size=agent_width=obs_width=10
-    step_size = 5
-    expert_folder = '../envs/expert_datasets/blank_slate/LocalGlobal_win3_user_played_empty_slate/'
-    feat_ext = LocalGlobal(window_size=3, grid_size=grid_size,
+    step_size = 3
+    expert_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureSAM1_user_played_subject_65_dir_agnostic/'
+    feat_ext = DroneFeatureSAM1(thresh1=10, thresh2=20, grid_size=grid_size,
                    agent_width=agent_width, 
                    obs_width=obs_width,
                    step_size=step_size,
                    )
     
 
-    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
-
-    expert_folder_2 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories/'
-    exp_svf_2 = calculate_expert_svf(expert_folder_2, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
-    
-    expert_folder_3 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories_sample1/'
-    exp_svf_3 = calculate_expert_svf(expert_folder_3, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
-
-
+    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=500, feature_extractor=feat_ext, gamma=1)
     pdb.set_trace()
+    exp_svf_3 = calculate_expert_svf(expert_folder, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
+
+    expert_folder_2 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_DroneFeatureSAM_updated_take12019-09-10_15:57:13-reg-0-seed-430-lr-0.001/agent_generated_trajectories/'
+    exp_svf_2 = calculate_expert_svf(expert_folder_2, max_time_steps=600, feature_extractor=feat_ext, gamma=1)
+    
+
+
+    state_list, diff_list = get_states_and_freq_diff(exp_svf, exp_svf_2, feat_ext)
+    #expert_folder_3 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories_sample1/'
+    #exp_svf_3 = calculate_expert_svf(expert_folder_3, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
+
+    exp_state_list = []
+    exp_state_list2 = []
+    exp_state_list3 = []
+
+    cur_key_1 = -1
+    cur_key_2 = -1
+
+    for key in exp_svf.keys():
+
+        exp_state_list.append(exp_svf[key])
+
+    for key in exp_svf_2.keys():
+
+        exp_state_list2.append(exp_svf_2[key])
+
+    for key in exp_svf_3.keys():
+
+        exp_state_list3.append(exp_svf_3[key])
+
+
+    '''
+    cum_state_exp1 = np.zeros(feat_ext.state_rep_size)
+    cum_state_exp2 = np.zeros(feat_ext.state_rep_size)
+
+
+    for state in exp_svf.keys():
+
+        cum_state_exp1 += feat_ext.recover_state_from_hash_value(state)*exp_svf[state]
+    
+    for state in exp_svf_2.keys():
+
+        cum_state_exp2 += feat_ext.recover_state_from_hash_value(state)*exp_svf_2[state]
+
+    plt.figure(1)
+    plt.bar(np.arange(feat_ext.state_rep_size), cum_state_exp1)
+    plt.figure(2)
+    plt.bar(np.arange(feat_ext.state_rep_size), cum_state_exp2)
+    plt.show()
+    pdb.set_trace()
+    '''
     print('printing from the expert :',exp_svf)
 
 

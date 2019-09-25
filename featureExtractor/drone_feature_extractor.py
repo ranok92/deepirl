@@ -409,18 +409,20 @@ class DroneFeatureSAM1():
                 self.bins[str(bin_val)].append(temp_obs)
         #if the obstacle does not classify to be considered
     
-    def overlay_bins(self, pygame_surface, state):
+    def overlay_bins(self, state):
 
         #a visualizing tool to debug if the binning is being done properly
         #draws the bins on the game surface for a visual inspection of the 
         #classification of the obstacles in their respective bins
+        #pdb.set_trace()
         self.orientation_approximator
         #draw inner ring
+        #pdb.set_trace()
         center =  np.array([int(state['agent_state']['position'][1]),
                   int(state['agent_state']['position'][0])])
-        pygame.draw.circle(pygame_surface, (0,0,0), center, self.thresh1,2) 
+        pygame.draw.circle(pygame.display.get_surface(), (0,0,0), center, self.thresh1,2) 
         #draw outer ring 
-        pygame.draw.circle(pygame_surface, (0,0,0), center, self.thresh2,2)
+        pygame.draw.circle(pygame.display.get_surface(), (0,0,0), center, self.thresh2,2)
 
         line_start_point = np.array([0, -self.thresh2])
         line_end_point = np.array([0,self.thresh2])
@@ -430,7 +432,7 @@ class DroneFeatureSAM1():
             cur_line_start = np.matmul(rot_matrix, line_start_point) + center
             cur_line_end = np.matmul(rot_matrix, line_end_point) + center
             #pdb.set_trace()
-            pygame.draw.line(pygame_surface, (0,0,0), cur_line_start,
+            pygame.draw.line(pygame.display.get_surface(), (0,0,0), cur_line_start,
                              cur_line_end,2)
         pygame.display.update()
         #pdb.set_trace()
@@ -824,10 +826,13 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         self.state_rep_size = 9+4+16*3
         self.generate_hash_variable()
         self.prev_agent_orient = None
-        if show_agent_persp:
-            #initiate the game surface
-            self.agent_view = pygame.surface(self.thresh2, self.thresh2)
 
+
+        self.show_agent_persp = show_agent_persp
+        self.init_surface = False
+        self.orig_disp_size_row = None
+        self.orig_disp_size_col = None
+    '''
     def show_agent_view(self, agent_orientation_val, agent_state, pygame_surface):
 
         #draw the agent
@@ -851,7 +856,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             for obs in obs_list:
 
                 rel_orient = obs['orientation'] - rotated_agent_orientation
-
+    '''
 
     def get_change_in_orientation(self, agent_orientation_index):
 
@@ -887,6 +892,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
     def compute_bin_info(self, agent_orientation_val, agent_state, pygame_surface=None):
 
+
+
         risk_vector = np.zeros((len(self.bins.keys()),3))
         #rotate the agent's orientation to match that of the obstacles
         thresh_value = self.agent_width/2 + self.obs_width/2 + self.step_size
@@ -899,6 +906,55 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         if agent_state['orientation'] is None:
             agent_state['orientation'] = np.array([1, 0])
         rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
+
+
+        pad = 80
+        mag = 20 #magnification of the orientation lines
+        
+        ################################
+        #code for the agent view
+        #make changes in the game display accordingly
+        #this is a onetime thing
+        if self.show_agent_persp and not self.init_surface:
+            #draw the bins
+            self.orig_disp_size_col, self.orig_disp_size_row = pygame.display.get_surface().get_size()
+            pygame.display.set_mode((self.orig_disp_size_col+self.thresh2*2+pad,
+                                     self.orig_disp_size_row))
+            self.init_surface = True
+
+        #add the agent view, refreshed every step
+        if self.show_agent_persp:
+
+            #center is in (row, col) format
+            center = (self.orig_disp_size_row/2, 
+                      self.orig_disp_size_col+ self.thresh2+pad/2)
+
+            dummy_state = {'agent_state':{}}
+            dummy_state['agent_state']['position'] = center
+            side = self.thresh2*2 + pad/2
+            #draw the primary agent_view rectangle
+            pygame.draw.line(pygame.display.get_surface(), (0, 0, 0),
+                            (self.orig_disp_size_col,0),(self.orig_disp_size_col,self.orig_disp_size_row),
+                            3)
+            pygame.draw.rect(pygame.display.get_surface(), (0, 0, 0), 
+                            ((center[1]-side/2, center[0]-side/2),
+                            (side, side)), 4)
+            #draw the cicles
+            #spdb.set_trace()
+            self.overlay_bins(dummy_state)
+            #draw the agent
+            pygame.draw.rect(pygame.display.get_surface(), (0,0,0), 
+                            [center[1]-self.agent_width/2, center[0]-self.agent_width/2, 
+                             self.agent_width, self.agent_width])
+            #draw the orientation
+            '''
+            pygame.draw.line(pygame.display.get_surface(), (0,0,0), (center[1], center[0]),
+                             ((center[1]+rotated_agent_orientation[1]*mag), (center[0]+rotated_agent_orientation[0]*mag)
+                             ), 2)
+            '''
+            pygame.display.update()
+        
+        #################################
 
         for key in self.bins.keys():
 
@@ -916,7 +972,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
                 ang = angle_between(rel_orient, rel_dist)
                 
-                if math.tan(ang)*np.linalg.norm(rel_dist,1) < thresh_value:
+                if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist,1) < thresh_value:
+                #if ang < np.pi/8:
                     #print('Moving towards')
                     #high risk
                     #adding to it, the rel_distance in both row and 
@@ -930,7 +987,36 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                     #low risk
                     pass
 
-                #pdb.set_trace()
+
+                if self.show_agent_persp:
+                    #determine the color of the obstacle based on the risk it poses
+                    if risk_val==0:
+                        color_val = (0, 255, 0)
+                    if risk_val==1:
+                        color_val = (0, 0, 255)
+                    if risk_val==2:
+                        color_val = (255, 0, 0)
+
+                    #draw the obstacle in the agent persepective window
+                    shifted_obs_pos = (center[0]+obs['position'][0], center[1]+obs['position'][1])
+                    pygame.draw.rect(pygame.display.get_surface(), color_val, 
+                                    [shifted_obs_pos[1]-self.obs_width/2, 
+                                     shifted_obs_pos[0]-self.obs_width/2,
+                                     self.obs_width, self.obs_width])
+
+                    #draw the obstacle orientation in the agent perspective window
+
+                    pygame.draw.line(pygame.display.get_surface(), color_val,
+                                    (shifted_obs_pos[1], shifted_obs_pos[0]),
+                                    (shifted_obs_pos[1]+rel_orient[1]*mag,
+                                     shifted_obs_pos[0]+rel_orient[0]*mag),
+                                    2
+                                    )
+
+                    pygame.display.update()
+
+                #
+            #pdb.set_trace()
 
             risk_vector[int(key)][risk_val] = 1
 
