@@ -245,6 +245,11 @@ def main():
     #CHANGE HERE 
     trajectory_path = args.exp_trajectory_path
 
+    if args.scale_svf is None:
+        scale = False
+    
+    if args.scale_svf:
+        scale = args.scale_svf
     irlMethod = DeepMaxEnt(trajectory_path, 
                            rlmethod=rlMethod, 
                            env=env,
@@ -254,7 +259,7 @@ def main():
                            learning_rate=args.lr_irl,
                            seed=args.seed,
                            graft=False,
-                           scale_svf=args.scale_svf,
+                           scale_svf=scale,
                            hidden_dims = args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
                            save_folder=parent_dir)

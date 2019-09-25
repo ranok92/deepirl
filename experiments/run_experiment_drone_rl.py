@@ -73,7 +73,7 @@ def main():
 
     from rlmethods.b_actor_critic import ActorCritic
     from envs.gridworld_drone import GridWorldDrone
-    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk
+    from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
@@ -140,10 +140,20 @@ def main():
     if args.feat_extractor == 'DroneFeatureRisk':
 
         feat_ext = DroneFeatureRisk(agent_width=agent_width,
-                                     obs_width=obs_width,
-                                     step_size=step_size,
-                                     grid_size=grid_size,
-                                     thresh1=15, thresh2=30)
+                                    obs_width=obs_width,
+                                    step_size=step_size,
+                                    grid_size=grid_size,
+                                    thresh1=15, thresh2=30)
+
+
+    if args.feat_extractor == 'DroneFeatureRisk_v2':
+
+        feat_ext = DroneFeatureRisk_v2(agent_width=agent_width,
+                                       obs_width=obs_width,
+                                       step_size=step_size,
+                                       grid_size=grid_size,
+                                       thresh1=15, thresh2=30)
+
 
 
     if feat_ext is None:
@@ -203,6 +213,7 @@ def main():
 
     if args.policy_path is not None:
 
+        from debugtools import numericalSort
         policy_file_list =  []
         reward_across_models = []
         if os.path.isfile(args.policy_path):
@@ -216,6 +227,8 @@ def main():
 
         
     if not args.play and not args.play_user:
+        #no playing of any kind, so training
+
         if args.reward_path is None:
             if args.policy_path:
                 model.policy.load(args.policy_path)
@@ -234,11 +247,12 @@ def main():
 
     if args.play:
         #env.tickSpeed = 15
+        from debugtools import compile_results
         xaxis = []
         counter = 1
-        print(policy_file_list)
         for policy_file in policy_file_list:
 
+            print('Playing for policy :', policy_file)
             model.policy.load(policy_file)
             policy_folder = policy_file.strip().split('/')[0:-2]
             save_folder = ''
@@ -246,7 +260,7 @@ def main():
                 save_folder = save_folder + p + '/'
 
             print('The final save folder ', save_folder)
-            env.tickSpeed = 15
+            env.tickSpeed = 60
             assert args.policy_path is not None, 'pass a policy to play from!'
             if args.exp_trajectory_path is not None:
                 from irlmethods.irlUtils import calculate_expert_svf
@@ -270,9 +284,11 @@ def main():
                     rewards, state_info, sub_info  = model.generate_trajectory(args.num_trajs, args.render, 
                                               path=save_folder+'/agent_generated_trajectories/',
                                               expert_svf=expert_svf)
+
+            compile_results(rewards, state_info, sub_info)
+            pdb.set_trace()
         
-        from debugtools import compile_results
-        compile_results(rewards, state_info, sub_info)
+        
 
     if args.play_user:
         env.tickSpeed = 200

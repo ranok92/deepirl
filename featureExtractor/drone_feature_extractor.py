@@ -889,7 +889,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
         risk_vector = np.zeros((len(self.bins.keys()),3))
         #rotate the agent's orientation to match that of the obstacles
-
+        thresh_value = self.agent_width/2 + self.obs_width/2 + self.step_size
+        thresh_value += self.agent_width #padding
         #pdb.set_trace()
         if agent_orientation_val>4:
             agent_orientation_val-=1
@@ -908,15 +909,18 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             for obs in obs_list:
 
                 #relative orientation of the obstacle wrt the agent
+
                 rel_orient = obs['orientation'] - rotated_agent_orientation
                 #relative position of the agent wrt the obstacle
                 rel_dist = -obs['position']
 
                 ang = angle_between(rel_orient, rel_dist)
-
-                if ang < np.pi/4:
+                
+                if math.tan(ang)*np.linalg.norm(rel_dist,1) < thresh_value:
                     #print('Moving towards')
                     #high risk
+                    #adding to it, the rel_distance in both row and 
+                    #col should be less than the sum(agent_width/2+obs_width/2)
                     risk_val = max(risk_val, 2) 
                 elif ang < np.pi/2:
                     #print('Moving away')
