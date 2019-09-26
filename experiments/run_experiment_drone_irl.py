@@ -88,9 +88,26 @@ def main():
     st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
     ###################
 
+    if not args.save_folder:
+        print('Provide save folder.')
+        exit()
+
+    policy_net_dims = '-policy_net-'
+    for dim in args.policy_net_hidden_dims:
+        policy_net_dims += str(dim) 
+        policy_net_dims += '-'
+
+    reward_net_dims = '-reward_net-'
+    for dim in args.reward_net_hidden_dims:
+        reward_net_dims += str(dim)
+        reward_net_dims += '-'
+
+
     parent_dir = './results/'+str(args.save_folder)+st
     to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
-                '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)
+                '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)+ \
+                policy_net_dims + reward_net_dims 
+                
     log_file = 'Experiment_info.txt'
 
     experiment_logger = Logger(to_save, log_file)

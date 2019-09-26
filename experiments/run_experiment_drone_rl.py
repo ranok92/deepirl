@@ -77,14 +77,26 @@ def main():
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
 
     save_folder = None
+
+
     if not args.dont_save and not args.play:
 
         if not args.save_folder:
             print('Provide save folder.')
             exit()
 
+        policy_net_dims = '-policy_net-'
+        for dim in args.policy_net_hidden_dims:
+            policy_net_dims += str(dim) 
+            policy_net_dims += '-'
+
+        reward_net_dims = '-reward_net-'
+        for dim in args.reward_net_hidden_dims:
+            reward_net_dims += str(dim)
+            reward_net_dims += '-'
+
         save_folder = './results/'+ args.save_folder +st + args.feat_extractor + \
-                      '-seed-'+str(args.seed) + \
+                      '-seed-'+str(args.seed) + policy_net_dims + reward_net_dims + \
                       '-total-ep-'+str(args.total_episodes)+'-max-ep-len-'+ str(args.max_ep_length)
 
         experiment_logger = Logger(save_folder,'experiment_info.txt')
@@ -143,6 +155,7 @@ def main():
                                     obs_width=obs_width,
                                     step_size=step_size,
                                     grid_size=grid_size,
+                                    show_agent_persp=True,
                                     thresh1=15, thresh2=30)
 
 
@@ -178,7 +191,7 @@ def main():
                         is_random=True,
                         annotation_file=args.annotation_file,
                         subject=args.subject,
-                        tick_speed=90, 
+                        tick_speed=10, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
@@ -260,7 +273,7 @@ def main():
                 save_folder = save_folder + p + '/'
 
             print('The final save folder ', save_folder)
-            env.tickSpeed = 60
+            #env.tickSpeed = 60
             assert args.policy_path is not None, 'pass a policy to play from!'
             if args.exp_trajectory_path is not None:
                 from irlmethods.irlUtils import calculate_expert_svf
