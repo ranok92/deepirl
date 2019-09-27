@@ -64,6 +64,16 @@ def get_action_q(all_q_a, action_indices):
 
     return all_q_a[index_tuple]
 
+def is_degenerate(ten):
+    """Returns true if ten contains inf or nan.
+
+    :param ten: input tensor to check for degeneracies.
+    """
+    contains_nan = torch.isnan(ten).any()
+    contains_inf = (ten == float('inf')).any()
+
+    return contains_nan or contains_inf
+
 
 class QNetwork(BaseNN):
     """Q function network."""
@@ -152,12 +162,12 @@ class SoftActorCritic:
 
         # NNs
         if not policy_net:
-            self.policy = PolicyNetwork(state_size, 2048, env.action_space.n)
+            self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
         else:
             self.policy = policy_net
 
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 2048)
+            self.q_net = QNetwork(state_size, env.action_space.n, 256)
         else:
             self.q_net = q_net
 
@@ -259,9 +269,11 @@ class SoftActorCritic:
         actions , log_actions, action_dist = self.select_action(state_batch)
         q_a_pi = self.q_net(state_batch)
         q_pi = get_action_q(q_a_pi, actions)
-        policy_loss = (alpha*log_actions - q_pi).mean()
-        # q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
-        # policy_loss = kl_divergence(action_dist, q_dist).mean()
+        q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
+        policy_loss = kl_divergence(action_dist, q_dist)
+        policy_loss = policy_loss[policy_loss != float('inf')]
+
+        policy_loss = policy_loss.mean()
 
         # update parameters
         self.q_optim.zero_grad()
@@ -372,5 +384,3 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play()
-            if self.training_i % 15 == 0:
-                breakpoint()
