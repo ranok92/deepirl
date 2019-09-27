@@ -294,9 +294,9 @@ class EwapGridworld(SimpleGridworld):
         dist_to_goal = np.sum(np.abs(state[-2:] - state[-4:-2]))
         next_dist_to_goal = np.sum(np.abs(next_state[-2:] - next_state[-4:-2]))
 
-        if next_dist_to_goal >= dist_to_goal:
+        if next_dist_to_goal > dist_to_goal:
             reward -= 0.001
-        else:
+        elif next_dist_to_goal < dist_to_goal:
             reward += 0.001
 
         return reward
