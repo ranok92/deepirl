@@ -74,6 +74,17 @@ def is_degenerate(ten):
 
     return contains_nan or contains_inf
 
+def soften_distribution(probs, alpha):
+    """Apply additive smoothing to discrete probabilities.
+
+    :param probs: Probabilities to smooth.
+    :param alpha: additive factor.
+    """
+    soft = probs + alpha
+    soft = soft / soft.sum(dim=1, keepdim=True)
+
+    return soft
+
 
 class QNetwork(BaseNN):
     """Q function network."""
@@ -266,12 +277,13 @@ class SoftActorCritic:
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        actions , log_actions, action_dist = self.select_action(state_batch)
+        actions, log_actions, action_dist = self.select_action(state_batch)
         q_a_pi = self.q_net(state_batch)
         q_pi = get_action_q(q_a_pi, actions)
-        q_dist = Categorical(F.softmax((1.0 / alpha) * q_a_pi, dim=-1))
+        q_probs = F.softmax((1.0 / alpha) * q_a_pi, dim=-1)
+        q_probs = soften_distribution(q_probs, 1e-4)
+        q_dist = Categorical(q_probs,)
         policy_loss = kl_divergence(action_dist, q_dist)
-        policy_loss = policy_loss[policy_loss != float('inf')]
 
         policy_loss = policy_loss.mean()
 
