@@ -280,7 +280,7 @@ class DroneFeatureSAM1():
         self.state_rep_size = 131
         self.generate_hash_variable()
         #self.generate_state_dictionary()
-        print('Done!')
+        #print('Done!')
 
 
 
@@ -296,7 +296,7 @@ class DroneFeatureSAM1():
     
             self.hash_variable[i] = math.pow(2, self.hash_variable.shape[0]-1-i)
 
-        print(self.hash_variable)
+        #print(self.hash_variable)
 
 
         
@@ -972,7 +972,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
                 ang = angle_between(rel_orient, rel_dist)
                 
-                if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist,1) < thresh_value:
+                if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist) < thresh_value:
                 #if ang < np.pi/8:
                     #print('Moving towards')
                     #high risk
