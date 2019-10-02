@@ -11,7 +11,8 @@ from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk
 
-
+from envs.drone_env_utils import InformationCollector
+from alternateController.potential_field_controller import PotentialFieldController as PFController
 from itertools import count
 import utils  # NOQA: E402
 from envs.gridworld import GridWorld
@@ -445,7 +446,7 @@ class GridWorldDrone(GridWorld):
             
         #print('Info from curent frame :',self.current_frame)
         #if action!=8:
-        #    pdb.set_trace()
+            #pdb.set_trace()
 
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
@@ -492,7 +493,7 @@ class GridWorldDrone(GridWorld):
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
 
-            reward, done = self.calculate_reward()
+        reward, done = self.calculate_reward()
 
         
         #if you are done ie hit an obstacle or the goal
@@ -878,20 +879,26 @@ if __name__=="__main__":
     window_size = 15
     feat_drone_2 = DroneFeatureOccup(step_size=10, window_size=window_size)
     '''
+    
+    info_collector = InformationCollector(thresh=60,
+                                          agent_step_size=2,
+                                          run_info='Potential field controller',
+                                          disp_info=True)
 
     feat_drone = DroneFeatureSAM1(step_size=2,
                                   thresh1=10,
                                   thresh2=20)
     
-    feat_drone = DroneFeatureRisk(step_size=3,
-                                  thresh1=10,
-                                  thresh2=20)
+    feat_drone = DroneFeatureRisk(step_size=2,
+                                  thresh1=15,
+                                  thresh2=30)
+
     world = GridWorldDrone(display=True, is_onehot = False, 
                         seed=0, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=43,
+                        subject=None,
                         tick_speed=30, 
                         obs_width=10,
                         step_size=2,
@@ -899,11 +906,12 @@ if __name__=="__main__":
                         stepReward=0.01,
                         show_comparison=False,
                         show_orientation=True,
-                        train_exact=False, 
+                        train_exact=True, 
                         consider_heading=False,                      
                         #rows=200, cols=200, width=10)
                         rows=576, cols=720, width=20)
 
+    pf_agent = PFController()
     '''
     feat_ext = LocalGlobal(window_size=9, 
                            grid_size = 10,
@@ -916,20 +924,25 @@ if __name__=="__main__":
     print ("here")
     
     done = False
-    for i in range(100):
-        world.reset()
+    for i in range(5):
+
+        world.subject = np.random.randint(1,200)
+        state = world.reset()
+        info_collector.reset_info(state)
         done = False
         init_frame = world.current_frame
-        fin_frame = init_frame+250
-        while world.current_frame < fin_frame and not done:
+        fin_frame = init_frame+300
+        while  world.current_frame < fin_frame and not done:
             #action = input()
 
-            action = world.take_action_from_user()
-            #print(action)
-            state, reward , done, _ = world.step(action)
+            #action = world.take_action_from_user()
 
+            action = pf_agent.select_action(state)
+            
+            state, reward , done, _ = world.step(action)
+            info_collector.collect_information_per_frame(state)
             #print(state['agent_state']['orientation'])
-            feat_drone.overlay_bins(world.gameDisplay, state)
+            #feat_drone.overlay_bins(state)
             
             feat = feat_drone.extract_features(state)
 
@@ -948,4 +961,7 @@ if __name__=="__main__":
             '''
             #print(world.agent_state)
             #print (reward, done)
+        info_collector.collab_end_traj_results()
+
+    info_collector.collab_end_results()
     
