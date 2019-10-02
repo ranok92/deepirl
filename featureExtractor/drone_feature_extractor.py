@@ -235,13 +235,23 @@ class DroneFeatureSAM1():
 
         self.thresh1 = thresh1*step_size
         self.thresh2 = thresh2*step_size
-
+        '''
+        orientation approximator format
+            0 1 2 
+            3   4
+            5 6 7
+        '''
 
         self.orientation_approximator = [np.array([-2, -2]), np.array([-2,0]),
                                          np.array([-2, 2]), np.array([0, -2]),
                                          np.array([0, 2]), np.array([2, -2]),
                                          np.array([2, 0]), np.array([2,2])]
 
+        '''
+            0
+        3       1
+            2
+        '''
         self.orientation_approximator_4 = [np.array([-2, 0]), np.array([0, 2]),
                                            np.array([2, 0]), np.array([0, -2])]
         
@@ -858,35 +868,28 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 rel_orient = obs['orientation'] - rotated_agent_orientation
     '''
 
-    def get_change_in_orientation(self, agent_orientation_index):
+    def get_change_in_orientation(self, cur_agent_orientation):
 
+        #cur_agent_orientation is a 2d array [row, col]
+        prev_agent_orient = None
         change_vector = np.zeros(5)
-        if self.prev_agent_orient is not None:
-            if self.prev_agent_orient > 4:
-                self.prev_agent_orient -= 1
 
-            if agent_orientation_index > 4:
-                agent_orientation_index -= 1
+        if self.prev_frame_info is not None:
+            prev_agent_orient = self.prev_frame_info['agent_state']['orientation']
+            angle_diffs = np.array([0, np.pi/4, np.pi/2, np.pi*3/4, np.pi])
+            diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
+            index = np.argmin(np.abs(angle_diffs - diff_in_angle))
 
-            if self.prev_agent_orient > agent_orientation_index:
-                max_val = self.prev_agent_orient
-                min_val = agent_orientation_index
-            else:
-                max_val = agent_orientation_index
-                min_val = self.prev_agent_orient
-
-            diff = max_val - min_val
-
-            if diff > 4:
-                diff = 8-diff
-            
-            change_vector[diff] = 1
-
-            return change_vector
+            #print('Prev orientation :', prev_agent_orient)
+            #print('cur_agent_orientation :', cur_agent_orientation)
+            #print('diff in angle :', diff_in_angle)
         else:
-            change_vector[0] = 1
+            index = 0
 
-            return change_vector
+        #print('Index selected :', index)
+        #pdb.set_trace()
+        change_vector[index] = 1
+        return change_vector
 
 
 
@@ -1038,8 +1041,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                                                    agent_orientation_index,
                                                    goal_state)
 
-        change_in_orientation = self.get_change_in_orientation(agent_orientation_index)
-
         for i in range(16):
             self.bins[str(i)] = []
 
@@ -1102,7 +1103,7 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
                                                    agent_orientation_index,
                                                    goal_state)
 
-        change_in_orientation = self.get_change_in_orientation(agent_orientation_index)
+        change_in_orientation = self.get_change_in_orientation(state['agent_state']['orientation'])
 
         for i in range(16):
             self.bins[str(i)] = []
@@ -1114,7 +1115,8 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
         collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
 
         self.prev_frame_info = copy.deepcopy(state)
-        self.prev_agent_orient = agent_orientation_index
+        #self.prev_agent_orient = agent_orientation_index
+        
         extracted_feature = np.concatenate((relative_orientation,
                                             relative_orientation_goal,
                                             change_in_orientation,
