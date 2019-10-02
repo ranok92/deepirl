@@ -34,8 +34,9 @@ class PotentialFieldController():
                  sigma=100, 
                  agent_width=10,
                  obs_width=10,
-                 step_size=10,
-                 limit=5,
+                 c_limit=5,
+                 attr_f_limit=5,
+                 rep_f_limit=5,
                  rep_force_dist_limit=60,
                  force_threshold=0.5,
                  ):
@@ -44,16 +45,17 @@ class PotentialFieldController():
         self.KV = v
         self.ETA = eta
         self.SIGMA = sigma
-        self.conic_limit = limit
+        self.conic_limit = c_limit
         self.rep_force_dist_limit = rep_force_dist_limit
         self.pfield = None
         self.action_array = [np.asarray([-1,0]),np.asarray([-1,1]),
-                    np.asarray([0,1]),np.asarray([1,1]),
-                    np.asarray([1,0]),np.asarray([1,-1]),
-                    np.asarray([0,-1]),np.asarray([-1,-1]), np.asarray([0,0])]
+                             np.asarray([0,1]),np.asarray([1,1]),
+                             np.asarray([1,0]),np.asarray([1,-1]),
+                             np.asarray([0,-1]),np.asarray([-1,-1]),
+                             np.asarray([0,0])]
 
-        self.attr_force_lim = 5
-        self.rep_force_lim = 2
+        self.attr_force_lim = attr_f_limit
+        self.rep_force_lim = rep_f_limit
         self.globalpath = {}
         self.normalize_force = True
         self.eps = np.finfo(float).eps
@@ -106,7 +108,7 @@ class PotentialFieldController():
     #calculates the potential(not being used for now)
     def calculate_positive_potential(self, agent_state, goal_state):
         pforce = None
-        dist = np.linalg.norm(agent_state['position']-goal_state, 1)
+        dist = np.linalg.norm(agent_state['position']-goal_state)
         if dist < self.conic_limit:
 
             pforce = 0.5*self.SIGMA*dist**2
@@ -135,7 +137,7 @@ class PotentialFieldController():
     def select_action_from_force(self, force):
 
         #if force is too small, it doesnt move
-        if np.linalg.norm(force,2) < self.force_threshold:
+        if np.linalg.norm(force) < self.force_threshold:
             return 8
 
         else:
@@ -161,7 +163,7 @@ class PotentialFieldController():
         #calculate force due to goal
         
         f_goal = self.calculate_attractive_force_btwpoints(agent_state, goal_state)
-
+        #print('fgoal - ', f_goal)
         total_force += f_goal
         rep_force = np.array([0.0, 0.0])
         for obs in obstacle_state_list:
@@ -169,7 +171,6 @@ class PotentialFieldController():
             rf = self.calculate_repulsive_force_btwpoints(agent_state, obs)
             rep_force += rf
 
-        #pdb.set_trace()
         total_force += rep_force
         return int(self.select_action_from_force(total_force))
 
