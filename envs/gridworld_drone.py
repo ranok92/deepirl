@@ -9,7 +9,7 @@ sys.path.insert(0, '..')
 
 from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
 
 from envs.drone_env_utils import InformationCollector
 from alternateController.potential_field_controller import PotentialFieldController as PFController
@@ -19,6 +19,7 @@ from envs.gridworld import GridWorld
 import copy
 with utils.HiddenPrints():
     import pygame
+    import pygame.freetype
 
 
 class Pedestrian():
@@ -63,8 +64,9 @@ class GridWorldDrone(GridWorld):
             agent_width=10,
             show_comparison=False,
             tick_speed=30,
-            train_exact=False, #this option trains the agent for the exact scenarios as seen by the expert
+            replace_subject=False, #this option trains the agent for the exact scenarios as seen by the expert
                               #Not an ideal thing to train on. Introduced as a debugging measure.
+            external_control=True,
             consider_heading=False
     ):
         super().__init__(seed=seed,
@@ -137,7 +139,8 @@ class GridWorldDrone(GridWorld):
 
         ########### debugging ##############
 
-        self.train_exact = train_exact
+        self.external_control = external_control
+        self.replace_subject = replace_subject
 
         self.show_orientation = show_orientation
         '''
@@ -304,11 +307,11 @@ class GridWorldDrone(GridWorld):
 
         print("Loading information. . .")
         subject_final_frame = -1
-        if self.subject is not None:
-            self.skip_list.append(int(self.subject))
+        #if self.cur_ped is not None:
+        #    self.skip_list.append(int(self.cur_ped))
         for entry in self.annotation_list:
             #checking for goal state of the given subject
-            if self.subject is not None:
+            if self.cur_ped is not None:
                 #pdb.set_trace()
                 if float(entry[1])==self.subject:
                     if subject_final_frame < int(entry[0]):
@@ -321,14 +324,14 @@ class GridWorldDrone(GridWorld):
             
             self.annotation_dict[entry[0]].append(entry)                
 
-            if self.subject is None:
+            if self.cur_ped is None:
                 if self.initial_frame > int(entry[0]):
                     self.initial_frame = int(entry[0])
 
                 if self.final_frame < int(entry[0]):
                     self.final_frame = int(entry[0])
             else:
-                if float(entry[1])==self.subject:
+                if float(entry[1])==self.cur_ped:
 
                     if self.initial_frame > int(entry[0]):
                         self.initial_frame = int(entry[0])
@@ -355,12 +358,16 @@ class GridWorldDrone(GridWorld):
             if float(element[1]) not in self.skip_list:
 
                 obs = self.pedestrian_dict[element[1]][str(self.current_frame)]
+                obs['id'] = element[1]
                 self.obstacles.append(obs)
-
+                #print(obs)
+                #pdb.set_trace()
             #populating the agent
             #dont update the agent if training is going on
-            if not self.train_exact:
-                if float(element[1]) == self.subject:
+            if not self.external_control:
+                #pdb.set_trace()
+                
+                if float(element[1]) == self.cur_ped:
                     agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
                     self.agent_state = agent
                     self.state['agent_state'] = self.agent_state
@@ -383,7 +390,7 @@ class GridWorldDrone(GridWorld):
         for element in frame_info:
 
             if element[6] != str(1): #they are visible
-                if int(element[0]) != self.subject:
+                if int(element[0]) != self.cur_ped:
 
                     left = int(element[1])
                     top = int(element[2])
@@ -404,13 +411,16 @@ class GridWorldDrone(GridWorld):
 
         #render board
         self.clock.tick(self.tickSpeed)
-
+        font = pygame.freetype.Font(None, 15)
         self.gameDisplay.fill(self.white)
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
                 pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2), \
                                 self.obs_width, self.obs_width])
+                font.render_to(self.gameDisplay, 
+                              (obs['position'][1]-(self.obs_width/2)-5,obs['position'][0]-(self.obs_width/2)), 
+                              obs['id'], fgcolor=(0,0,0))
                 if self.show_orientation:
                     if obs['orientation'] is not None: 
                         pygame.draw.line(self.gameDisplay, self.black, [obs['position'][1],obs['position'][0]], 
@@ -442,16 +452,18 @@ class GridWorldDrone(GridWorld):
 
 
     def step(self, action=None):
-            #print('printing the keypress status',self.agent_action_keyboard)
-            
-        #print('Info from curent frame :',self.current_frame)
-        #if action!=8:
-            #pdb.set_trace()
+        '''
+        if external_control: t
+            the state of the agent is updated based on the current action. 
+        else:
+            the state of the agent is updated based on the information from the frames
 
+        the rest of the actions, like calculating reward and checking if the episode is done remains as usual.
+        '''
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
-        if self.subject is None or self.train_exact:
+        if self.external_control:
 
             if not self.release_control:
 
@@ -493,6 +505,9 @@ class GridWorldDrone(GridWorld):
             if not np.array_equal(self.pos_history[-1],self.agent_state):
                 self.pos_history.append(self.agent_state)
 
+
+
+        #calculate the reward and completion condition
         reward, done = self.calculate_reward()
 
         
@@ -512,11 +527,10 @@ class GridWorldDrone(GridWorld):
             #the rest of the information remains the same
 
             #added new
-            if self.subject is None or self.train_exact:
-                if not self.release_control:
-                    self.state['agent_state'] = self.agent_state
-                    if action!=8:
-                        self.state['agent_head_dir'] = action
+            if not self.release_control:
+                self.state['agent_state'] = self.agent_state
+                if action!=8:
+                    self.state['agent_head_dir'] = action
 
 
         if self.is_onehot:
@@ -530,15 +544,11 @@ class GridWorldDrone(GridWorld):
         
         self.current_frame += 1
 
-        if self.subject is None or self.train_exact:
+        if self.external_control:
             if done:
                 self.release_control = True
 
-            return self.state, reward, done, None
-
-        else:
-
-            return self.state, 0, False, None
+        return self.state, reward, done, None
 
 
     def reset(self):
@@ -556,7 +566,7 @@ class GridWorldDrone(GridWorld):
         '''
         #pygame.image.save(self.gameDisplay,'traced_trajectories.png')
         #########for debugging purposes###########
-        if self.train_exact:
+        if self.replace_subject:
 
             return self.reset_and_replace()
 
@@ -579,7 +589,7 @@ class GridWorldDrone(GridWorld):
 
             #only for the goal and the agent when the subject is not specified speicfically.
             
-            if self.subject is None:
+            if self.cur_ped is None:
                 
                 #placing the goal
                 while True:
@@ -655,10 +665,9 @@ class GridWorldDrone(GridWorld):
                     break
                 else:
                     print('Selected pedestrian not available.')
-                    #pdb.set_trace()
         else:
-            
             self.cur_ped = self.subject
+
 
         if self.display:
             if self.show_comparison:
@@ -778,9 +787,9 @@ class GridWorldDrone(GridWorld):
             '''
             action = self.action_dict[np.array2string(sign_arr*def_arr)]
             #pdb.set_trace()
-            print( 'absolute action ',action)
+            #print( 'absolute action ',action)
             action = (action - self.cur_heading_dir)%8
-            print( ' relative action :',action)
+            #print( ' relative action :',action)
             #self.prev_action = action
             #print('relative action :', action)
             return action
@@ -881,7 +890,6 @@ if __name__=="__main__":
     '''
     
     info_collector = InformationCollector(thresh=60,
-                                          agent_step_size=2,
                                           run_info='Potential field controller',
                                           disp_info=True)
 
@@ -889,7 +897,7 @@ if __name__=="__main__":
                                   thresh1=10,
                                   thresh2=20)
     
-    feat_drone = DroneFeatureRisk(step_size=2,
+    feat_drone = DroneFeatureRisk_v2(step_size=2,
                                   thresh1=15,
                                   thresh2=30)
 
@@ -906,7 +914,8 @@ if __name__=="__main__":
                         stepReward=0.01,
                         show_comparison=False,
                         show_orientation=True,
-                        train_exact=True, 
+                        external_control=True,
+                        replace_subject=False, 
                         consider_heading=False,                      
                         #rows=200, cols=200, width=10)
                         rows=576, cols=720, width=20)
@@ -926,24 +935,27 @@ if __name__=="__main__":
     done = False
     for i in range(5):
 
-        world.subject = np.random.randint(1,200)
+
         state = world.reset()
+        print(world.cur_ped)
         info_collector.reset_info(state)
         done = False
         init_frame = world.current_frame
-        fin_frame = init_frame+300
-        while  world.current_frame < fin_frame and not done:
+        fin_frame = init_frame+100
+        while not done:
             #action = input()
 
-            #action = world.take_action_from_user()
+            action = world.take_action_from_user()
 
-            action = pf_agent.select_action(state)
+            #action = pf_agent.select_action(state)
             
             state, reward , done, _ = world.step(action)
+            #print(reward, done)
             info_collector.collect_information_per_frame(state)
             #print(state['agent_state']['orientation'])
             #feat_drone.overlay_bins(state)
-            
+            #print(state)
+            #pdb.set_trace()
             feat = feat_drone.extract_features(state)
 
             #feat2 = feat_drone_2.extract_features(state)
