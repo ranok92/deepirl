@@ -54,8 +54,7 @@ parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[1
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the policy network.')
 
-parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_ \
-                    students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--lr-rl', type=float, default=1e-3, help='The learning rate for the policy network.')
@@ -68,7 +67,7 @@ parser.add_argument('--clipping-value', type=float, default=None, help='For grad
 parser.add_argument('--scale-svf', action='store_true', default=None, help='If true, will scale the states \
                     based on the reward the trajectory got.')
 
-parser.add_argument('--train-exact', action='store_true', default=None)
+parser.add_argument('--replace-subject', action='store_true', default=None)
 parser.add_argument('--subject', type=int, default=None)
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
@@ -222,7 +221,8 @@ def main():
                     goal_state=goal_state, 
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
-                    train_exact=args.train_exact,
+                    replace_subject=args.replace_subject,
+                    external_control=True,
                     reset_wrapper=utils.reset_wrapper,
                     consider_heading=True,
                     is_onehot=False)

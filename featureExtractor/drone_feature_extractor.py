@@ -874,7 +874,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         prev_agent_orient = None
         change_vector = np.zeros(5)
 
-        if self.prev_frame_info is not None:
+        if self.prev_frame_info is not None and cur_agent_orientation is not None:
             prev_agent_orient = self.prev_frame_info['agent_state']['orientation']
             angle_diffs = np.array([0, np.pi/4, np.pi/2, np.pi*3/4, np.pi])
             diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
@@ -882,7 +882,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
             #print('Prev orientation :', prev_agent_orient)
             #print('cur_agent_orientation :', cur_agent_orientation)
-            #print('diff in angle :', diff_in_angle)
         else:
             index = 0
 
