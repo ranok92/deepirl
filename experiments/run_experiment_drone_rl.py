@@ -39,13 +39,13 @@ parser.add_argument('--save-folder', type=str, default=None, help= 'The name of 
                     store experiment related information.')
 
 parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_\
-                    students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
+students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
 parser.add_argument('--max-ep-length', type=int, default=200, help='Max length of a single episode.')
 
-parser.add_argument('--train-exact', action='store_true')
+parser.add_argument('--replace-subject', action='store_true')
 parser.add_argument('--seed', type=int, default=789)
 
 parser.add_argument('--subject', type=int, default=None, help='The id of the pedestrian to replace during training or \
@@ -165,6 +165,7 @@ def main():
                                        obs_width=obs_width,
                                        step_size=step_size,
                                        grid_size=grid_size,
+                                       show_agent_persp=False,
                                        thresh1=15, thresh2=30)
 
 
@@ -180,10 +181,10 @@ def main():
         experiment_logger.log_info(feat_ext.__dict__)
 
     #initialize the environment
-    if args.train_exact:
-        train_exact=True
+    if args.replace_subject:
+        replace_subject=True
     else:
-        train_exact=False
+        replace_subject=False
 
     env = GridWorldDrone(display=args.render, is_onehot = False, 
                         seed=args.seed, obstacles=None, 
@@ -195,7 +196,8 @@ def main():
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
-                        train_exact=train_exact,
+                        replace_subject=replace_subject,
+                        external_control=True,
                         show_comparison=True,
                         consider_heading=True,
                         show_orientation=True,
@@ -273,7 +275,7 @@ def main():
                 save_folder = save_folder + p + '/'
 
             print('The final save folder ', save_folder)
-            #env.tickSpeed = 60
+            env.tickSpeed = 60
             assert args.policy_path is not None, 'pass a policy to play from!'
             if args.exp_trajectory_path is not None:
                 from irlmethods.irlUtils import calculate_expert_svf

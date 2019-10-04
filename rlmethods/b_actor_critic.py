@@ -201,6 +201,7 @@ class ActorCritic:
         :param state: Current state in environment.
         """
         probs, state_value = self.policy(state)
+        #print('The probs :', probs)
         m = Categorical(probs)
         action = m.sample()
         self.policy.saved_actions.append(SavedAction(m.log_prob(action),
@@ -414,6 +415,7 @@ class ActorCritic:
         #rewards obtained in the form of a list
         running_reward = 0
         running_reward_list =[]
+        action_array = np.zeros(9)
         plt.figure('Loss')
         for i_episode in count(1):
 
@@ -434,6 +436,7 @@ class ActorCritic:
             for t in range(self.max_ep_length):  # Don't infinite loop while learning
 
                 action = self.select_action(state)
+                action_array[action] += 1
                 state, reward, done, _ = self.env.step(action)
 
                 if self.feature_extractor is not None:
@@ -476,8 +479,10 @@ class ActorCritic:
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
+                        print('The action frequency array :', action_array)
                         running_reward_list.append(running_reward/self.log_interval)
                         running_reward = 0
+                        action_array = np.zeros(9)
                         if self.plot_loss:
 
                             plt.plot(self.loss)
@@ -515,6 +520,8 @@ class ActorCritic:
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
+                        print('The action frequency array :', action_array)
+                        action_array = np.zeros(9)
                         running_reward_list.append(running_reward/self.log_interval)
 
                         running_reward = 0
