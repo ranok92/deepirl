@@ -52,7 +52,7 @@ class GridWorldDrone(GridWorld):
             display=True,
             is_onehot=True,
             is_random=False,
-            stepReward=0.001,
+            step_reward=0.001,
             step_wrapper=utils.identity_wrapper,
             reset_wrapper=utils.identity_wrapper,
             show_trail=False,
@@ -78,7 +78,7 @@ class GridWorldDrone(GridWorld):
                          display=display,
                          is_onehot=is_onehot,
                          is_random=is_random,
-                         stepReward=stepReward,
+                         step_reward=step_reward,
                          step_wrapper=step_wrapper,
                          reset_wrapper=reset_wrapper,
                          show_trail=show_trail,
@@ -124,7 +124,7 @@ class GridWorldDrone(GridWorld):
                             np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
 
         self.action_dict = {}
-        self.prev_action = None
+        self.prev_action = 8
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
@@ -132,7 +132,7 @@ class GridWorldDrone(GridWorld):
         #self.spec = MockSpec(1.0)
 
         ######################################################################
-        self.stepReward = stepReward
+        self.step_reward = step_reward
         self.generate_annotation_list()
         self.generate_pedestrian_dict()
         self.generate_annotation_dict_universal()
@@ -508,8 +508,8 @@ class GridWorldDrone(GridWorld):
 
 
         #calculate the reward and completion condition
-        reward, done = self.calculate_reward()
-
+        reward, done = self.calculate_reward(action)
+        self.prev_action = action
         
         #if you are done ie hit an obstacle or the goal
         #you leave control of the agent and you are forced to
@@ -549,6 +549,43 @@ class GridWorldDrone(GridWorld):
                 self.release_control = True
 
         return self.state, reward, done, None
+
+
+
+    def calculate_reward(self, cur_action):
+
+        hit = False
+        done = False
+        
+        if self.obstacles is not None:
+            for obs in self.obstacles:
+                if self.check_overlap(self.agent_state['position'], obs['position'], self.obs_width, self.buffer_from_obs):
+                    hit = True
+
+        if (hit):
+            reward = -1
+            done = True
+
+        elif self.check_overlap(self.agent_state['position'] ,self.goal_state, self.cellWidth, 0):
+            reward = 1
+            done = True
+
+        else:
+
+            newdist = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
+
+            reward = (self.distanceFromgoal - newdist)*self.step_reward
+
+            self.distanceFromgoal = newdist
+
+        if cur_action is not None:
+
+            energy_spent = -np.sum(np.square(self.actionArray[cur_action]-self.actionArray[self.prev_action]))
+            
+            reward += energy_spent*self.step_reward*1
+
+        #pdb.set_trace()
+        return reward, done
 
 
     def reset(self):
@@ -668,7 +705,7 @@ class GridWorldDrone(GridWorld):
         else:
             self.cur_ped = self.subject
 
-
+        #print('Replacing agent :', self.cur_ped)
         if self.display:
             if self.show_comparison:
                 self.ghost = self.cur_ped
@@ -906,18 +943,17 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=None,
-                        tick_speed=30, 
-                        obs_width=10,
+                        subject=165,
+                        tick_speed=25, 
+                        obs_width=7,
                         step_size=2,
-                        agent_width=10,
-                        stepReward=0.01,
+                        agent_width=7,
+                        step_reward=0.01,
                         show_comparison=False,
                         show_orientation=True,
-                        external_control=True,
-                        replace_subject=False, 
+                        external_control=False,
+                        replace_subject=True, 
                         consider_heading=False,                      
-                        #rows=200, cols=200, width=10)
                         rows=576, cols=720, width=20)
 
     pf_agent = PFController()
@@ -933,7 +969,7 @@ if __name__=="__main__":
     print ("here")
     
     done = False
-    for i in range(5):
+    for i in range(50):
 
 
         state = world.reset()
@@ -941,8 +977,8 @@ if __name__=="__main__":
         info_collector.reset_info(state)
         done = False
         init_frame = world.current_frame
-        fin_frame = init_frame+100
-        while not done:
+        fin_frame = init_frame+5400
+        while world.current_frame < fin_frame:
             #action = input()
 
             action = world.take_action_from_user()

@@ -57,7 +57,7 @@ class GridWorldClockless:
         display = False,
         is_onehot = True,
         is_random = False,
-        stepReward=0.001,
+        step_reward=0.001,
         obs_width=None,
         agent_width=None,
         step_size=None,
@@ -252,7 +252,7 @@ class GridWorldClockless:
 
         #########################################
         
-        self.stepReward = stepReward
+        self.step_reward = step_reward
 
         # TODO: Remove the below mock spec in favor of gym style spec
         # creates an environment spec containing useful info, notably reward
@@ -499,7 +499,8 @@ class GridWorldClockless:
 
         hit = False
         done = False
-
+        
+        
         if self.obstacles is not None:
             for obs in self.obstacles:
                 if self.check_overlap(self.agent_state['position'], obs['position'], self.obs_width, self.buffer_from_obs):
@@ -517,7 +518,7 @@ class GridWorldClockless:
 
             newdist = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
 
-            reward = (self.distanceFromgoal - newdist)*self.stepReward
+            reward = (self.distanceFromgoal - newdist)*self.step_reward
 
             self.distanceFromgoal = newdist
         
