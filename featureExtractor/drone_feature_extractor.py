@@ -934,7 +934,12 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             dummy_state = {'agent_state':{}}
             dummy_state['agent_state']['position'] = center
             side = self.thresh2*2 + pad/2
-            #draw the primary agent_view rectangle
+      
+
+            #clear and re-draw the primary agent_view rectangle
+            pygame.display.get_surface().fill((255, 255, 255), ((self.orig_disp_size_col, 0),
+                            (self.thresh2*2+pad, self.orig_disp_size_row)))
+
             pygame.draw.line(pygame.display.get_surface(), (0, 0, 0),
                             (self.orig_disp_size_col,0),(self.orig_disp_size_col,self.orig_disp_size_row),
                             3)
@@ -948,6 +953,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             pygame.draw.rect(pygame.display.get_surface(), (0,0,0), 
                             [center[1]-self.agent_width/2, center[0]-self.agent_width/2, 
                              self.agent_width, self.agent_width])
+
+
             #draw the orientation
             '''
             pygame.draw.line(pygame.display.get_surface(), (0,0,0), (center[1], center[0]),
@@ -973,7 +980,10 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 rel_dist = -obs['position']
 
                 ang = angle_between(rel_orient, rel_dist)
-                
+                '''
+                if np.linalg.norm(rel_dist) < (self.agent_width+self.obs_width)/2+self.step_size:
+                    risk_val = max(risk_val, 2)
+                '''
                 if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist) < thresh_value:
                 #if ang < np.pi/8:
                     #print('Moving towards')
@@ -1089,7 +1099,7 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
         self.generate_hash_variable()
 
 
-    def extract_features(self, state):
+    def extract_features(self, state, ignore_cur_state=False):
 
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
@@ -1113,7 +1123,8 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
 
         collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
 
-        self.prev_frame_info = copy.deepcopy(state)
+        if not ignore_cur_state:
+            self.prev_frame_info = copy.deepcopy(state)
         #self.prev_agent_orient = agent_orientation_index
         
         extracted_feature = np.concatenate((relative_orientation,

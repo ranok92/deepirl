@@ -8,8 +8,10 @@ import torch.multiprocessing as mp
 import os
 
 import glob
+import math
 from logger.logger import Logger
 import matplotlib
+import matplotlib.pyplot as plt
 import datetime, time
 #from debugtools import compile_results
 from utils import step_wrapper, reset_wrapper
@@ -66,6 +68,8 @@ parser.add_argument('--save-folder', type=str, default=None, help= 'The name of 
 
 #************************************************************************#
 
+parser.add_argument('--reward-analysis', action='store_true', default=False)
+
 def main():
 
     #**************************************************
@@ -110,16 +114,17 @@ def main():
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=False,
+                        subject=None,
                         annotation_file=args.annotation_file,
                         tick_speed=60, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
-                        train_exact=args.run_exact,
+                        external_control=True,
+                        replace_subject=args.run_exact,
                         show_comparison=True,
-                        consider_heading=consider_heading,
+                        consider_heading=True,
                         show_orientation=True,
-                        #rows=200, cols=300, width=grid_size)                       
                         rows=576, cols=720, width=grid_size)
 
 
@@ -163,7 +168,7 @@ def main():
                                        obs_width=obs_width,
                                        step_size=step_size,
                                        grid_size=grid_size,
-                                       show_agent_persp=False,
+                                       show_agent_persp=True,
                                        thresh1=thresh1, thresh2=thresh2)
 
 
@@ -203,11 +208,22 @@ def main():
         pass
 
     #*************************************************
+    #load reward network if present
+
+    if args.reward_path is not None:
+        from irlmethods.deep_maxent import RewardNet 
+
+        state_size = feat_ext.extract_features(env.reset()).shape[0]
+        reward_net = RewardNet(state_size, args.reward_net_hidden_dims)
+        reward_net.load(args.reward_path)
+
+    #*************************************************
     #play
     for i in range(args.num_trajs):
 
         #reset the world
         state=env.reset()
+
         if args.feat_extractor is not None:
             state_feat = feat_ext.extract_features(state)
             #pass
@@ -216,9 +232,53 @@ def main():
         done=False
         t = 0
         while t < args.max_ep_length and not done:
+            reward_arr = np.zeros(9)
+            reward_arr_true = np.zeros(9)
 
             if args.feat_extractor is not None:
-                action = agent.select_action(state_feat)
+
+                #************reward analysis block*************
+                if args.reward_analysis:
+                    
+                    for i in range(9): #as there are 9 actions
+
+                        action = i 
+                        state, reward_true, _ , _ = env.step(action)
+                        #pdb.set_trace()
+                        print('Taking a step', action)
+                        if args.feat_extractor is not None:
+
+                            state_feat = feat_ext.extract_features(state, ignore_cur_state=True)
+                            reward_arr[i] = reward_net(state_feat)
+                            reward_arr_true[i] = reward_true
+                            env.rollback(1)
+                            #print(reward_arr)
+                #**********************************************
+                #making sure the graphics are consistent
+
+                state_feat = feat_ext.extract_features(state)
+                #**********************************************
+                #selecting the action
+                action = agent.select_action_play(state_feat)
+                #print('The action finally taken :', action)
+                #action = int(np.argmax(reward_arr_true))
+                #**********************************************
+
+                if args.reward_analysis:
+                    #comparing the reward network
+
+                    true_reward_norm = (reward_arr_true - reward_arr_true.mean())/(reward_arr_true.std()+np.finfo(float).eps)
+                    network_reward_norm = (reward_arr - reward_arr.mean())/(reward_arr.std()+np.finfo(float).eps)
+                    #print('The true reward normalized:\n', true_reward_norm)
+                    #print('The network reward normalized: \n', network_reward_norm)
+                    plt.plot(true_reward_norm, c='r')
+                    plt.plot(network_reward_norm, c='b')
+                    #action = np.argmax(true_reward_norm)
+                    #print('Action taken from here:', action)
+                    plt.show()
+                    #comparing the policy network
+
+                    
                 if args.render:
                     feat_ext.overlay_bins(state)
 
@@ -226,10 +286,18 @@ def main():
                 action = agent.select_action(state) 
             #pdb.set_trace()
             state, reward, done, _ = env.step(action)
-            info_collector.collect_information_per_frame(state)
 
             if args.feat_extractor is not None:
-                state_feat = feat_ext.extract_features(state)
+                state_feat = feat_ext.extract_features(state, ignore_cur_state=True)
+            if args.reward_path is not None:
+                reward = reward_net(state_feat)
+
+            if args.reward_analysis:
+                print('Reward : {} for action {}:'.format(reward, action))
+                #pdb.set_trace()
+
+            info_collector.collect_information_per_frame(state)
+
             t+=1
 
         info_collector.collab_end_traj_results()

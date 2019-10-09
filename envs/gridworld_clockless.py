@@ -148,6 +148,9 @@ class GridWorldClockless:
 
 
         self.cur_heading_dir = None
+        self.heading_dir_history = None
+
+        self.pos_history = None
         self.obstacles = []
         #does not matter if none or not.
         if isinstance(obstacles,str):
@@ -231,6 +234,7 @@ class GridWorldClockless:
         #0 : up, 1:top-right 2:right and so on ... 8: top left (in a clockwise manner
         #starting from top and doing nothing)
         
+
         self.actionArray = [np.asarray([-1,0]),np.asarray([-1,1]),
                             np.asarray([0,1]),np.asarray([1,1]),
                             np.asarray([1,0]),np.asarray([1,-1]),
@@ -394,6 +398,7 @@ class GridWorldClockless:
 
 
         self.cur_heading_dir = 0
+        self.heading_dir_history = []
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.release_control = False
         if self.is_onehot:
@@ -439,6 +444,7 @@ class GridWorldClockless:
             #and also update the heading direction based on the current action               
                 action = (self.cur_heading_dir + action)%8
                 self.cur_heading_dir = action
+                self.heading_dir_history.append(self.cur_heading_dir)
 
             self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
                               (self.step_size * self.actionArray[action]),self.upper_limit_agent),self.lower_limit_agent)
@@ -499,8 +505,8 @@ class GridWorldClockless:
 
         hit = False
         done = False
-        
-        
+
+
         if self.obstacles is not None:
             for obs in self.obstacles:
                 if self.check_overlap(self.agent_state['position'], obs['position'], self.obs_width, self.buffer_from_obs):

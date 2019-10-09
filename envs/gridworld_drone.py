@@ -67,7 +67,8 @@ class GridWorldDrone(GridWorld):
             replace_subject=False, #this option trains the agent for the exact scenarios as seen by the expert
                               #Not an ideal thing to train on. Introduced as a debugging measure.
             external_control=True,
-            consider_heading=False
+            consider_heading=False,
+            variable_speed=False
     ):
         super().__init__(seed=seed,
                          rows=rows,
@@ -102,7 +103,7 @@ class GridWorldDrone(GridWorld):
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
         self.pedestrian_dict = {}
-        self.current_frame = 10
+        self.current_frame = 0
         self.final_frame = -1
         self.initial_frame = 999999999999 #a large number
 
@@ -122,6 +123,8 @@ class GridWorldDrone(GridWorld):
                             np.asarray([0, 1]), np.asarray([1, 1]),
                             np.asarray([1, 0]), np.asarray([1, -1]),
                             np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
+
+        self.speed_array = np.array([1, 0.75, 0.5, 0.25, 0])
 
         self.action_dict = {}
         self.prev_action = 8
@@ -370,7 +373,7 @@ class GridWorldDrone(GridWorld):
                 if float(element[1]) == self.cur_ped:
                     agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
                     self.agent_state = agent
-                    self.state['agent_state'] = self.agent_state
+                    self.state['agent_state'] = copy.deepcopy(self.agent_state)
 
             #populating the ghost
             if float(element[1]) == self.ghost:
@@ -412,7 +415,7 @@ class GridWorldDrone(GridWorld):
         #render board
         self.clock.tick(self.tickSpeed)
         font = pygame.freetype.Font(None, 15)
-        self.gameDisplay.fill(self.white)
+        self.gameDisplay.fill(self.white, [0,0, self.cols, self.rows])
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
@@ -460,6 +463,8 @@ class GridWorldDrone(GridWorld):
 
         the rest of the actions, like calculating reward and checking if the episode is done remains as usual.
         '''
+        self.current_frame += 1
+
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
@@ -469,11 +474,11 @@ class GridWorldDrone(GridWorld):
 
                 if action is not None:
                     if isinstance(action, int):
-                        #print('its int', action)
 
                         if action != 8 and self.consider_heading:
                             action = (self.cur_heading_dir + action)%8
-                            self.cur_heading_dir =  action
+                            self.cur_heading_dir = action
+                        #self.heading_dir_history.append(self.cur_heading_dir)
                         #self.cur_heading_dir = action
                         prev_position = self.agent_state['position']
                         self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
@@ -492,6 +497,7 @@ class GridWorldDrone(GridWorld):
                                 if action!=8 and self.consider_heading:
                                     action = (self.cur_heading_dir + action)%8
                                     self.cur_heading_dir =  action
+                                #self.heading_dir_history.append(self.cur_heading_dir)
                                 #self.cur_heading_dir = action
                                 
                                 self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
@@ -502,9 +508,10 @@ class GridWorldDrone(GridWorld):
                                 self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
                     #print("Agent :",self.agent_state)
             
-            if not np.array_equal(self.pos_history[-1],self.agent_state):
-                self.pos_history.append(self.agent_state)
+            #if not np.array_equal(self.pos_history[-1],self.agent_state):
+            self.heading_dir_history.append(self.cur_heading_dir)
 
+            self.pos_history.append(copy.deepcopy(self.agent_state))
 
 
         #calculate the reward and completion condition
@@ -528,7 +535,7 @@ class GridWorldDrone(GridWorld):
 
             #added new
             if not self.release_control:
-                self.state['agent_state'] = self.agent_state
+                self.state['agent_state'] = copy.deepcopy(self.agent_state)
                 if action!=8:
                     self.state['agent_head_dir'] = action
 
@@ -542,7 +549,7 @@ class GridWorldDrone(GridWorld):
                 None
             )
         
-        self.current_frame += 1
+
 
         if self.external_control:
             if done:
@@ -663,7 +670,7 @@ class GridWorldDrone(GridWorld):
             else:
 
                 self.state = {}
-                self.state['agent_state'] = self.agent_state
+                self.state['agent_state'] = copy.deepcopy(self.agent_state)
                 self.state['agent_head_dir'] = 0 #starts heading towards top
                 self.state['goal_state'] = self.goal_state
 
@@ -671,10 +678,12 @@ class GridWorldDrone(GridWorld):
                 #if self.obstacles is not None:
                 self.state['obstacles'] = self.obstacles
 
-            self.pos_history.append(self.agent_state)
+            self.pos_history.append(copy.deepcopy(self.agent_state))
 
             self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
             self.cur_heading_dir = 0
+            self.heading_dir_history = []
+            self.heading_dir_history.append(self.cur_heading_dir)
 
             pygame.display.set_caption('Your friendly grid environment')
             if self.display:
@@ -733,7 +742,7 @@ class GridWorldDrone(GridWorld):
             self.state = self.onehotrep()
         else:
             self.state = {}
-            self.state['agent_state'] = self.agent_state
+            self.state['agent_state'] = copy.deepcopy(self.agent_state)
             self.state['agent_head_dir'] = 0 #starts heading towards top
             self.state['goal_state'] = self.goal_state
 
@@ -741,11 +750,14 @@ class GridWorldDrone(GridWorld):
             #if self.obstacles is not None:
             self.state['obstacles'] = self.obstacles
 
-        self.pos_history.append(self.agent_state)
+        self.pos_history = []
+        self.pos_history.append(copy.deepcopy(self.agent_state))
 
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.cur_heading_dir = 0
-        
+        self.heading_dir_history = []
+        self.heading_dir_history.append(self.cur_heading_dir)
+
         if self.display:
             pygame.display.set_caption('Your friendly grid environment')
             self.render()
@@ -839,6 +851,36 @@ class GridWorldDrone(GridWorld):
         pygame.quit()
 #created this to trace the trajectory of the agents whose trajectory informations are provided in the 
 #master list
+    
+
+    def rollback(self, frames):
+        ''' 
+        Added this function primarily for reward analysis purpose.
+        Provided the frames, this function rolls the environment back in time by the number of 
+        frames provided
+        '''
+        self.current_frame = self.current_frame - frames 
+
+        if str(self.current_frame) in self.annotation_dict.keys():
+            self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+
+        if self.external_control:
+
+            self.agent_state = copy.deepcopy(self.pos_history[-frames-1])
+            self.cur_heading_dir = self.heading_dir_history[-frames-1]
+
+            for i in range(1,frames+1):
+
+                self.heading_dir_history.pop(-i)
+                self.pos_history.pop(-i)
+
+        if self.release_control:
+            self.release_control = False
+        self.state['agent_state'] = copy.deepcopy(self.agent_state)
+        if self.display:
+            self.render()
+
+
 
 
     def draw_arrow(self, base_position , next_position):
