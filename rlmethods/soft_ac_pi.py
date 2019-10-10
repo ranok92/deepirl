@@ -282,7 +282,7 @@ class SoftActorCritic:
         q_pi = get_action_q(q_a_pi, actions)
         q_probs = F.softmax((1.0 / alpha) * q_a_pi, dim=-1)
         q_probs = soften_distribution(q_probs, 1e-4)
-        q_dist = Categorical(q_probs,)
+        q_dist = Categorical(q_probs)
         policy_loss = kl_divergence(action_dist, q_dist)
 
         policy_loss = policy_loss.mean()

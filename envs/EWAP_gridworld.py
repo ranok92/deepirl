@@ -169,6 +169,9 @@ class EwapGridworld(SimpleGridworld):
             goals
         )
 
+        # agent velociy
+        self.player_vel = np.zeros(2)
+
         # construct goal map
         self.adopt_goal(ped_id)
 
@@ -275,6 +278,8 @@ class EwapGridworld(SimpleGridworld):
         super().reset()
         assert self.step_number == 0, 'Step number non-zero after reset!'
 
+        self.player_vel = np.zeros(2)
+
         self.populate_person_map(self.step_number)
 
         return self.state_extractor().astype('float32')
@@ -330,7 +335,7 @@ class EwapGridworld(SimpleGridworld):
 
         # state vector is surroundings concatenated with player pos and goal
         # pos, hence the +4 size
-        state = np.zeros(obstacles.size + people.size + goals.size + 4)
+        state = np.zeros(obstacles.size + people.size + goals.size + 6)
         local_map = np.concatenate(
             (
                 obstacles.flatten(),
@@ -340,8 +345,9 @@ class EwapGridworld(SimpleGridworld):
         )
 
         # populate state vector
-        state[:-4] = local_map
-        state[-4:-2] = self.player_pos
+        state[:-6] = local_map
+        state[-6:-4] = self.player_pos
+        state[-4:-2] = self.player_vel
         state[-2:] = np.array(self.goal_pos)
 
         return state
@@ -363,6 +369,7 @@ class EwapGridworld(SimpleGridworld):
 
         # advance player based on action
         action_vector = self.speed * self.action_dict[action]
+        self.player_vel = action_vector
         next_pos = self.player_pos + action_vector
         self.step_number += 1
 
@@ -381,7 +388,7 @@ class EwapGridworld(SimpleGridworld):
         obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == 1.0)
         person_hit = (self.person_map[tuple(self.player_pos)] == 1.0)
 
-        if goal_reached or obstacle_hit or person_hit:
+        if obstacle_hit or person_hit:
             self.reset_player_pos()
 
         # temrination conditions

@@ -1,4 +1,5 @@
 import sys
+import pdb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -37,11 +38,6 @@ class ConvQNet(BaseNN):
             kernel_shape=(3, 3),
             pool_shape=(3, 3)
     ):
-        """__init__
-
-        :param 3:
-        :param 3:
-        """
         super().__init__()
 
         # env information
@@ -50,19 +46,15 @@ class ConvQNet(BaseNN):
 
         # convolutional layers
         padding = (kernel_shape[0] - 1) // 2
-        self.conv1_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv1_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv1_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv2_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv2_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv2_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
+        self.conv_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
 
         self.pool = nn.MaxPool2d(pool_shape)
 
         # calculate length of vector input into fully connected layers
-        pool_reduction_factor = pool_shape[0] * pool_shape[1]
-        conv2_in_len = (map_side**2) // pool_reduction_factor
-        fc_in_len = 4 + (3 * (conv2_in_len // pool_reduction_factor))
+        reduce_side = self.map_side // pool_shape[0]
+        fc_in_len = 6 + 3 * reduce_side**2
 
         # create fully connected layers based on above
         self.fc1 = nn.Linear(fc_in_len, hidden_layer_width)
@@ -70,7 +62,6 @@ class ConvQNet(BaseNN):
         self.out_layer = nn.Linear(hidden_layer_width, action_length)
 
     def forward(self, state):
-
         # split statespace into respective maps based on each side of the
         # statespace maps (squares with sides = self.map_side)
         state_ = state.reshape(-1, state.shape[-1])
@@ -85,16 +76,13 @@ class ConvQNet(BaseNN):
         in_goals = in_goals.reshape(-1, 1, self.map_side, self.map_side)
 
         # convolutional processsing
-        out_obs = self.pool(F.relu(self.conv1_obstacles(in_obs)))
-        out_obs = self.pool(F.relu(self.conv2_obstacles(out_obs)))
+        out_obs = self.pool(F.relu(self.conv_obstacles(in_obs)))
         out_obs = out_obs.squeeze(dim=1)
 
-        out_persons = self.pool(F.relu(self.conv1_persons(in_persons)))
-        out_persons = self.pool(F.relu(self.conv2_persons(out_persons)))
+        out_persons = self.pool(F.relu(self.conv_persons(in_persons)))
         out_persons = out_persons.squeeze(dim=1)
 
-        out_goals = self.pool(F.relu(self.conv1_goals(in_goals)))
-        out_goals = self.pool(F.relu(self.conv2_goals(out_goals)))
+        out_goals = self.pool(F.relu(self.conv_goals(in_goals)))
         out_goals = out_goals.squeeze(dim=1)
 
         x = torch.cat(
@@ -102,7 +90,7 @@ class ConvQNet(BaseNN):
                 out_obs.flatten(start_dim=1),
                 out_persons.flatten(start_dim=1),
                 out_goals.flatten(start_dim=1),
-                state_[:, -4:]
+                state_[:, -6:]
             ),
             dim=1
         )
@@ -113,12 +101,14 @@ class ConvQNet(BaseNN):
 
         return x
 
+
 class ConvPiNet(ConvQNet):
     def action_distribution(self, state):
         probs = F.softmax(self.__call__(state), dim=-1)
         dist = Categorical(probs)
 
         return dist
+
 
 def main():
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
@@ -153,8 +143,8 @@ def main():
         log_alpha=args.log_alpha,
         entropy_tuning=True,
         entropy_target=args.entropy_target,
-        # q_net=conv_q_net,
-        # policy_net=conv_policy_net
+        q_net=conv_q_net,
+        policy_net=conv_policy_net
     )
 
     soft_ac.train_and_play(args.max_episodes, args.play_interval)
