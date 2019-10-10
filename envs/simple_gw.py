@@ -75,6 +75,17 @@ class SimpleGridworld:
 
         return obs
 
+    def reset_player_pos(self):
+        """Resets the player's position to a random unoccupied position."""
+        # generate player location
+        validity_condition = np.logical_and(
+            self.grid != 1.0,
+            self.goal_grid != 1.0
+        )
+        valid_spots = np.argwhere(validity_condition)
+        self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
+
+
     def reset(self):
         """
         Reset the gridworld, moving the player to random position on the
@@ -93,13 +104,7 @@ class SimpleGridworld:
         assert self.grid[tuple(self.goal_pos)] != 1.0, "Goal is obstacle."
         self.goal_grid[self.goal_pos[0], self.goal_pos[1]] = 1.0
 
-        # generate player location
-        validity_condition = np.logical_and(
-            self.grid != 1.0,
-            self.goal_grid != 1.0
-        )
-        valid_spots = np.argwhere(validity_condition)
-        self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
+        self.reset_player_pos()
 
         return self.state_extractor().astype('float32')
 

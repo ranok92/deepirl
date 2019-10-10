@@ -376,13 +376,18 @@ class EwapGridworld(SimpleGridworld):
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
-        # temrination conditions
+        # position reset condition
         goal_reached = (self.goal_grid[tuple(self.player_pos)] == 1.0)
         obstacle_hit = (self.obstacle_grid[tuple(self.player_pos)] == 1.0)
         person_hit = (self.person_map[tuple(self.player_pos)] == 1.0)
+
+        if goal_reached or obstacle_hit or person_hit:
+            self.reset_player_pos()
+
+        # temrination conditions
         max_steps_elapsed = self.step_number > self.max_steps
 
-        done = goal_reached or obstacle_hit or max_steps_elapsed or person_hit
+        done = max_steps_elapsed
 
         if self.render:
             self.render_gridworld()
