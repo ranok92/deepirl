@@ -18,6 +18,7 @@ from utils import step_wrapper, reset_wrapper
 
 parser = argparse.ArgumentParser()
 #general arguments 
+
 parser.add_argument('--render', action='store_true', help="show the env.")
 parser.add_argument('--num-trajs', type=int, default=50)
 parser.add_argument('--max-ep-length', type=int, default=600, help='Max length of a single episode.')
@@ -26,6 +27,7 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
                      feature extractor to be used in the experiment.')
 
 parser.add_argument('--run-exact', action='store_true')
+parser.add_argument('--subject', type=int, default=None)
 parser.add_argument('--seed', type=int, default=789)
 parser.add_argument('--on-server', action='store_true')
 
@@ -70,6 +72,27 @@ parser.add_argument('--save-folder', type=str, default=None, help= 'The name of 
 
 parser.add_argument('--reward-analysis', action='store_true', default=False)
 
+
+def check_parameters(args):
+
+    if args.agent_type=='Policy_network':
+        if args.policy_path is None or args.policy_net_hidden_dims is None:
+            print("Please provide correct information to load a policy network.")
+            exit()
+
+        if args.feat_extractor is None:
+            print("Please provide a feature extractor to continue.")
+            exit()
+
+
+    if args.reward_analysis:
+
+        if args.reward_path is None or args.reward_net_hidden_dims is None:
+            print("Please provide reward network details to perform reward analysis.")
+            exit()
+
+
+
 def main():
 
     #**************************************************
@@ -87,6 +110,9 @@ def main():
     st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 
     args = parser.parse_args()
+
+    #checks if all the parameters are in order
+    check_parameters(args)
 
     if args.on_server:
 
@@ -114,9 +140,9 @@ def main():
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=False,
-                        subject=None,
+                        subject=args.subject,
                         annotation_file=args.annotation_file,
-                        tick_speed=60, 
+                        tick_speed=30, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
@@ -174,6 +200,7 @@ def main():
 
     #*************************************************
     #initialize the agent
+
 
     if args.agent_type=='Policy_network':
         #initialize the network
@@ -259,7 +286,13 @@ def main():
                 state_feat = feat_ext.extract_features(state)
                 #**********************************************
                 #selecting the action
-                action = agent.select_action_play(state_feat)
+                #action selection for network
+                if args.agent_type=='Policy_network':
+                    action, probs = agent.select_action_play(state_feat)
+                else:
+                #action selection for alternate controller namely potential field
+                    action = agent.select_action_play(state)
+                #pdb.set_trace()
                 #print('The action finally taken :', action)
                 #action = int(np.argmax(reward_arr_true))
                 #**********************************************
@@ -273,17 +306,18 @@ def main():
                     #print('The network reward normalized: \n', network_reward_norm)
                     plt.plot(true_reward_norm, c='r')
                     plt.plot(network_reward_norm, c='b')
+                    plt.plot(probs.cpu().detach().numpy(), c='g')
                     #action = np.argmax(true_reward_norm)
                     #print('Action taken from here:', action)
                     plt.show()
                     #comparing the policy network
 
-                    
+
                 if args.render:
                     feat_ext.overlay_bins(state)
 
             else:
-                action = agent.select_action(state) 
+                action = agent.select_action_play(state) 
             #pdb.set_trace()
             state, reward, done, _ = env.step(action)
 
