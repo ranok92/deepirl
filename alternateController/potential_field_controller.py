@@ -39,6 +39,7 @@ class PotentialFieldController():
                  rep_f_limit=5,
                  rep_force_dist_limit=60,
                  force_threshold=0.5,
+                 consider_heading=True
                  ):
 
         self.KP = k
@@ -53,6 +54,8 @@ class PotentialFieldController():
                              np.asarray([1,0]),np.asarray([1,-1]),
                              np.asarray([0,-1]),np.asarray([-1,-1]),
                              np.asarray([0,0])]
+
+
 
         self.attr_force_lim = attr_f_limit
         self.rep_force_lim = rep_f_limit
@@ -151,9 +154,7 @@ class PotentialFieldController():
             #pdb.set_trace()
             return np.argmin(similarity_index)
 
-
-
-    def select_action(self, state):
+    def select_action_play(self, state):
         #given the current state take the apt action
         total_force = 0
         agent_state = state['agent_state']
@@ -172,7 +173,16 @@ class PotentialFieldController():
             rep_force += rf
 
         total_force += rep_force
-        return int(self.select_action_from_force(total_force))
+        true_action = int(self.select_action_from_force(total_force))
+        
+        if true_action!=8:
+            rel_action = (true_action - state['agent_head_dir'])%8
+        else:
+            rel_action = true_action
+        #pdb.set_trace()
+        return rel_action
+
+
 
 
 
