@@ -869,10 +869,13 @@ class GridWorldDrone(GridWorld):
             self.agent_state = copy.deepcopy(self.pos_history[-frames-1])
             self.cur_heading_dir = self.heading_dir_history[-frames-1]
 
-            for i in range(1,frames+1):
+            if frames > len(self.heading_dir_history):
+                print('Trying to rollback more than the size of current history!')
+            else:
+                for i in range(1,frames+1):
 
-                self.heading_dir_history.pop(-i)
-                self.pos_history.pop(-i)
+                    self.heading_dir_history.pop(-1)
+                    self.pos_history.pop(-1)
 
         if self.release_control:
             self.release_control = False
@@ -985,8 +988,8 @@ if __name__=="__main__":
                         show_trail=False,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=165,
-                        tick_speed=25, 
+                        subject=7,
+                        tick_speed=1, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1015,11 +1018,14 @@ if __name__=="__main__":
 
 
         state = world.reset()
+        feat_drone.reset()
+
         print(world.cur_ped)
         info_collector.reset_info(state)
         done = False
         init_frame = world.current_frame
         fin_frame = init_frame+5400
+        t = 1
         while world.current_frame < fin_frame:
             #action = input()
 
@@ -1035,7 +1041,10 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
-
+            if t%20==0:
+                world.rollback(10)
+                feat_drone.rollback(10)
+                t=1
             #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
             '''
@@ -1051,6 +1060,7 @@ if __name__=="__main__":
             '''
             #print(world.agent_state)
             #print (reward, done)
+            t+=1
         info_collector.collab_end_traj_results()
 
     info_collector.collab_end_results()
