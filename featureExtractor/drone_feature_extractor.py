@@ -116,7 +116,7 @@ def get_rel_orientation(prev_frame_info, agent_state, goal_state):
     if prev_frame_info is None:
         agent_orientation = np.array([-1, 0])
     else:
-        agent_orientation = agent_state['position'] - prev_frame_info['agent_state']['position']
+        agent_orientation = agent_state['position'] - prev_frame_info['position']
     diff_in_angle = angle_between(vector_to_goal, agent_orientation)
     #pdb.set_trace()
     if diff_in_angle < np.pi/8:
@@ -230,7 +230,8 @@ class DroneFeatureSAM1():
         self.obs_width = obs_width
         self.step_size = step_size
         self.grid_size = grid_size
-        self.prev_frame_info = None
+        #self.prev_frame_info = None
+        self.agent_state_history = []
         self.state_rep_size = None
 
         self.thresh1 = thresh1*step_size
@@ -520,8 +521,11 @@ class DroneFeatureSAM1():
 
         #print('The orientation :')
         #print(abs_approx_orientation.reshape(3,3))
-
-        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
         relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
                                                    self.rel_orient_conv,
                                                    agent_state, 
@@ -556,10 +560,22 @@ class DroneFeatureSAM1():
             pdb.set_trace()
             pass
         '''
-        self.prev_frame_info = copy.deepcopy(state)
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
 
         return reset_wrapper(extracted_feature)
 
+
+    def rollback(self, frames):
+
+        if frames > len(self.agent_state_history):
+            print('Trying to rollback more than it has seen!!!')
+        else:
+            for i in range(1, frames+1):
+                self.agent_state_history.pop(-1)
+
+    def reset(self):
+
+        self.agent_state_history = []
 
 
 class DroneFeatureMinimal(DroneFeatureSAM1):
@@ -642,9 +658,13 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
 
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+        
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
 
-
-        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
 
         for i in range(16):
             self.bins[str(i)] = []
@@ -653,7 +673,7 @@ class DroneFeatureMinimal(DroneFeatureSAM1):
 
         collision_info = self.compute_bin_info()
 
-        self.prev_frame_info = copy.deepcopy(state)
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
         #pdb.set_trace()
 
         #return reset_wrapper(extracted_feature)
@@ -777,7 +797,12 @@ class DroneFeatureOccup(DroneFeatureSAM1):
         #print('The orientation :')
         #print(abs_approx_orientation.reshape(3,3))
 
-        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
         relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
                                                    self.rel_orient_conv,
                                                    agent_state, 
@@ -802,7 +827,7 @@ class DroneFeatureOccup(DroneFeatureSAM1):
                                             relative_orientation,
                                             local_occup_grid))
 
-        self.prev_frame_info = copy.deepcopy(state)
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
 
         return reset_wrapper(extracted_feature)
 
@@ -835,8 +860,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         '''
         self.state_rep_size = 9+4+16*3
         self.generate_hash_variable()
-        self.prev_agent_orient = None
-
 
         self.show_agent_persp = show_agent_persp
         self.init_surface = False
@@ -873,9 +896,12 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         #cur_agent_orientation is a 2d array [row, col]
         prev_agent_orient = None
         change_vector = np.zeros(5)
-
-        if self.prev_frame_info is not None and cur_agent_orientation is not None:
-            prev_agent_orient = self.prev_frame_info['agent_state']['orientation']
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+        if prev_frame_info is not None and cur_agent_orientation is not None:
+            prev_agent_orient = prev_frame_info['orientation']
             angle_diffs = np.array([0, np.pi/4, np.pi/2, np.pi*3/4, np.pi])
             diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
             index = np.argmin(np.abs(angle_diffs - diff_in_angle))
@@ -1042,8 +1068,12 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
 
-        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
         relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
                                                    self.rel_orient_conv,
                                                    agent_state, 
@@ -1059,8 +1089,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
         collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
 
-        self.prev_frame_info = copy.deepcopy(state)
-        self.prev_agent_orient = agent_orientation_index
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
         extracted_feature = np.concatenate((relative_orientation,
                                             relative_orientation_goal,
                                             collision_info.reshape((-1))
@@ -1099,13 +1128,20 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
         self.generate_hash_variable()
 
 
-    def extract_features(self, state, ignore_cur_state=False):
+    def extract_features(self, state):
+        '''
+        the parameter ignore_cur_state, if set to true indicates that this is a part of a rollback play.
 
+        '''
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
 
-        relative_orientation = get_rel_orientation(self.prev_frame_info, agent_state, goal_state)
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
         relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
                                                    self.rel_orient_conv,
                                                    agent_state, 
@@ -1123,9 +1159,8 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
 
         collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
 
-        if not ignore_cur_state:
-            self.prev_frame_info = copy.deepcopy(state)
-        #self.prev_agent_orient = agent_orientation_index
+        
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
         
         extracted_feature = np.concatenate((relative_orientation,
                                             relative_orientation_goal,
