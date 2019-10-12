@@ -211,7 +211,7 @@ class EwapGridworld(SimpleGridworld):
         self.im_gridworld.set_clim(vmin=0, vmax=ROBOT)
 
         self.fig.canvas.draw()
-        plt.pause(0.001)
+        plt.pause(0.000001)
 
     def disable_rendering(self):
         self.render = False
@@ -423,7 +423,7 @@ class EwapGridworld(SimpleGridworld):
 
         self.im_gridworld.set_data(to_render)
         self.fig.canvas.draw()
-        plt.pause(0.00001)
+        self.fig.canvas.flush_events()
 
     def dump_png(self, path='./png_dumps/'):
         """Saves a PNG image of current state.
