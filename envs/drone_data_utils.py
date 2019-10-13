@@ -1,6 +1,6 @@
 import numpy as np 
 import torch
-
+import glob
 
 import sys
 sys.path.insert(0, '..')
@@ -9,7 +9,7 @@ from envs.gridworld_drone import GridWorldDrone
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 
 
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from scipy.interpolate import splev, splprep
 
 import os
@@ -105,6 +105,7 @@ def read_data_from_file(annotation_file):
     processed_dict = {}
     if not os.path.isfile(annotation_file):
         print("The file does not exist!")
+        exit()
         return 0
 
     with open(annotation_file) as f:
@@ -113,7 +114,7 @@ def read_data_from_file(annotation_file):
             prob_point_info = line.split(' - ')[0]
             if len(prob_point_info.split(' '))==4:
                 point_info = prob_point_info.split(' ')
-                processed_dict[ped_id].append([point_info[2], ped_id, float(point_info[1])+diff_y, float(point_info[0])+diff_x])
+                processed_dict[ped_id].append([point_info[2], ped_id, frame_y - (float(point_info[1])+diff_y), float(point_info[0])+diff_x])
             else:
                 ped_id += 1
                 processed_dict[ped_id] = []
@@ -169,9 +170,10 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
     print(dir_name) 
-    file_n = dir_name + file_name+'_processed'+'.txt'
+    file_n = dir_name + file_name+'_processed_corrected'+'.txt'
 
     extracted_dict = read_data_from_file(annotation_file)
+    pdb.set_trace()
     dense_info_list = []
     for ped in extracted_dict.keys():
             
@@ -205,25 +207,32 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
     print(subject_list)
     disp = display
     total_path_len = 0
-    if subject is not None:
-        subject_list = subject
-    for sub in subject_list:
-        trajectory_info = []
-        print('Starting for subject :',sub)
-        if show_states:
-            disp=True
+
+    if show_states:
             tick_speed=5
-        world = GridWorldDrone(display=disp, is_onehot=False, 
+            disp=True
+            
+    #initialize world
+    world = GridWorldDrone(display=disp, is_onehot=False, 
                         seed=10, obstacles=None, 
                         show_trail=False,
                         is_random=False,
                         show_orientation=True,
                         annotation_file=annotation_file,
-                        subject=sub,      
+                        subject=None,
+                        external_control=False,
+                        replace_subject=True,      
                         tick_speed=tick_speed,                  
                         rows=576, cols=720,
                         width=10)
 
+    if subject is not None:
+        subject_list = subject
+    for sub in subject_list:
+        trajectory_info = []
+        print('Starting for subject :',sub)
+
+        world.subject=sub
         world.reset()
         print('Path lenghth :',world.final_frame - world.current_frame)
         total_path_len += world.final_frame - world.current_frame
@@ -231,7 +240,7 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
             state,_,_,_ = world.step()
 
             if disp:
-                feature_extractor.overlay_bins(world.gameDisplay, state)
+                feature_extractor.overlay_bins(state)
 
             state = feature_extractor.extract_features(state)
             state = torch.tensor(state)
@@ -255,12 +264,13 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
 
                 
                 #this one is for LocalGlobal
+                '''
                 window_size = feature_extractor.window_size
                 print('The general direction :', state[0:9].reshape(3,3))
                 print('The proximity indicator :', state[9:12])
                 print('The local information :', state[12:].reshape(window_size, window_size))
                 pdb.set_trace()
-
+                '''
         state_tensors = torch.stack(trajectory_info)
         torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
 
@@ -315,10 +325,14 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
 
         done = False
         run_reward = 0
+        record_flag = False
         while not done:
 
             action = env.take_action_from_user()
             if action !=8:
+                record_flag=True
+
+            if record_flag:
                 actions.append(action)
             next_state, reward, done, _ = env.step(action)
             run_reward += reward 
@@ -334,20 +348,21 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
             
             #for fbs simple
             #print(next_state[12:].reshape(3,4))
-            if action!=8:
+            if record_flag:
                 '''
                 print(done)
                 print(next_state[0:9].reshape(3,3))
                 print(next_state[9:18].reshape(3,3))
                 print(next_state[18:])
                 '''
+                #print('Action taken :', action)
                 states.append(next_state)
+                #print('not recording')
+
+        print('Run reward :',run_reward)
 
 
-        #print('RUn reward :',run_reward)
-
-
-        if run_reward > 1:
+        if run_reward >= .90:
 
             avg_len += len(states)
             actions_tensor = torch.tensor(actions)
@@ -368,89 +383,149 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
     print('Avg length :', avg_len/num_of_trajs)
 
 
+def get_expert_trajectory_info(expert_trajectory_folder):
+    '''
+    given the expert trajectory folder, this fuctions reads the folder and 
+    publishes the following information
+    1. The dimension of the states present in the trajectory.
+    2. The length of the trajectories.
+    3. The avg length of the trajectories.
+    '''
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    trajectories = glob.glob(os.path.join(expert_trajectory_folder, '*.states'))
+
+    traj_counter = 0
+    print('Total number of trajectories :', len(trajectories))
+    flag = False
+    total_len = 0
+    for idx, trajectory in enumerate(trajectories):
+
+        traj = torch.load(trajectory, map_location=DEVICE)
+        traj_np = traj.cpu().numpy()
+
+        pdb.set_trace()
+        if not flag:
+            print('State size :', traj[0].shape)
+            flag = True
+
+        total_len += len(traj.shape[1])
+
+    print('Average len of trajectories :', total_len/len(trajectories))
+
+
+
+
+
+
+
 if __name__=='__main__':
 
 
     
     #********* section to extract trajectories **********
-    '''
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
-    file_n = 'processed/frame_skip_1/students003_processed.txt'
+    file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
 
-    feature_extractor = 'DroneFeatureSAM1_updated_subject_45/'
+    feature_extractor = 'DroneFeatureRisk_v3/'
     to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
     folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
     
-    feature_extractor = DroneFeatureSAM1(thresh1=5, thresh2=15,
-                                        agent_width=10, obs_width=10,
-                                        grid_size=10, step_size=5)
-
-    
     grid_size=agent_width=obs_width = 10
-    step_size = 5
+    step_size = 2
     
-    feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
-                                    agent_width=agent_width, 
-                                    obs_width=obs_width,
-                                    step_size=step_size,
-                                    )
-    
+    feature_extractor = DroneFeatureRisk_v2(thresh1=10, thresh2=15,
+                                        agent_width=10, obs_width=10,
+                                        grid_size=10, step_size=step_size)
 
-    print(extract_subjects_from_file(file_name))
-    extract_trajectory(file_name, feature_extractor, folder_to_save, show_states=True, display=True, subject=[45])
-    '''
+    
+   
+    #feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
+    #                                agent_width=agent_width, 
+    #                                obs_width=obs_width,
+    #                                step_size=step_size,
+    #                              )
+    
+    
+    #print(extract_subjects_from_file(file_name))
+    extract_trajectory(file_name, feature_extractor, folder_to_save, show_states=False, display=False)
+    
     
     #****************************************************
     #******** section to record trajectories
-    
-    step_size = 5
+    '''
+    step_size = 2
     agent_size = 10
     grid_size = 10
     obs_size = 10
-    window_size = 11
+    window_size = 15
     
-    num_trajs = 30
-    path_to_save = './LocalGlobal_user_played_subject_45'
+    num_trajs = 20
+    path_to_save = './DroneFeatureRisk_user_played_subject_165_new'
+    
     
     feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
                                     step_size=step_size, 
                                     obs_width=obs_size,
                                     grid_size=grid_size, 
                                     )
-    '''
+    
     feature_extractor = DroneFeatureSAM1(step_size=step_size,
-                                         thresh1= 3,
-                                         thresh2=5)
-    '''
+                                         thresh1=15,
+                                         thresh2=30,
+                                         agent_width=agent_size,
+                                         grid_size=grid_size,
+                                         obs_width=obs_size,
+                                         )
+    
+    
+    feature_extractor = DroneFeatureRisk_v2(step_size=step_size,
+                                     thresh1=15,
+                                     thresh2=30,
+                                     agent_width=agent_size,
+                                     grid_size=grid_size,
+                                     obs_width=obs_size,
+                                     )
+
+    
     env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
                          seed=10, obstacles=None, obs_width=obs_size,
                          step_size=step_size, width=grid_size,
                          show_trail=False,
                          is_random=True,
-                         stepReward=.001,
-                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt',
+                         step_reward=.005,
+                         annotation_file='../envs/expert_datasets/custom_scenarios/frame_skip_1/wall_left_to_right_fanned_from_behind_processed_corrected.txt',
                          subject=None,
-                         train_exact=True,
+                         consider_heading=True,
+                         replace_subject=True,
                          rows=576, cols=720) 
 
 
     
-    record_trajectories(num_trajs, env, feature_extractor, path_to_save, subject_list=[45])
-    
+    record_trajectories(num_trajs, env, feature_extractor, path_to_save, subject_list=[7])
+    '''
     #***************************************************** 
 
-    '''
+    
     #******** section for preprocessing data ************
-    file_name = '../envs/expert_datasets/university_students/annotation/students001.vsp'
+    '''
+    file_name = '../envs/expert_datasets/custom_scenarios/sparse_splines/wall_left_to_right_fanned_from_behind.vsp'
 
     intval = preprocess_data_from_control_points(file_name, 1)
     
 
-
+    '''
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
-    '''
+    
+
+    #*****************************************************
+    #********** getting information of the trajectories
+
+    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_v3'
+    get_expert_trajectory_info(expert_traj_folder)
