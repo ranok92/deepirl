@@ -728,11 +728,12 @@ class GridWorldDrone(GridWorld):
         #self.agent_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][0][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][0][3])])
 
-        final_frame = self.pedestrian_dict[str(self.cur_ped)]['final_frame']
+        self.final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
+        print('Cur_ped : {} final frame {}'.format(self.cur_ped, self.final_frame))
         #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
 
-        self.goal_state = self.pedestrian_dict[str(self.cur_ped)][final_frame]['position']
+        self.goal_state = self.pedestrian_dict[str(self.cur_ped)][str(self.final_frame)]['position']
 
         self.release_control = False
 
@@ -883,6 +884,8 @@ class GridWorldDrone(GridWorld):
         if self.display:
             self.render()
 
+        return self.state
+
 
 
 
@@ -989,7 +992,7 @@ if __name__=="__main__":
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
                         subject=7,
-                        tick_speed=1, 
+                        tick_speed=60, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1024,7 +1027,7 @@ if __name__=="__main__":
         info_collector.reset_info(state)
         done = False
         init_frame = world.current_frame
-        fin_frame = init_frame+5400
+        fin_frame = world.final_frame
         t = 1
         while world.current_frame < fin_frame:
             #action = input()
@@ -1041,9 +1044,9 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
-            if t%20==0:
+            if t%100==0:
                 world.rollback(10)
-                feat_drone.rollback(10)
+                feat_drone.rollback(10, state)
                 t=1
             #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
