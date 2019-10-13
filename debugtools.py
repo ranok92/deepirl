@@ -667,6 +667,8 @@ def compile_results(reward_info, unknown_state_info, subject_info=None):
     avg_unknown_states = sum(unknown_state_info)/len(reward_info)
     print('Average reward obtained over {:d} runs : {:.3f}'.format(len(reward_info), avg_reward))
     print('Average unknown states encountered over {:d} runs : {:.3f}'.format(len(reward_info), avg_unknown_states))
+    return avg_reward, len(good_runs)/len(reward_info)
+
 
 if __name__ == '__main__':
 
