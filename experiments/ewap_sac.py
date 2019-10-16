@@ -8,6 +8,7 @@ from tensorboardX import SummaryWriter
 sys.path.insert(0, '..')  # NOQA: E402
 
 from rlmethods.soft_ac import SoftActorCritic
+from rlmethods.rlutils import ReplayBuffer
 from envs.EWAP_gridworld import EwapGridworld
 from neural_nets.base_network import BaseNN
 
@@ -128,9 +129,11 @@ def main():
         kernel_shape=(3, 3)
     )
 
+    replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
     soft_ac = SoftActorCritic(
         env,
-        replay_buffer_size=args.replay_buffer_size,
+        replay_buffer=replay_buffer,
         buffer_sample_size=args.replay_buffer_sample_size,
         tbx_writer=tbx_writer,
         tau=0.005,

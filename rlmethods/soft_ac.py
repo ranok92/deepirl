@@ -130,7 +130,7 @@ class SoftActorCritic:
     def __init__(
             self,
             env,
-            replay_buffer_size=10**6,
+            replay_buffer,
             buffer_sample_size=10**4,
             gamma=0.99,
             learning_rate=3e-4,
@@ -146,7 +146,7 @@ class SoftActorCritic:
         state_size = starting_state.shape[0]
 
         # buffer
-        self.replay_buffer = ReplayBuffer(replay_buffer_size)
+        self.replay_buffer = replay_buffer
         self.buffer_sample_size = buffer_sample_size
 
         # NNs
