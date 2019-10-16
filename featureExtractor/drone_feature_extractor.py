@@ -565,13 +565,17 @@ class DroneFeatureSAM1():
         return reset_wrapper(extracted_feature)
 
 
-    def rollback(self, frames):
+    def rollback(self, frames, state):
 
         if frames > len(self.agent_state_history):
             print('Trying to rollback more than it has seen!!!')
         else:
             for i in range(1, frames+1):
-                self.agent_state_history.pop(-1)
+                if len(self.agent_state_history) > 0:
+                    self.agent_state_history.pop(-1)
+
+        return self.extract_features(state)
+
 
     def reset(self):
 
@@ -1006,10 +1010,11 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 rel_dist = -obs['position']
 
                 ang = angle_between(rel_orient, rel_dist)
-                '''
-                if np.linalg.norm(rel_dist) < (self.agent_width+self.obs_width)/2+self.step_size:
+                
+                #if np.linalg.norm(rel_dist) < (self.agent_width+self.obs_width)/2+self.step_size:
+                if np.linalg.norm(rel_dist) < (self.agent_width/math.sqrt(2) + self.obs_width/math.sqrt(2) + self.step_size*math.sqrt(2)):
                     risk_val = max(risk_val, 2)
-                '''
+                
                 if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist) < thresh_value:
                 #if ang < np.pi/8:
                     #print('Moving towards')
