@@ -124,14 +124,14 @@ class GridWorldDrone(GridWorld):
                             np.asarray([1, 0]), np.asarray([1, -1]),
                             np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
 
-        self.speed_array = np.array([1, 0.75, 0.5, 0.25, 0])
+        self.speed_array = [1, 0.75, 0.5, 0.25, 0]
 
         self.action_dict = {}
         self.prev_action = 8
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
-        self.action_space = MockActionspace(len(self.actionArray))
+        self.action_space = MockActionspace(len(self.actionArray)*len(self.speed_array))
         #self.spec = MockSpec(1.0)
 
         ######################################################################
@@ -474,15 +474,17 @@ class GridWorldDrone(GridWorld):
 
                 if action is not None:
                     if isinstance(action, int):
+                        action_orient = action%len(self.actionArray)
+                        action_speed = int(action/len(self.actionArray))
 
-                        if action != 8 and self.consider_heading:
-                            action = (self.cur_heading_dir + action)%8
-                            self.cur_heading_dir = action
+                        if action_orient != 8 and self.consider_heading:
+                            action_orient = (self.cur_heading_dir + action_orient)%8
+                            self.cur_heading_dir = action_orient
                         #self.heading_dir_history.append(self.cur_heading_dir)
                         #self.cur_heading_dir = action
                         prev_position = self.agent_state['position']
                         self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
-                                           self.step_size*self.actionArray[action],self.upper_limit_agent),self.lower_limit_agent)
+                                           self.speed_array[action_speed]*self.step_size*self.actionArray[action_orient],self.upper_limit_agent),self.lower_limit_agent)
 
                         self.agent_state['orientation'] = self.agent_state['position'] - prev_position
                         self.agent_state['speed'] = np.linalg.norm(self.agent_state['orientation'])
@@ -493,15 +495,17 @@ class GridWorldDrone(GridWorld):
                         if len(action.shape)==1 and a.shape[0]==1: #check if it the tensor has a single value
                             if isinstance(action.item(), int):
                                 prev_position = self.agent_state['position']
+                                action_orient = action%len(self.actionArray)
+                                action_speed = int(action/len(self.actionArray))
 
-                                if action!=8 and self.consider_heading:
-                                    action = (self.cur_heading_dir + action)%8
-                                    self.cur_heading_dir =  action
+                                if action_orient != 8 and self.consider_heading:
+                                    action_orient = (self.cur_heading_dir + action_orient)%8
+                                    self.cur_heading_dir = action_orient
                                 #self.heading_dir_history.append(self.cur_heading_dir)
                                 #self.cur_heading_dir = action
                                 
                                 self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
-                                                               self.step_size*self.actionArray[action],
+                                                               self.speed_array[action_speed]*self.step_size*self.actionArray[action_orient],
                                                                self.upper_limit_agent),self.lower_limit_agent)
 
                                 self.agent_state['orientation'] = self.agent_state['position'] - prev_position
@@ -587,8 +591,8 @@ class GridWorldDrone(GridWorld):
 
         if cur_action is not None:
 
-            energy_spent = -np.sum(np.square(self.actionArray[cur_action]-self.actionArray[self.prev_action]))
-            
+            #energy_spent = -np.sum(np.square(self.actionArray[cur_action]-self.actionArray[self.prev_action]))
+            energy_spent = 0
             reward += energy_spent*self.step_reward*1
 
         #pdb.set_trace()
@@ -999,7 +1003,7 @@ if __name__=="__main__":
                         step_reward=0.01,
                         show_comparison=False,
                         show_orientation=True,
-                        external_control=False,
+                        external_control=True,
                         replace_subject=True, 
                         consider_heading=False,                      
                         rows=576, cols=720, width=20)
@@ -1032,10 +1036,11 @@ if __name__=="__main__":
         while world.current_frame < fin_frame:
             #action = input()
 
-            action = world.take_action_from_user()
+            #action = world.take_action_from_user()
 
             #action = pf_agent.select_action(state)
-            
+            action = np.random.randint(45)
+            print('Action :', action)
             state, reward , done, _ = world.step(action)
             #print(reward, done)
             info_collector.collect_information_per_frame(state)

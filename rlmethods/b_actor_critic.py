@@ -415,7 +415,7 @@ class ActorCritic:
         #rewards obtained in the form of a list
         running_reward = 0
         running_reward_list =[]
-        action_array = np.zeros(9)
+        action_array = np.zeros(self.env.action_space.n)
         plt.figure('Loss')
         for i_episode in count(1):
 
@@ -482,7 +482,7 @@ class ActorCritic:
                         print('The action frequency array :', action_array)
                         running_reward_list.append(running_reward/self.log_interval)
                         running_reward = 0
-                        action_array = np.zeros(9)
+                        action_array = np.zeros(self.env.action_space.n)
                         if self.plot_loss:
 
                             plt.plot(self.loss)
