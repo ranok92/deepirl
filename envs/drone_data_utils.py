@@ -424,7 +424,7 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
@@ -455,7 +455,7 @@ if __name__=='__main__':
     #print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, feature_extractor, folder_to_save, show_states=False, display=False)
     
-    
+    '''
     #****************************************************
     #******** section to record trajectories
     '''
@@ -513,19 +513,20 @@ if __name__=='__main__':
 
     
     #******** section for preprocessing data ************
-    '''
-    file_name = '../envs/expert_datasets/custom_scenarios/sparse_splines/wall_left_to_right_fanned_from_behind.vsp'
+    
+    file_name = '../envs/Another_spline_file.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
     
 
-    '''
+    
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
     
 
     #*****************************************************
     #********** getting information of the trajectories
-
+    '''
     expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_v3'
     get_expert_trajectory_info(expert_traj_folder)
+    '''

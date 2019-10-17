@@ -223,7 +223,7 @@ class ActorCritic:
         val, ind = torch.max(probs,0)
         #print(ind.item())
         #pdb.set_trace()
-        return ind.item()
+        return ind.item(), probs
 
 
 
@@ -279,7 +279,7 @@ class ActorCritic:
         frac_unknown_states_enc = []
         subject_list = None
 
-        if self.env.train_exact:
+        if self.env.replace_subject:
             subject_list = []
         
 
@@ -293,7 +293,7 @@ class ActorCritic:
             else:
                 state = self.feature_extractor.extract_features(self.env.reset())
 
-                if self.env.train_exact:
+                if self.env.replace_subject:
                     subject_list.append(self.env.cur_ped)
             states = [state]
 
@@ -305,7 +305,7 @@ class ActorCritic:
             
             while not done and t < self.max_ep_length:
                 
-                action = self.select_action_play(state)
+                action,_ = self.select_action_play(state)
 
                 if expert_svf is not None:
                     if self.feature_extractor.hash_function(state) not in expert_svf.keys():

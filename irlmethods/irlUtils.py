@@ -411,10 +411,11 @@ def calculate_expert_svf_with_smoothing(traj_path,
 
 
 
-
-#function for sanity check for the states generated in the trajectories in the traj_path 
-# mainly for debugging/visualizing the states in the path.
 def debug_custom_path(traj_path, criteria ,state_dict = None):
+
+    #function for sanity check for the states generated in the trajectories in the traj_path 
+    #mainly for debugging/visualizing the states in the path.
+    #Update Oct 13 2019 : This function is of no use.
 
 	actions = glob.glob(os.path.join(traj_path, '*.acts'))
 	states = glob.glob(os.path.join(traj_path, '*.states'))

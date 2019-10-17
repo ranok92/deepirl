@@ -69,6 +69,7 @@ def main():
         # pygame without monitor
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
+    from matplotlib import pyplot as plt
     mp.set_start_method('spawn')
 
     from rlmethods.b_actor_critic import ActorCritic
@@ -198,9 +199,11 @@ def main():
                         agent_width=agent_width,
                         replace_subject=replace_subject,
                         external_control=True,
+                        step_reward=0.001,
                         show_comparison=True,
                         consider_heading=True,
                         show_orientation=True,
+
                         #rows=200, cols=300, width=grid_size)                       
                         rows=576, cols=720, width=grid_size)
 
@@ -265,6 +268,9 @@ def main():
         from debugtools import compile_results
         xaxis = []
         counter = 1
+        plt.figure(0)
+        avg_reward_list = []
+        frac_good_run_list = []
         for policy_file in policy_file_list:
 
             print('Playing for policy :', policy_file)
@@ -300,9 +306,14 @@ def main():
                                               path=save_folder+'/agent_generated_trajectories/',
                                               expert_svf=expert_svf)
 
-            compile_results(rewards, state_info, sub_info)
-            pdb.set_trace()
-        
+            avg_reward, good_run_frac = compile_results(rewards, state_info, sub_info)
+            #pdb.set_trace()
+            avg_reward_list.append(avg_reward)
+            frac_good_run_list.append(good_run_frac)
+            plt.plot(avg_reward_list, c='r')
+            plt.plot(frac_good_run_list, c='g')
+            plt.draw()
+        plt.show()
         
 
     if args.play_user:
