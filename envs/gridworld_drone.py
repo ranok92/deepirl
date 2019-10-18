@@ -136,9 +136,16 @@ class GridWorldDrone(GridWorld):
 
         ######################################################################
         self.step_reward = step_reward
-        self.generate_annotation_list()
-        self.generate_pedestrian_dict()
-        self.generate_annotation_dict_universal()
+        if self.annotation_file is not None:
+
+            self.generate_annotation_list()
+            self.generate_pedestrian_dict()
+            self.generate_annotation_dict_universal()
+
+        else:
+
+            print('No annotation file provided.')
+
 
         ########### debugging ##############
 
@@ -178,6 +185,7 @@ class GridWorldDrone(GridWorld):
         if self.annotation_file is not None:
             if not os.path.isfile(self.annotation_file):
                 print("The annotation file does not exist.")
+                exit()
                 return 0
 
             with open(self.annotation_file) as f:
@@ -623,8 +631,10 @@ class GridWorldDrone(GridWorld):
             #if this flag is true, the position of the obstacles and the goal 
             #change with each reset
             dist_g = self.goal_spawn_clearance
+
+            if self.annotation_file:
+                self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
             
-            self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
             num_obs = len(self.obstacles)
 
             #placing the obstacles
