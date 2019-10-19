@@ -406,14 +406,15 @@ class DeepMaxEnt():
                            input_net=self.reward.input,
                            hidden_net=self.reward.hidden_layers)
         else:
-            newNN = Policy(inp_size, out_size, 
+        '''
+        newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims)
         
         newNN.to(self.device)
         self.rl.policy = newNN
-        print('the rewards of the new policy :')
-        print(self.rl.policy.rewards)
-        '''
+        #print('the rewards of the new policy :')
+        #print(self.rl.policy.rewards)
+        
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=self.rl.lr)
 
     #############################################################################
