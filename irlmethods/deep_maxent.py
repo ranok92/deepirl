@@ -633,6 +633,8 @@ class DeepMaxEnt():
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
+            diff_freq = diff_freq/np.sum(diff_freq)
+
             state_rewards = self.get_rewards_of_states(self.reward, states_visited)
 
             #all_state_rewards = self.per_state_reward(self.reward)
