@@ -628,12 +628,16 @@ class DeepMaxEnt():
             
 
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
+            
             self.writer.add_scalar('Log_info/svf_difference', np.linalg.norm(diff_freq,1), i)
             svf_diff_list.append(np.linalg.norm(diff_freq,1))
+            #print('The norm :',np.sum(np.abs(diff_freq)))
+            #print('The norm 2 :', np.linalg.norm(diff_freq,1))
+            diff_freq = diff_freq/np.sum(np.abs(diff_freq))
+            #print('The norm :',np.sum(np.abs(diff_freq)))
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
-            diff_freq = diff_freq/np.sum(diff_freq)
 
             state_rewards = self.get_rewards_of_states(self.reward, states_visited)
 
