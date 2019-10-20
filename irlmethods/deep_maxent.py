@@ -131,7 +131,7 @@ class DeepMaxEnt():
         self.learning_rate = learning_rate
         self.optimizer = optim.SGD(self.reward.parameters(), lr=self.learning_rate)
 
-        #self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
         self.EPS = np.finfo(np.float32).eps.item()
 
@@ -406,7 +406,7 @@ class DeepMaxEnt():
                            input_net=self.reward.input,
                            hidden_net=self.reward.hidden_layers)
         else:
-        '''
+        
         newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims)
         
@@ -414,7 +414,7 @@ class DeepMaxEnt():
         self.rl.policy = newNN
         #print('the rewards of the new policy :')
         #print(self.rl.policy.rewards)
-        
+        '''
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=self.rl.lr)
 
     #############################################################################
@@ -633,7 +633,6 @@ class DeepMaxEnt():
             svf_diff_list.append(np.linalg.norm(diff_freq,1))
             #print('The norm :',np.sum(np.abs(diff_freq)))
             #print('The norm 2 :', np.linalg.norm(diff_freq,1))
-            diff_freq = diff_freq/np.sum(np.abs(diff_freq))
             #print('The norm :',np.sum(np.abs(diff_freq)))
 
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
@@ -643,7 +642,7 @@ class DeepMaxEnt():
 
             #all_state_rewards = self.per_state_reward(self.reward)
 
-            dot_prod_from_dict = torch.dot(state_rewards.squeeze(), diff_freq.squeeze())
+            #dot_prod_from_dict = torch.dot(state_rewards.squeeze(), diff_freq.squeeze())
 
             # GRAD AND BACKPROP
 
@@ -684,7 +683,7 @@ class DeepMaxEnt():
             #pdb.set_trace()
             self.optimizer.step()
 
-            #self.lr_scheduler.step()
+            self.lr_scheduler.step()
 
             print('done')
 
