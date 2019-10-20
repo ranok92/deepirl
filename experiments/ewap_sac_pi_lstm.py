@@ -132,7 +132,8 @@ class ConvPiNet(ConvQNet):
 def main():
     tbx_writer = SummaryWriter(comment='_alpha_' + str(args.log_alpha))
 
-    env = EwapGridworld(ped_id=1, render=args.render, vision_radius=100)
+    env = EwapGridworld(ped_id=1, render=args.render, vision_radius=50,
+                        person_thickness=1)
 
     state_size = env.reset().shape[0]
     map_side = (1 + env.vision_radius * 2)

@@ -286,8 +286,8 @@ class SoftActorCritic:
         q_probs = soften_distribution(q_probs, 1e-4)
         q_dist = Categorical(q_probs)
 
-        policy_loss = (alpha * log_actions - q_pi).detach() * log_actions
-
+        # policy_loss = (alpha * log_actions - q_pi).detach() * log_actions
+        policy_loss = kl_divergence(action_dist, q_dist)
         policy_loss = policy_loss.mean()
 
         # update parameters
@@ -298,8 +298,6 @@ class SoftActorCritic:
         self.policy_optim.zero_grad()
         policy_loss.backward()
         self.policy_optim.step()
-
-        self.print_grads()
 
         # automatic entropy tuning
         alpha_loss = self.log_alpha * \
@@ -326,8 +324,9 @@ class SoftActorCritic:
                 'Q/avg_V': next_state_values.mean().item(),
                 'Q/entropy': q_dist.entropy().mean(),
                 'pi/avg_entropy': action_dist.entropy().mean(),
-                'pi/avg_log_actions': log_actions.detach().mean().item(),
-                'alpha': alpha.item(),
+                'H/alpha': alpha.item(),
+                'H/Q_entropy': q_dist.entropy().mean(),
+                'H/pi_entropy': action_dist.entropy().mean(),
             },
             self.training_i
         )
@@ -401,3 +400,6 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play()
+
+            if self.training_i % 50 == 0:
+                breakpoint()
