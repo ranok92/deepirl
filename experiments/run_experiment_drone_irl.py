@@ -102,10 +102,11 @@ def main():
         reward_net_dims += '-'
 
 
-    parent_dir = './results/'+str(args.save_folder)+st
-    to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
-                '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)+ \
-                policy_net_dims + reward_net_dims 
+    parent_dir = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims 
+    to_save = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims + \
+              '-reg-'+str(args.regularizer)+ \
+              '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)
+                
                 
     log_file = 'Experiment_info.txt'
 
