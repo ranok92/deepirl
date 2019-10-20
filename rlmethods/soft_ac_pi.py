@@ -236,6 +236,10 @@ class SoftActorCritic:
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
+    def print_grads(self):
+        for name, param in self.policy.named_parameters():
+            print(name, param.grad.abs().sum())
+
     def train_episode(self):
         """Train Soft Actor Critic"""
 
@@ -253,19 +257,18 @@ class SoftActorCritic:
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
 
-        with torch.no_grad():
-            # Figure out value function
-            next_actions, log_next_actions, _ = self.select_action(
-                next_state_batch
-            )
-            next_q_a = self.avg_q_net(next_state_batch)
-            next_q = get_action_q(next_q_a, next_actions)
-            next_state_values = next_q - alpha * log_next_actions
+        # Figure out value function
+        next_actions, log_next_actions, _ = self.select_action(
+            next_state_batch
+        )
+        next_q_a = self.avg_q_net(next_state_batch)
+        next_q = get_action_q(next_q_a, next_actions)
+        next_state_values = next_q - alpha * log_next_actions
 
-            # Calculate Q network target
-            done_floats = dones.type(torch.float)
-            q_target = reward_batch.clone()
-            q_target += self.gamma * done_floats * next_state_values.squeeze()
+        # Calculate Q network target
+        done_floats = dones.type(torch.float)
+        q_target = reward_batch.clone()
+        q_target += self.gamma * done_floats * next_state_values.squeeze()
 
         # q network loss
         q_a_values = self.q_net(state_batch)
@@ -282,7 +285,8 @@ class SoftActorCritic:
         q_probs = F.softmax((1.0 / alpha) * q_a_pi, dim=-1)
         q_probs = soften_distribution(q_probs, 1e-4)
         q_dist = Categorical(q_probs)
-        policy_loss = kl_divergence(action_dist, q_dist)
+
+        policy_loss = (alpha * log_actions - q_pi).detach() * log_actions
 
         policy_loss = policy_loss.mean()
 
@@ -294,6 +298,8 @@ class SoftActorCritic:
         self.policy_optim.zero_grad()
         policy_loss.backward()
         self.policy_optim.step()
+
+        self.print_grads()
 
         # automatic entropy tuning
         alpha_loss = self.log_alpha * \
