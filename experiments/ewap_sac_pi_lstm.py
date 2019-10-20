@@ -27,6 +27,10 @@ parser.add_argument('--render', action='store_true')
 args = parser.parse_args()
 
 
+def conv_out_size(h_in, kernel_side, stride):
+    return ((h_in - (kernel_side-1) - 1) // stride[0]) + 1
+
+
 class ConvQNet(BaseNN):
     def __init__(
             self,
@@ -44,16 +48,29 @@ class ConvQNet(BaseNN):
         self.map_side = map_side
 
         # convolutional layers
-        padding = (kernel_shape[0] - 1) // 2
-        self.conv_obstacles = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv_persons = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-        self.conv_goals = nn.Conv2d(1, 1, kernel_shape, padding=padding)
-
         self.pool = nn.MaxPool2d(pool_shape)
 
+        self.conv1 = nn.Conv2d(3, 8, (8, 8), 4)
+        self.conv2 = nn.Conv2d(8, 32, (4, 4), 2)
+        self.conv3 = nn.Conv2d(32, 32, (2, 2), 1)
+
         # calculate length of vector input into fully connected layers
-        reduce_side = self.map_side // pool_shape[0]
-        fc_in_len = 6 + 3 * reduce_side**2
+        reduced_side = conv_out_size(
+            self.map_side,
+            self.conv1.kernel_size[1],
+            self.conv1.stride
+        )
+        reduced_side = conv_out_size(
+            reduced_side,
+            self.conv2.kernel_size[1],
+            self.conv2.stride
+        )
+        reduced_side = conv_out_size(
+            reduced_side,
+            self.conv3.kernel_size[1],
+            self.conv3.stride
+        )
+        fc_in_len = 6 + self.conv3.out_channels*(reduced_side**2)
 
         # create fully connected layers based on above
         self.fc1 = nn.Linear(fc_in_len, hidden_layer_width)
@@ -77,12 +94,14 @@ class ConvQNet(BaseNN):
         in_surround = torch.stack((in_obs, in_persons, in_goals), dim=1)
 
         # convolutional processsing
+        out_surround = F.relu(self.conv1(in_surround))
+        out_surround = F.relu(self.conv2(out_surround))
+        out_surround = F.relu(self.conv3(out_surround))
 
+        # fully connected
         x = torch.cat(
             (
-                out_obs.flatten(start_dim=1),
-                out_persons.flatten(start_dim=1),
-                out_goals.flatten(start_dim=1),
+                out_surround.flatten(start_dim=1),
                 state_[:, -6:]
             ),
             dim=1
@@ -96,8 +115,15 @@ class ConvQNet(BaseNN):
 
 
 class ConvPiNet(ConvQNet):
+
+    def forward(self, state):
+        x = super().forward(state)
+        x = F.softmax(x, dim=-1)
+
+        return x
+
     def action_distribution(self, state):
-        probs = F.softmax(self.__call__(state), dim=-1)
+        probs = self.__call__(state)
         dist = Categorical(probs)
 
         return dist
@@ -114,7 +140,7 @@ def main():
     conv_q_net = ConvQNet(
         state_size,
         env.action_space.n,
-        256,
+        1024,
         map_side,
         kernel_shape=(3, 3)
     )
@@ -122,7 +148,7 @@ def main():
     conv_policy_net = ConvPiNet(
         state_size,
         env.action_space.n,
-        256,
+        1024,
         map_side,
         kernel_shape=(3, 3)
     )
