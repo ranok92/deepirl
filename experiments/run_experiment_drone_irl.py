@@ -84,7 +84,7 @@ def main():
 
     #####for the logger
     ts = time.time()
-    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%H:%M:%S')
     ###################
 
     if not args.save_folder:
@@ -102,10 +102,10 @@ def main():
         reward_net_dims += '-'
 
 
-    parent_dir = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims 
+    parent_dir = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims
     to_save = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims + \
               '-reg-'+str(args.regularizer)+ \
-              '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)
+              '-seed-'+str(args.seed)+'-lr-'+str(args.lr_irl)
                 
                 
     log_file = 'Experiment_info.txt'
