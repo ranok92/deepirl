@@ -400,6 +400,3 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play()
-
-            if self.training_i % 50 == 0:
-                breakpoint()
