@@ -286,7 +286,6 @@ class SoftActorCritic:
         q_probs = soften_distribution(q_probs, 1e-4)
         q_dist = Categorical(q_probs)
 
-        # policy_loss = (alpha * log_actions - q_pi).detach() * log_actions
         policy_loss = kl_divergence(action_dist, q_dist)
         policy_loss = policy_loss.mean()
 
