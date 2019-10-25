@@ -3,7 +3,6 @@
 import numpy as np
 import torch
 from gym.spaces import Discrete
-import pdb
 
 # Define the default tensor type
 torch.set_default_tensor_type(
@@ -39,12 +38,16 @@ class SimpleGridworld:
         obstacles.
         :param player_pos: (row, column) coordinate of player starting
         position.
-        :param goal_pos: (row, column) coordinate of goal.
+        :param goal_pos: 2xN matrix of row, column coordinates of goal.
         """
 
         # top left of grid is 0,0 as per image standards
         self.grid = np.zeros(size)
+        self.goal_grid = np.zeros(size)
         self.obstacles_map = obstacles_map
+
+        self.obstacle_grid = np.zeros(size)
+        self.obstacle_grid = self.compute_obstacle_grid()
 
         # actions space mappings:
         # {0,1,2,3,4} = {up,left,down,right,stay}
@@ -60,29 +63,48 @@ class SimpleGridworld:
         self.obstacles = obstacles_map
         self.goal_pos = goal_pos
         self.player_pos = goal_pos
+        self.step_number = 0
+
+
+    def compute_obstacle_grid(self):
+        """
+        Returns a grid with obstacles defined in obstacle_map place in.
+        """
+        obs = np.zeros(self.grid.shape)
+        obs[self.obstacles_map.T[0], self.obstacles_map.T[1]] = 1.0
+
+        return obs
+
+    def reset_player_pos(self):
+        """Resets the player's position to a random unoccupied position."""
+        # generate player location
+        validity_condition = np.logical_and(
+            self.grid != 1.0,
+            self.goal_grid != 1.0
+        )
+        valid_spots = np.argwhere(validity_condition)
+        self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
+
 
     def reset(self):
         """
         Reset the gridworld, moving the player to random position on the
         grid.
         """
+        # reset step number
+        self.step_number = 0
+
         # reset grid
         self.grid.fill(0)
 
         # fill obstacles (2 = obstacle)
-        self.grid[self.obstacles_map.T[0], self.obstacles_map.T[1]] = OBSTACLE
+        self.grid += self.obstacle_grid
 
         # set goal
-        assert self.grid[tuple(self.goal_pos)] != OBSTACLE, "Goal is obstacle."
-        self.grid[tuple(self.goal_pos)] = GOAL
+        assert self.grid[tuple(self.goal_pos)] != 1.0, "Goal is obstacle."
+        self.goal_grid[self.goal_pos[0], self.goal_pos[1]] = 1.0
 
-        # generate player location
-        validity_condition = np.logical_or(
-            self.grid != OBSTACLE,
-            self.grid != GOAL
-        )
-        valid_spots = np.argwhere(validity_condition)
-        self.player_pos = valid_spots[np.random.choice(valid_spots.shape[0])]
+        self.reset_player_pos()
 
         return self.state_extractor().astype('float32')
 
@@ -93,40 +115,46 @@ class SimpleGridworld:
         :param action: Action a_t taken at state s_t.
         :param next_state: State resulting from performing a_t at s_t.
         """
-        goal_vector = self.goal_pos - self.player_pos
-        movement_vector = next_state - state
-        reward = np.sign(np.dot(goal_vector, movement_vector)) *0.01
+        reward = np.array(0.0)
 
-        if (self.player_pos == self.goal_pos).all():
+        if self.goal_grid[tuple(self.player_pos)] == 1.0:
             reward += 1.0
 
-        if (self.grid[tuple(self.player_pos)] == OBSTACLE):
+        if self.grid[tuple(self.player_pos)] == 1.0:
             reward += -1.0
 
-        return reward.astype('float32')
+        return np.asarray(reward).astype('float32')
 
     def state_extractor(self):
+        """
+        Figures out a state vector for function 'step()' to return, based on
+        available internal information of the object.
+        """
         pad_width = 5
         padded_grid = np.pad(
             self.grid,
             pad_width,
             mode='constant',
-            constant_values=OBSTACLE
+            constant_values=1.0
         )
-        padded_pos = self.player_pos + np.array([pad_width,pad_width])
+        padded_pos = self.player_pos + np.array([pad_width, pad_width])
 
-        state =  padded_grid[
-            padded_pos[0]-pad_width: padded_pos[0]+pad_width+1,
-            padded_pos[1]-pad_width: padded_pos[1]+pad_width+1,
+        state = padded_grid[
+            padded_pos[0] - pad_width: padded_pos[0] + pad_width + 1,
+            padded_pos[1] - pad_width: padded_pos[1] + pad_width + 1,
         ].flatten()
 
         return state
 
     def step(self, action):
-        """Advance the gridworld player based on action.
-        Returns (next_state, reward, done, False)
+        """
+        Advance the gridworld player based on action.
+        'done' is set when environment reaches goal, hits obstacle, or exceeds
+        max step number, which is heuristically set to length*height of
+        gridworld.
 
         :param action: Action peformed by player.
+        :return (next_state, reward, done, False)
         """
         assert self.action_space.contains(action), "Invalid action!"
 
@@ -140,16 +168,16 @@ class SimpleGridworld:
         )
         self.player_pos = next_state
 
+        self.step_number += 1
+
         # reward function r(s_t, a_t, s_t+1)
         reward = self.reward_function(state, action, next_state)
 
         goal_reached = (self.player_pos == self.goal_pos).all()
-        obstacle_hit = (self.grid[tuple(self.player_pos)] == OBSTACLE)
+        obstacle_hit = (self.grid[tuple(self.player_pos)] == 1.0)
+        max_steps_elapsed = self.step_number > self.grid.size
 
-        done = goal_reached or obstacle_hit
-
-        if done:
-            self.reset()
+        done = goal_reached or obstacle_hit or max_steps_elapsed
 
         return self.state_extractor().astype('float32'), reward, done, False
 

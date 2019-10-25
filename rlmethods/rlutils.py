@@ -3,6 +3,7 @@ import sys
 import pdb
 import random
 import collections
+from itertools import islice
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -118,6 +119,33 @@ class ReplayBuffer():
     def is_full(self):
         """returns true if replay buffer is full."""
         return len(self) == self.buffer.maxlen
+
+class ContigousReplayBuffer(ReplayBuffer):
+    """Replay buffer than samples n consecutive samples instead of randomly."""
+
+    def sample(self, n):
+        """Sample n contigous samples from replay buffer.
+
+        :param n: number of samples returned.
+        """
+        assert len(self.buffer) >= n, "not enough samples in buffer."
+        sample_idx = np.random.randint(0, len(self.buffer) - n)
+        sample_batch = list(islice(self.buffer, sample_idx, sample_idx+n))
+
+        inverted_batch = list(map(list, zip(*sample_batch)))
+        sample_states = np.array(inverted_batch[0]).astype('float32')
+        sample_actions = np.array(inverted_batch[1]).astype('float32')
+        sample_rewards = np.array(inverted_batch[2]).astype('float32')
+        sample_next_states = np.array(inverted_batch[3]).astype('float32')
+        dones = np.array(np.array(inverted_batch[4])).astype('float32')
+
+        return (
+            sample_states,
+            sample_actions,
+            sample_rewards,
+            sample_next_states,
+            dones
+        )
 
 
 if __name__ == '__main__':
