@@ -412,6 +412,19 @@ class DroneFeatureSAM1():
                 for i in range(len(self.orientation_approximator)):
                     #print('The orientation val')
                     #print(orientation)
+                    '''
+                    print("***")
+                    print(self.orientation_approximator[i])
+                    print("---")
+                    print(rel_coord_obs)
+                    print("+++")
+                    print(vec_to_obs)
+                    print("####")
+                    print(rot_matrix)
+                    print("+++")
+                    print(agent_orientation_val)
+                    print("***")
+                    '''
                     angle_diff[i] = angle_between(self.orientation_approximator[i], rel_coord_obs)            
                 bin_val = np.argmin(angle_diff)
 
@@ -426,14 +439,14 @@ class DroneFeatureSAM1():
                 temp_obs['speed'] = obs_state['speed']
 
                 '''
-                for debugging purposes
+                #******for debugging purposes
                 print('The current agent heading direction :', agent_orientation_val)
                 print('Change in position : before :{}, after :{}'.format(obs_state['position'],
                                                                           temp_obs['position']))
                 print('Change in orientation : before :{}, after : {}'.format(obs_state['orientation'],
                                                                               temp_obs['orientation']))
                 print('Change in speed : before :{}, after :{}'.format(obs_state['speed'], temp_obs['speed']))
-                pdb.set_trace()
+                #pdb.set_trace()
                 '''
 
                 self.bins[str(bin_val)].append(temp_obs)
@@ -953,14 +966,18 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         thresh_value += self.agent_width #padding
         #pdb.set_trace()
 
-        print('The orientation val :', agent_orientation_val)
         rot_matrix = get_rot_matrix(-agent_orientation_val)
         if agent_state['orientation'] is None:
             agent_state['orientation'] = np.array([1, 0])
         rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
 
+        '''
+        #***for debugging purposes****
+        print('The orientation val :', agent_orientation_val)
         print('Agent orientation val :', agent_orientation_val)
         print('Rotated agent orientation :', rotated_agent_orientation)
+        #*****************************
+        '''
 
         pad = 80
         mag = 1 #magnification of the orientation lines
@@ -1026,9 +1043,9 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             for obs in obs_list:
 
                 #relative orientation of the obstacle wrt the agent
-                print('Obs information wrt pygame :', obs['orientation'])
+                #print('Obs information wrt pygame :', obs['orientation'])
                 rel_orient = obs['orientation'] - rotated_agent_orientation
-                print('Relative orientation :', rel_orient)
+                #print('Relative orientation :', rel_orient)
                 #relative position of the agent wrt the obstacle
                 rel_dist = -obs['position']
 
@@ -1166,7 +1183,7 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
 
 
         agent_orientation_angle = state['agent_head_dir']
-        print('Current heading direction :', agent_orientation_angle)
+        #print('Current heading direction :', agent_orientation_angle)
         if len(self.agent_state_history) > 0:
             prev_frame_info = self.agent_state_history[-1]
         else:
