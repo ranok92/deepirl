@@ -144,9 +144,9 @@ class GridWorldDrone(GridWorld):
         min_val = -quantization*(divisions-1)/2
         self.orientation_array = [min_val+(i*quantization) for i in range(divisions)]
         divisions = 5
-        quantization = 20
+        quantization = 4
         min_val = -quantization*(divisions-1)/2
-        self.max_speed = 200
+        self.max_speed = 10
         self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
         '''
         Some things to note:
@@ -468,9 +468,12 @@ class GridWorldDrone(GridWorld):
                             (self.agent_width/2), self.agent_width, self.agent_width])
 
             if self.show_orientation:
+                mag = 10 * self.agent_state['speed']
+
                 if self.agent_state['orientation'] is not None: 
                         pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
-                                         [self.agent_state['position'][1]+self.agent_state['orientation'][1]*10, self.agent_state['position'][0]+self.agent_state['orientation'][0]*10], 2)
+                                         [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
+                                         2)
 
         if self.ghost_state is not None:
             pygame.draw.rect(self.gameDisplay, (220,220,220),[self.ghost_state[1]-(self.agent_width/2), self.ghost_state[0]- \
@@ -508,7 +511,7 @@ class GridWorldDrone(GridWorld):
                         action_speed = int(action/len(self.orientation_array))
                         print('Orientation action :', self.orientation_array[action_orient])
                         print('Speed action :', self.speed_array[action_speed])
-                        pdb.set_trace()
+                        #pdb.set_trace()
 
                         #if self.consider_heading:
                             #after 360, it comes back to 0
@@ -528,9 +531,9 @@ class GridWorldDrone(GridWorld):
                                            cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
 
                         self.agent_state['speed'] = agent_cur_speed
-                                                
-                        self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
-
+                        
+                        #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
+                        self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
                         
                     else:
                         #if the action is a torch
@@ -556,8 +559,8 @@ class GridWorldDrone(GridWorld):
                                                    cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
 
                                 self.agent_state['speed'] = agent_cur_speed
-                                self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
-            
+                                #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
+                                self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1, 0]))
             #print("Agent :",self.agent_state)
             #if not np.array_equal(self.pos_history[-1],self.agent_state):
             self.heading_dir_history.append(self.cur_heading_dir)
@@ -585,8 +588,7 @@ class GridWorldDrone(GridWorld):
         #added new
         if not self.release_control:
             self.state['agent_state'] = copy.deepcopy(self.agent_state)
-            if action!=8:
-                self.state['agent_head_dir'] = action
+            self.state['agent_head_dir'] = self.cur_heading_dir
 
         if self.external_control:
             if done:
@@ -741,7 +743,7 @@ class GridWorldDrone(GridWorld):
         from the video feed in the environment with the agent. 
         Pro tip: Use this for testing the result.
         '''
-        pdb.set_trace()
+        #pdb.set_trace()
         no_of_peds = len(self.pedestrian_dict.keys())
         if self.subject is None:
             while True:
@@ -912,42 +914,18 @@ class GridWorldDrone(GridWorld):
         arrow_width  = self.cellWidth*.3 #in pixels
         base_pos_pixel = (base_position+.5)
         next_pos_pixel = (next_position+.5)
-        pdb.set_trace()
+        #pdb.set_trace()
 
         #draw the head
         ref_pos = base_pos_pixel+(next_pos_pixel-base_pos_pixel)*.35
 
-        if base_position[0]==next_position[0]:
-            #same row (movement left/right)
-            gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
-            pygame.draw.line(self.gameDisplay, (0,0,0),
-                            (base_pos_pixel[1],base_pos_pixel[0]),
-                            (next_pos_pixel[1]-gap,next_pos_pixel[0]))
+        #same row (movement left/right)
+        gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
+        pygame.draw.line(self.gameDisplay, (0,0,0),
+                        (base_pos_pixel[1],base_pos_pixel[0]),
+                        (next_pos_pixel[1]-gap,next_pos_pixel[0]),2)
 
-            
-            pygame.draw.polygon(self.gameDisplay,(0,0,0),
-                            (
-                            (ref_pos[1],ref_pos[0]+(arrow_width/2)),
-                            (next_pos_pixel[1]-gap,next_pos_pixel[0]),
-                            (ref_pos[1],ref_pos[0]-(arrow_width/2))  ),
-                            0
-                            )
-        
-        if base_position[1]==next_position[1]:
-
-            gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
-            pygame.draw.line(self.gameDisplay, (0,0,0),
-                            (base_pos_pixel[1],base_pos_pixel[0]),
-                            (next_pos_pixel[1],next_pos_pixel[0]-gap))
-
-            pygame.draw.polygon(self.gameDisplay,(0,0,0),
-                (
-                (ref_pos[1]+(arrow_width/2),ref_pos[0]),
-                (ref_pos[1]-(arrow_width/2),ref_pos[0]),
-                (next_pos_pixel[1],next_pos_pixel[0]-gap)   ),
-                0
-                )
-
+      
 
     def draw_trajectory(self):
 
@@ -957,8 +935,8 @@ class GridWorldDrone(GridWorld):
         #denotes the start and end positions of the trajectory
         
         rad = int(self.cellWidth*.4)
-        start_pos=(self.pos_history[0]+.5)*self.cellWidth
-        end_pos=(self.pos_history[-1]+0.5)*self.cellWidth 
+        start_pos=(self.pos_history[0]['position']+.5)*self.cellWidth
+        end_pos=(self.pos_history[-1]['position']+0.5)*self.cellWidth 
 
         pygame.draw.circle(self.gameDisplay,(0,255,0),
                             (int(start_pos[1]),int(start_pos[0])),
@@ -970,7 +948,8 @@ class GridWorldDrone(GridWorld):
 
         for count in range(len(self.pos_history)-1):
             #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
-            self.draw_arrow(self.pos_history[count],self.pos_history[count+1])
+            self.draw_arrow(self.pos_history[count]['position'],
+                            self.pos_history[count+1]['position'])
     
 
 
@@ -998,16 +977,17 @@ if __name__=="__main__":
                                   thresh2=20)
     
     feat_drone = DroneFeatureRisk_v2(step_size=2,
-                                  thresh1=15,
-                                  thresh2=30)
+                                  thresh1=35,
+                                  thresh2=60,
+                                  show_agent_persp=True)
 
     world = GridWorldDrone(display=True, 
                         seed=0, obstacles=None, 
-                        show_trail=False,
+                        show_trail=True,
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=7,
-                        tick_speed=60, 
+                        subject=13,
+                        tick_speed=1, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1052,9 +1032,10 @@ if __name__=="__main__":
             #action = pf_agent.select_action(state)
             print("agent state :", world.agent_state)
             print("current orientation :", world.cur_heading_dir)
-            action_speed = int(input())
-            action_orient = int(input())
-            action = action_speed+(action_orient*7)
+            #action_speed = int(input())
+            #action_orient = int(input())
+            action = np.random.randint(35)
+            #action = action_speed+(action_orient*7)
             print('Action :', action)
             state, reward , done, _ = world.step(action)
             #print(reward, done)
@@ -1064,6 +1045,7 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
+            print(feat)
             if t%100==0:
                 world.rollback(10)
                 feat_drone.rollback(10, state)
@@ -1078,12 +1060,13 @@ if __name__=="__main__":
 
             print('Occupancy grid info:')
             print(feat[22:].reshape(window_size, window_size))
-            
-            pdb.set_trace()
             '''
+            pdb.set_trace()
+
             #print(world.agent_state)
             #print (reward, done)
             t+=1
+
         info_collector.collab_end_traj_results()
 
     info_collector.collab_end_results()
