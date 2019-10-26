@@ -1061,7 +1061,7 @@ if __name__=="__main__":
             print('Occupancy grid info:')
             print(feat[22:].reshape(window_size, window_size))
             '''
-            pdb.set_trace()
+            #pdb.set_trace()
 
             #print(world.agent_state)
             #print (reward, done)

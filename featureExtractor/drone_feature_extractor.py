@@ -36,6 +36,13 @@ def angle_between(v1, v2):
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
+def deg_to_rad(deg):
+
+    return deg*np.pi/180
+
+def rad_to_deg(rad):
+
+    return rad*180/np.pi
 
 
 def get_rot_matrix(theta):
@@ -361,9 +368,10 @@ class DroneFeatureSAM1():
         #populates the self.bins dictionary with the appropriate obstacles 
         #self.bins is a dictionary where against each key of the dictionary 
         #is a list of obstacles that are present in that particular bin
-        if agent_orientation_val >4:
-            agent_orientation_val-=1
 
+        #for debugging purposes
+        #print('***INSIDE populate_orientation_bin ***')
+        
         for obs_state in obs_state_list:
 
             distance = np.linalg.norm(obs_state['position'] - agent_state['position'])
@@ -389,7 +397,7 @@ class DroneFeatureSAM1():
                 #check for the orientation
                 #obtain relative orientation
                 #get the relative coordinates
-                rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
+                rot_matrix = get_rot_matrix(deg_to_rad(agent_orientation_val))
 
                 #translate the point so that the agent sits at the center of the coordinates
                 #before rtotation
@@ -416,6 +424,17 @@ class DroneFeatureSAM1():
                 temp_obs['orientation'] = rel_coord_orient_ref - rel_coord_obs
                 temp_obs['position'] = rel_coord_obs
                 temp_obs['speed'] = obs_state['speed']
+
+                '''
+                for debugging purposes
+                print('The current agent heading direction :', agent_orientation_val)
+                print('Change in position : before :{}, after :{}'.format(obs_state['position'],
+                                                                          temp_obs['position']))
+                print('Change in orientation : before :{}, after : {}'.format(obs_state['orientation'],
+                                                                              temp_obs['orientation']))
+                print('Change in speed : before :{}, after :{}'.format(obs_state['speed'], temp_obs['speed']))
+                pdb.set_trace()
+                '''
 
                 self.bins[str(bin_val)].append(temp_obs)
         #if the obstacle does not classify to be considered
@@ -519,6 +538,8 @@ class DroneFeatureSAM1():
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+        agent_orientation_angle = state['agent_head_dir']
+
         #print('The orientation :')
         #print(abs_approx_orientation.reshape(3,3))
         if len(self.agent_state_history) > 0:
@@ -541,7 +562,7 @@ class DroneFeatureSAM1():
 
 
         #print('Here')
-        self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+        self.populate_orientation_bin(agent_orientation_angle, agent_state, obstacles)
         #pdb.set_trace()
         sam_vector, inner_ring_density, outer_ring_density = self.compute_bin_info()
 
@@ -931,17 +952,18 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         thresh_value = self.agent_width/2 + self.obs_width/2 + self.step_size
         thresh_value += self.agent_width #padding
         #pdb.set_trace()
-        if agent_orientation_val>4:
-            agent_orientation_val-=1
 
-        rot_matrix = get_rot_matrix(self.rel_orient_conv[agent_orientation_val])
+        print('The orientation val :', agent_orientation_val)
+        rot_matrix = get_rot_matrix(-agent_orientation_val)
         if agent_state['orientation'] is None:
             agent_state['orientation'] = np.array([1, 0])
         rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
 
+        print('Agent orientation val :', agent_orientation_val)
+        print('Rotated agent orientation :', rotated_agent_orientation)
 
         pad = 80
-        mag = 20 #magnification of the orientation lines
+        mag = 1 #magnification of the orientation lines
         
         ################################
         #code for the agent view
@@ -1004,8 +1026,9 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             for obs in obs_list:
 
                 #relative orientation of the obstacle wrt the agent
-
+                print('Obs information wrt pygame :', obs['orientation'])
                 rel_orient = obs['orientation'] - rotated_agent_orientation
+                print('Relative orientation :', rel_orient)
                 #relative position of the agent wrt the obstacle
                 rel_dist = -obs['position']
 
@@ -1141,6 +1164,9 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
         abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
+
+        agent_orientation_angle = state['agent_head_dir']
+        print('Current heading direction :', agent_orientation_angle)
         if len(self.agent_state_history) > 0:
             prev_frame_info = self.agent_state_history[-1]
         else:
@@ -1160,9 +1186,9 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
 
         #print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
         #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
-        self.populate_orientation_bin(agent_orientation_index, agent_state, obstacles)
+        self.populate_orientation_bin(agent_orientation_angle, agent_state, obstacles)
 
-        collision_info = self.compute_bin_info(agent_orientation_index, agent_state)
+        collision_info = self.compute_bin_info(agent_orientation_angle, agent_state)
 
         
         self.agent_state_history.append(copy.deepcopy(state['agent_state']))
@@ -1172,6 +1198,13 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
                                             change_in_orientation,
                                             collision_info.reshape((-1))
                                             ))
-        #spdb.set_trace()
+        '''
+        #***debugging block*****#
+        print('Relative orientation :', relative_orientation)
+        print('Relative orientation goal :', relative_orientation_goal.reshape(3,3))
+        print('Change in orientation :', change_in_orientation)
+        pdb.set_trace()
+        #****end block****#
+        '''
         return reset_wrapper(extracted_feature)
 
