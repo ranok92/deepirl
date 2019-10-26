@@ -166,9 +166,15 @@ class GridWorldDrone(GridWorld):
 
         ######################################################################
         self.step_reward = step_reward
-        self.generate_annotation_list()
-        self.generate_pedestrian_dict()
-        self.generate_annotation_dict_universal()
+
+        if self.annotation_file is not None:
+            self.generate_annotation_list()
+            self.generate_pedestrian_dict()
+            self.generate_annotation_dict_universal()
+
+        else:
+
+            print('No annotation file provided.')
 
         ########### debugging ##############
 
@@ -509,8 +515,6 @@ class GridWorldDrone(GridWorld):
                     if isinstance(action, int):
                         action_orient = action%len(self.orientation_array)
                         action_speed = int(action/len(self.orientation_array))
-                        print('Orientation action :', self.orientation_array[action_orient])
-                        print('Speed action :', self.speed_array[action_speed])
                         #pdb.set_trace()
 
                         #if self.consider_heading:
@@ -519,7 +523,6 @@ class GridWorldDrone(GridWorld):
                         agent_cur_speed = max(0,min(self.agent_state['speed'] + self.speed_array[action_speed], self.max_speed))
                         #self.heading_dir_history.append(self.cur_heading_dir)
                         #self.cur_heading_dir = action
-                        print(type(self.cur_heading_dir))
                         prev_position = self.agent_state['position']
                         rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
                         cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
@@ -663,7 +666,9 @@ class GridWorldDrone(GridWorld):
             #change with each reset
             dist_g = self.goal_spawn_clearance
             
-            self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+            if self.annotation_file:
+                self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
+                
             num_obs = len(self.obstacles)
 
             #placing the obstacles
@@ -774,7 +779,7 @@ class GridWorldDrone(GridWorld):
                                                                             np.array([self.agent_state['speed'], 0]))
 
         self.final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
-        print('Cur_ped : {} final frame {}'.format(self.cur_ped, self.final_frame))
+        #print('Cur_ped : {} final frame {}'.format(self.cur_ped, self.final_frame))
         #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
         #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
 
@@ -785,7 +790,7 @@ class GridWorldDrone(GridWorld):
 
         self.state = {}
         self.state['agent_state'] = copy.deepcopy(self.agent_state)
-        self.state['agent_head_dir'] = self.agent_state['orientation'] #starts heading towards top
+        self.state['agent_head_dir'] = self.cur_heading_dir #starts heading towards top
         self.state['goal_state'] = self.goal_state
 
         self.state['release_control'] = self.release_control
@@ -987,7 +992,7 @@ if __name__=="__main__":
                         is_random=False,
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
                         subject=13,
-                        tick_speed=1, 
+                        tick_speed=10, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1030,13 +1035,13 @@ if __name__=="__main__":
             #action = world.take_action_from_user()
 
             #action = pf_agent.select_action(state)
-            print("agent state :", world.agent_state)
-            print("current orientation :", world.cur_heading_dir)
+            #print("agent state :", world.agent_state)
+            #print("current orientation :", world.cur_heading_dir)
             #action_speed = int(input())
             #action_orient = int(input())
             action = np.random.randint(35)
             #action = action_speed+(action_orient*7)
-            print('Action :', action)
+            #print('Action :', action)
             state, reward , done, _ = world.step(action)
             #print(reward, done)
             info_collector.collect_information_per_frame(state)
@@ -1045,7 +1050,7 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
-            print(feat)
+            #print(feat)
             if t%100==0:
                 world.rollback(10)
                 feat_drone.rollback(10, state)
