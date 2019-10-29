@@ -525,7 +525,7 @@ class ActorCritic:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
                         print('The action frequency array :', action_array)
-                        action_array = np.zeros(9)
+                        action_array = np.zeros(self.env.action_space.n)
                         running_reward_list.append(running_reward/self.log_interval)
 
                         running_reward = 0
