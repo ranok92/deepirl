@@ -38,8 +38,7 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
 parser.add_argument('--save-folder', type=str, default=None, help= 'The name of the folder to \
                     store experiment related information.')
 
-parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_\
-students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt', help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--total-episodes', type=int, default=1000, help='Total episodes of RL')
@@ -76,6 +75,7 @@ def main():
     from envs.gridworld_drone import GridWorldDrone
     from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
+    from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 
     save_folder = None
 
@@ -166,6 +166,15 @@ def main():
                                        obs_width=obs_width,
                                        step_size=step_size,
                                        grid_size=grid_size,
+                                       show_agent_persp=True,
+                                       thresh1=15, thresh2=30)
+
+    if args.feat_extractor == 'DroneFeatureRisk_speed':
+
+        feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
+                                       obs_width=obs_width,
+                                       step_size=step_size,
+                                       grid_size=grid_size,
                                        show_agent_persp=False,
                                        thresh1=15, thresh2=30)
 
@@ -193,7 +202,7 @@ def main():
                         is_random=True,
                         annotation_file=args.annotation_file,
                         subject=args.subject,
-                        tick_speed=10, 
+                        tick_speed=60, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
@@ -281,7 +290,7 @@ def main():
                 save_folder = save_folder + p + '/'
 
             print('The final save folder ', save_folder)
-            env.tickSpeed = 60
+            #env.tickSpeed = 10
             assert args.policy_path is not None, 'pass a policy to play from!'
             if args.exp_trajectory_path is not None:
                 from irlmethods.irlUtils import calculate_expert_svf

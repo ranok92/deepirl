@@ -138,7 +138,7 @@ if args.agent_type =='Potential_field':
     consider_heading = False
 env = GridWorldDrone(display=args.render, is_onehot = False, 
                     seed=args.seed, obstacles=None, 
-                    show_trail=False,
+                    show_trail=True,
                     is_random=False,
                     subject=args.subject,
                     annotation_file=args.annotation_file,
@@ -487,7 +487,7 @@ def agent_drift_analysis(pos_reset=20):
 
 
             #info_collector.collect_information_per_frame(state)
-            print('heading_dir', env.cur_heading_dir)
+            #print('heading_dir', env.cur_heading_dir)
             t+=1
             abs_counter+=1
             if t%pos_reset==0:
@@ -522,7 +522,7 @@ def agent_drift_analysis(pos_reset=20):
 
 if __name__ == '__main__':
 
-    agent_drift_analysis()
+    agent_drift_analysis(pos_reset=50)
     '''
     if args.reward_analysis:
         reward_analysis()

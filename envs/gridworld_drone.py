@@ -10,7 +10,7 @@ sys.path.insert(0, '..')
 from envs.gridworld_clockless import MockActionspace, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
-
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from envs.drone_env_utils import InformationCollector
 from alternateController.potential_field_controller import PotentialFieldController as PFController
 from itertools import count
@@ -144,9 +144,9 @@ class GridWorldDrone(GridWorld):
         min_val = -quantization*(divisions-1)/2
         self.orientation_array = [min_val+(i*quantization) for i in range(divisions)]
         divisions = 5
-        quantization = 4
+        quantization = .2
         min_val = -quantization*(divisions-1)/2
-        self.max_speed = 10
+        self.max_speed = 2
         self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
         '''
         Some things to note:
@@ -516,7 +516,7 @@ class GridWorldDrone(GridWorld):
                         action_orient = action%len(self.orientation_array)
                         action_speed = int(action/len(self.orientation_array))
                         #pdb.set_trace()
-
+                        #print(self.orientation_array[action_orient])
                         #if self.consider_heading:
                             #after 360, it comes back to 0
                         self.cur_heading_dir = (self.cur_heading_dir+self.orientation_array[action_orient])%360
@@ -869,6 +869,17 @@ class GridWorldDrone(GridWorld):
         return self.action_dict[np.array2string(np.array([0,0]))]
 
 
+    def return_position(self, ped_id, frame_id):
+
+        print(ped_id, frame_id)
+        try:
+            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
+        except KeyError:
+            while str(frame_id) not in self.pedestrian_dict[str(ped_id)]:
+                frame_id -= 1
+            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
+
+
     def close_game(self):
 
         pygame.quit()
@@ -985,6 +996,11 @@ if __name__=="__main__":
                                   thresh1=35,
                                   thresh2=60,
                                   show_agent_persp=True)
+
+    feat_drone = DroneFeatureRisk_speed(step_size=2,
+                                        thresh1=20,
+                                        thresh2=30,
+                                        show_agent_persp=True)
 
     world = GridWorldDrone(display=True, 
                         seed=0, obstacles=None, 

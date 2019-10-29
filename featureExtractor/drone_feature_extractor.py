@@ -1225,3 +1225,114 @@ class DroneFeatureRisk_v2(DroneFeatureRisk):
         '''
         return reset_wrapper(extracted_feature)
 
+
+
+
+class DroneFeatureRisk_speed(DroneFeatureRisk):
+
+    def __init__(self, thresh1=1, thresh2=2,
+                 agent_width=10, step_size=10,
+                 obs_width=10, grid_size=10,
+                 show_bins=False, 
+                 max_speed=2,
+                 show_agent_persp=False
+                 ):
+
+        super().__init__(thresh1=thresh1,
+                         thresh2=thresh2,
+                         agent_width=agent_width,
+                         obs_width=obs_width,
+                         step_size=step_size,
+                         grid_size=grid_size,
+                         show_bins=show_bins,
+                         show_agent_persp=show_agent_persp
+                         )
+
+        #change the state representation size accordingly
+        '''
+        relative_orientation 9
+        relative_orientation_goal 4 
+        change_in_orientation 5
+        collision_info 48
+        speed_info 6
+        '''
+        self.state_rep_size = 9+4+5+16*3+6
+        self.max_speed = max_speed
+        self.speed_divisions = 6
+        self.generate_hash_variable()
+
+
+    def get_speed_info(self, agent_state):
+
+        speed_info = np.zeros(self.speed_divisions)
+        cur_speed = agent_state['speed']
+
+        if cur_speed is None:
+            cur_speed = 0
+
+        if cur_speed >= self.max_speed:
+            cur_speed = self.max_speed-0.001
+
+        quantization = self.max_speed/self.speed_divisions
+        speed_info[int(cur_speed/quantization)] = 1
+
+        return speed_info
+
+
+    def extract_features(self, state):
+        '''
+        the parameter ignore_cur_state, if set to true indicates that this is a part of a rollback play.
+
+        '''
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
+        abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+
+        agent_orientation_angle = state['agent_head_dir']
+        #print('Current heading direction :', agent_orientation_angle)
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
+
+        change_in_orientation = self.get_change_in_orientation(state['agent_state']['orientation'])
+
+
+        for i in range(16):
+            self.bins[str(i)] = []
+
+        #print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
+        #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
+        self.populate_orientation_bin(agent_orientation_angle, agent_state, obstacles)
+
+        collision_info = self.compute_bin_info(agent_orientation_angle, agent_state)
+
+        #adding speed information
+        speed_info = self.get_speed_info(agent_state)
+        
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
+
+        extracted_feature = np.concatenate((relative_orientation,
+                                            relative_orientation_goal,
+                                            change_in_orientation,
+                                            collision_info.reshape((-1)),
+                                            speed_info
+                                            ))
+        '''
+        #***debugging block*****#
+        print('Relative orientation :', relative_orientation)
+        print('Relative orientation goal :', relative_orientation_goal.reshape(3,3))
+        print('Change in orientation :', change_in_orientation)
+        pdb.set_trace()
+        #****end block****#
+        '''
+        return reset_wrapper(extracted_feature)
+
+
