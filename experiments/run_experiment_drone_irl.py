@@ -12,6 +12,8 @@ import utils
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+
 
 import datetime
 from logger.logger import Logger
@@ -178,6 +180,16 @@ def main():
                                     step_size=step_size,
                                     grid_size=grid_size,
                                     thresh1=15, thresh2=30)
+
+
+    if args.feat_extractor == 'DroneFeatureRisk_speed':
+
+        feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            thresh1=10, thresh2=15)
+
 
 
     experiment_logger.log_header('Parameters of the feature extractor :')
