@@ -480,6 +480,10 @@ class ActorCritic:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
                         print('The action frequency array :', action_array)
+
+                        if (running_reward/self.log_interval) > 0.9:
+                            self.policy.save(self.save_folder+'/policy-models/')
+                        
                         running_reward_list.append(running_reward/self.log_interval)
                         running_reward = 0
                         action_array = np.zeros(self.env.action_space.n)
