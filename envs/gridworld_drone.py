@@ -79,6 +79,7 @@ class GridWorldDrone(GridWorld):
             tick_speed=30,
             replace_subject=False, #this option trains the agent for the exact scenarios as seen by the expert
                               #Not an ideal thing to train on. Introduced as a debugging measure.
+            segment_size=None,
             external_control=True,
             consider_heading=False,
             variable_speed=False
@@ -113,6 +114,10 @@ class GridWorldDrone(GridWorld):
 
         self.ghost = None
         self.ghost_state = None
+        self.ghost_state_history = []
+        self.ghost_color = (140, 0, 200)
+
+
         self.annotation_file = annotation_file #the file from which the video information will be used
         self.annotation_dict = {}
         self.pedestrian_dict = {}
@@ -180,7 +185,7 @@ class GridWorldDrone(GridWorld):
 
         self.external_control = external_control
         self.replace_subject = replace_subject
-
+        self.segment_size = segment_size
         self.show_orientation = show_orientation
         '''
         self.ped_start_pos = {} # a dictionary that will store the starting positions of all the pedestrians
@@ -415,8 +420,8 @@ class GridWorldDrone(GridWorld):
             if float(element[1]) == self.ghost:
 
 
-                self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]['position']
-
+                self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]
+                self.ghost_state_history.append(self.ghost_state)
 
         self.state['obstacles'] = self.obstacles 
 
@@ -480,13 +485,16 @@ class GridWorldDrone(GridWorld):
                         pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
                                          [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
                                          2)
-
         if self.ghost_state is not None:
-            pygame.draw.rect(self.gameDisplay, (220,220,220),[self.ghost_state[1]-(self.agent_width/2), self.ghost_state[0]- \
-                            (self.agent_width/2), self.agent_width, self.agent_width], 1)
+            pygame.draw.rect(self.gameDisplay, self.ghost_color, [self.ghost_state['position'][1]-(self.agent_width/2), self.ghost_state['position'][0]- \
+                            (self.agent_width/2), self.agent_width, self.agent_width])
+
 
         if self.show_trail:
-            self.draw_trajectory()
+            self.draw_trajectory(self.pos_history, self.black)
+
+            if self.ghost:
+                self.draw_trajectory(self.ghost_state_history, self.ghost_color)
 
 
         pygame.display.update()
@@ -516,7 +524,8 @@ class GridWorldDrone(GridWorld):
                         action_orient = action%len(self.orientation_array)
                         action_speed = int(action/len(self.orientation_array))
                         #pdb.set_trace()
-                        #print(self.orientation_array[action_orient])
+                        #print('Change in speed :',self.speed_array[action_speed])
+
                         #if self.consider_heading:
                             #after 360, it comes back to 0
                         self.cur_heading_dir = (self.cur_heading_dir+self.orientation_array[action_orient])%360
@@ -534,7 +543,7 @@ class GridWorldDrone(GridWorld):
                                            cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
 
                         self.agent_state['speed'] = agent_cur_speed
-                        
+                        #print('Current speed :', agent_cur_speed)
                         #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
                         self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
                         
@@ -570,6 +579,9 @@ class GridWorldDrone(GridWorld):
 
             self.pos_history.append(copy.deepcopy(self.agent_state))
 
+            if self.ghost:
+
+                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
         #calculate the reward and completion condition
         reward, done = self.calculate_reward(action)
@@ -662,6 +674,7 @@ class GridWorldDrone(GridWorld):
 
             self.current_frame = self.initial_frame
             self.pos_history = []
+            self.ghost_state_history = []
             #if this flag is true, the position of the obstacles and the goal 
             #change with each reset
             dist_g = self.goal_spawn_clearance
@@ -728,6 +741,9 @@ class GridWorldDrone(GridWorld):
 
             self.pos_history.append(copy.deepcopy(self.agent_state))
 
+            if self.ghost:
+                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
+
             self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
             self.cur_heading_dir = 0
             self.heading_dir_history = []
@@ -768,7 +784,24 @@ class GridWorldDrone(GridWorld):
 
         self.skip_list = [] 
         self.skip_list.append(self.cur_ped)
-        self.current_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame']) #frame from the first entry of the list
+        if self.segment_size is None:
+            
+            self.current_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame']) #frame from the first entry of the list
+            self.final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
+            self.goal_state = self.pedestrian_dict[str(self.cur_ped)][str(self.final_frame)]['position']
+
+        else:
+            first_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame'])
+            final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
+            total_frames = final_frame - first_frame
+
+            total_segments = int(total_frames/self.segment_size) + 1
+            cur_segment = np.random.randint(total_segments)
+            self.current_frame = first_frame + cur_segment*self.segment_size
+            self.final_frame = min(self.current_frame+self.segment_size, final_frame)
+            self.goal_state = self.pedestrian_dict[str(self.cur_ped)][str(self.final_frame)]['position']
+
+
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
         self.agent_state = copy.deepcopy(self.pedestrian_dict[str(self.cur_ped)][str(self.current_frame)])
@@ -777,13 +810,6 @@ class GridWorldDrone(GridWorld):
         self.cur_heading_dir = 0
         self.agent_state['orientation'] = np.matmul(get_rot_matrix(deg_to_rad(self.cur_heading_dir)),
                                                                             np.array([self.agent_state['speed'], 0]))
-
-        self.final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
-        #print('Cur_ped : {} final frame {}'.format(self.cur_ped, self.final_frame))
-        #self.goal_state = np.asarray([float(self.pedestrian_dict[str(cur_ped)][-1][2]), \
-        #                              float(self.pedestrian_dict[str(cur_ped)][-1][3])])
-
-        self.goal_state = self.pedestrian_dict[str(self.cur_ped)][str(self.final_frame)]['position']
 
         self.release_control = False
 
@@ -799,6 +825,11 @@ class GridWorldDrone(GridWorld):
 
         self.pos_history = []
         self.pos_history.append(copy.deepcopy(self.agent_state))
+
+        if self.ghost:
+            self.ghost_state_history = []
+            self.ghost_state = copy.deepcopy(self.agent_state)
+            self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.heading_dir_history = []
@@ -922,37 +953,69 @@ class GridWorldDrone(GridWorld):
 
 
 
-    def draw_arrow(self, base_position , next_position):
+    def draw_arrow(self, base_position , next_position, color):
 
         #base_position = (row,col)
-
+        if np.linalg.norm(base_position - next_position) <= self.step_size*math.sqrt(2):
         #draw the stalk
-        arrow_width  = self.cellWidth*.3 #in pixels
-        base_pos_pixel = (base_position+.5)
-        next_pos_pixel = (next_position+.5)
+            arrow_width  = self.cellWidth*.1 #in pixels
+            base_pos_pixel = (base_position+.5)
+            next_pos_pixel = (next_position+.5)
+            #pdb.set_trace()
+
+            #draw the head
+            ref_pos = base_pos_pixel+(next_pos_pixel-base_pos_pixel)*.35
+            arrow_length = 0.7
+            arrow_base = base_pos_pixel
+            arrow_end = base_pos_pixel + (next_pos_pixel - base_pos_pixel)* arrow_length
+
+            '''
+            if base_position[0]==next_position[0]:
+                #same row (movement left/right)
+                gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
+                pygame.draw.line(self.gameDisplay, (0,0,0),
+                                (base_pos_pixel[1],base_pos_pixel[0]),
+                                (next_pos_pixel[1]-gap,next_pos_pixel[0]))
+                
+                pygame.draw.polygon(self.gameDisplay,(0,0,0),
+                                (
+                                (ref_pos[1],ref_pos[0]+(arrow_width/2)),
+                                (next_pos_pixel[1]-gap,next_pos_pixel[0]),
+                                (ref_pos[1],ref_pos[0]-(arrow_width/2))  ),
+                                0
+                                )
+            
+            if base_position[1]==next_position[1]:
+                gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
+                pygame.draw.line(self.gameDisplay, (0,0,0),
+                                (base_pos_pixel[1],base_pos_pixel[0]),
+                                (next_pos_pixel[1],next_pos_pixel[0]-gap))
+                pygame.draw.polygon(self.gameDisplay,(0,0,0),
+                    (
+                    (ref_pos[1]+(arrow_width/2),ref_pos[0]),
+                    (ref_pos[1]-(arrow_width/2),ref_pos[0]),
+                    (next_pos_pixel[1],next_pos_pixel[0]-gap)   ),
+                    0
+                    )
+            '''
+
+            pygame.draw.line(self.gameDisplay, color, (arrow_base[1], arrow_base[0]),
+                             (arrow_end[1], arrow_end[0]), 2)
+
+
+ 
+
+    def draw_trajectory(self, trajectory=[], color=None):
+
         #pdb.set_trace()
-
-        #draw the head
-        ref_pos = base_pos_pixel+(next_pos_pixel-base_pos_pixel)*.35
-
-        #same row (movement left/right)
-        gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
-        pygame.draw.line(self.gameDisplay, (0,0,0),
-                        (base_pos_pixel[1],base_pos_pixel[0]),
-                        (next_pos_pixel[1]-gap,next_pos_pixel[0]),2)
-
-      
-
-    def draw_trajectory(self):
-
         arrow_length = 1
         arrow_head_width = 1
         arrow_width = .1
         #denotes the start and end positions of the trajectory
         
         rad = int(self.cellWidth*.4)
-        start_pos=(self.pos_history[0]['position']+.5)*self.cellWidth
-        end_pos=(self.pos_history[-1]['position']+0.5)*self.cellWidth 
+        start_pos=(trajectory[0]['position']+.5)*self.cellWidth
+        end_pos=(trajectory[-1]['position']+0.5)*self.cellWidth 
 
         pygame.draw.circle(self.gameDisplay,(0,255,0),
                             (int(start_pos[1]),int(start_pos[0])),
@@ -962,11 +1025,12 @@ class GridWorldDrone(GridWorld):
                     (int(end_pos[1]),int(end_pos[0])),
                     rad)
 
-        for count in range(len(self.pos_history)-1):
+        for count in range(len(trajectory)-1):
             #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
-            self.draw_arrow(self.pos_history[count]['position'],
-                            self.pos_history[count+1]['position'])
+            self.draw_arrow(trajectory[count]['position'],trajectory[count+1]['position'], color)
     
+
+
 
 
 
@@ -1017,6 +1081,7 @@ if __name__=="__main__":
                         show_orientation=True,
                         external_control=True,
                         replace_subject=True, 
+                        segment_size=50,
                         consider_heading=True,                      
                         rows=576, cols=720, width=20)
 

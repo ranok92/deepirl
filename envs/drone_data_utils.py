@@ -10,12 +10,15 @@ from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,Fr
 
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from scipy.interpolate import splev, splprep
+
+
 
 import os
 import pdb
 import pathlib
-
+import copy
 '''
 information regarding datasets and annotations:
 ZARA DATASET:
@@ -196,7 +199,10 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
 
-def extract_trajectory(annotation_file, feature_extractor, folder_to_save, display=False, show_states=False, subject=None):
+def extract_trajectory(annotation_file, feature_extractor, 
+                       folder_to_save, display=False, 
+                       show_states=False, subject=None, 
+                       trajectory_length_limit=None):
 
 
     if not os.path.exists(folder_to_save):
@@ -232,47 +238,51 @@ def extract_trajectory(annotation_file, feature_extractor, folder_to_save, displ
         trajectory_info = []
         print('Starting for subject :',sub)
 
+        step_counter = 0
+        segment_counter = 1
         world.subject=sub
         world.reset()
         print('Path lenghth :',world.final_frame - world.current_frame)
+        path_len = world.final_frame - world.current_frame
+        cur_subject_final_frame = world.final_frame
         total_path_len += world.final_frame - world.current_frame
-        while world.current_frame < world.final_frame:
-            state,_,_,_ = world.step()
 
+        if trajectory_length_limit is not None:
+
+            traj_seg_length = min(trajectory_length_limit, path_len)
+            #change the goal position
+            world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
+            world.state['goal_state'] = copy.deepcopy(world.goal_state) 
+           
+        while world.current_frame < cur_subject_final_frame:
+            state,_,_,_ = world.step()
+            step_counter += 1
             if disp:
                 feature_extractor.overlay_bins(state)
 
             state = feature_extractor.extract_features(state)
             state = torch.tensor(state)
             trajectory_info.append(state)
+            if trajectory_length_limit is not None:
 
-            if show_states:
-                '''
-                this one is for dronefeaturesam
-                general_dir = state[0:9].reshape(3,3)
-                print('General direction :\n', general_dir)
-           
-                print('Goal direction :\n', state[9:18].reshape(3,3))   
-
-                print('Towards goal :', state[18:22])
-                local_info_arr = state[22:134].reshape(16,-1)
-                print('The local information :\n', local_info_arr)
-
-                print('Inner ring :', state[134:137])
-                print('Outer ring :', state[137:])
-                '''
-
+                path_len = cur_subject_final_frame - world.current_frame
                 
-                #this one is for LocalGlobal
-                '''
-                window_size = feature_extractor.window_size
-                print('The general direction :', state[0:9].reshape(3,3))
-                print('The proximity indicator :', state[9:12])
-                print('The local information :', state[12:].reshape(window_size, window_size))
-                pdb.set_trace()
-                '''
-        state_tensors = torch.stack(trajectory_info)
-        torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
+                if step_counter%trajectory_length_limit==0:
+                    traj_seg_length = min(trajectory_length_limit, path_len)
+                    #change the goal position
+                    world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
+                    world.state['goal_state'] = copy.deepcopy(world.goal_state) 
+                    step_counter = 0 
+
+                    state_tensors = torch.stack(trajectory_info)
+                    torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+                    segment_counter += 1 
+
+
+
+        if trajectory_length_limit is None:
+            state_tensors = torch.stack(trajectory_info)
+            torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
 
     print('The average path length :', total_path_len/len(subject_list))
 
@@ -394,22 +404,27 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     trajectories = glob.glob(os.path.join(expert_trajectory_folder, '*.states'))
-
+    total_avg_speed = np.zeros(6)
     traj_counter = 0
     print('Total number of trajectories :', len(trajectories))
     flag = False
     total_len = 0
+    avg_speed = np.zeros(6)
     for idx, trajectory in enumerate(trajectories):
 
         traj = torch.load(trajectory, map_location=DEVICE)
         traj_np = traj.cpu().numpy()
 
-        pdb.set_trace()
         if not flag:
             print('State size :', traj[0].shape)
             flag = True
 
-        total_len += len(traj.shape[1])
+        total_len += len(traj)
+        avg_speed = np.sum(traj_np[:,-6:],0)
+        total_avg_speed += avg_speed
+        print(avg_speed)
+
+    print('Average speed :', total_avg_speed/len(trajectories))
 
     print('Average len of trajectories :', total_len/len(trajectories))
 
@@ -424,13 +439,13 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    '''
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
 
-    feature_extractor = 'DroneFeatureRisk_v3/'
+    feature_extractor = 'DroneFeatureRisk_speed_segments/'
     to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
@@ -443,7 +458,10 @@ if __name__=='__main__':
                                         agent_width=10, obs_width=10,
                                         grid_size=10, step_size=step_size)
 
-    
+    feature_extractor = DroneFeatureRisk_speed(thresh1=10, thresh2=15,
+                                               agent_width=10, obs_width=10,
+                                               grid_size=10, step_size=step_size)
+
    
     #feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
     #                                agent_width=agent_width, 
@@ -453,9 +471,11 @@ if __name__=='__main__':
     
     
     #print(extract_subjects_from_file(file_name))
-    extract_trajectory(file_name, feature_extractor, folder_to_save, show_states=False, display=False)
+    extract_trajectory(file_name, feature_extractor, 
+                       folder_to_save, show_states=False,
+                       display=False, trajectory_length_limit=50)
     
-    '''
+    
     #****************************************************
     #******** section to record trajectories
     '''
@@ -465,8 +485,8 @@ if __name__=='__main__':
     obs_size = 10
     window_size = 15
     
-    num_trajs = 20
-    path_to_save = './DroneFeatureRisk_user_played_subject_165_new'
+    num_trajs = 50
+    path_to_save = './DroneFeatureRisk_speed'
     
     
     feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
@@ -492,6 +512,12 @@ if __name__=='__main__':
                                      obs_width=obs_size,
                                      )
 
+    feature_extractor = DroneFeatureRisk_speed(step_size=step_size,
+                                               thresh1=10,
+                                               thresh2=15,
+                                               agent_width=agent_size,
+                                               grid_size=grid_size,
+                                               obs_width=obs_size)
     
     env = GridWorldDrone(display=True, is_onehot=False, agent_width=agent_size,
                          seed=10, obstacles=None, obs_width=obs_size,
@@ -499,21 +525,22 @@ if __name__=='__main__':
                          show_trail=False,
                          is_random=True,
                          step_reward=.005,
-                         annotation_file='../envs/expert_datasets/custom_scenarios/frame_skip_1/wall_left_to_right_fanned_from_behind_processed_corrected.txt',
+                         #annotation_file='../envs/expert_datasets/custom_scenarios/frame_skip_1/wall_left_to_right_fanned_from_behind_processed_corrected.txt',
                          subject=None,
                          consider_heading=True,
-                         replace_subject=True,
-                         rows=576, cols=720) 
+                         replace_subject=False,
+                         #rows=576, cols=720
+                         rows=100, cols=100) 
 
 
     
-    record_trajectories(num_trajs, env, feature_extractor, path_to_save, subject_list=[7])
+    record_trajectories(num_trajs, env, feature_extractor, path_to_save)
     '''
     #***************************************************** 
 
     
     #******** section for preprocessing data ************
-    
+    '''
     file_name = '../envs/Another_spline_file.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
@@ -522,11 +549,11 @@ if __name__=='__main__':
     
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
-    
+    '''
 
     #*****************************************************
     #********** getting information of the trajectories
     '''
-    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_v3'
+    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Continuous_new_drone_env2019-10-29 17:05:55-reg-0-seed-96-lr-0.0005/agent_generated_trajectories'
     get_expert_trajectory_info(expert_traj_folder)
     '''
