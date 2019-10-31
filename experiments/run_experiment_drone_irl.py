@@ -70,6 +70,7 @@ parser.add_argument('--scale-svf', action='store_true', default=None, help='If t
                     based on the reward the trajectory got.')
 
 parser.add_argument('--replace-subject', action='store_true', default=None)
+parser.add_argument('--segment-size', type=int, default=None, help='Size of each trajectory segment.')
 parser.add_argument('--subject', type=int, default=None)
 
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
@@ -234,12 +235,12 @@ def main():
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
                     replace_subject=args.replace_subject,
+                    segment_size=args.segment_size,
                     external_control=True,
                     reset_wrapper=utils.reset_wrapper,
                     consider_heading=True,
                     is_onehot=False)
     
-
 
     experiment_logger.log_header('Environment details :')
     experiment_logger.log_info(env.__dict__)

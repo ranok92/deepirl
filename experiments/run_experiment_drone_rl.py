@@ -53,6 +53,7 @@ parser.add_argument('--subject', type=int, default=None, help='The id of the ped
 parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The name of the directory in which \
                     the expert trajectories are stored.(Relative path)')
 
+parser.add_argument('--segment-size', type=int, default=None, help='Size of each trajectory segment.')
 def main():
     
     #####for the logger
@@ -176,7 +177,7 @@ def main():
                                        step_size=step_size,
                                        grid_size=grid_size,
                                        show_agent_persp=False,
-                                       thresh1=15, thresh2=30)
+                                       thresh1=10, thresh2=15)
 
 
 
@@ -207,6 +208,7 @@ def main():
                         step_size=step_size,
                         agent_width=agent_width,
                         replace_subject=replace_subject,
+                        segment_size=args.segment_size,
                         external_control=True,
                         step_reward=0.001,
                         show_comparison=True,
