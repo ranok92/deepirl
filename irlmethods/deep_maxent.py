@@ -129,9 +129,9 @@ class DeepMaxEnt():
         self.hidden_dims = hidden_dims
 
         self.learning_rate = learning_rate
-        self.optimizer = optim.SGD(self.reward.parameters(), lr=self.learning_rate)
+        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0.01, lr=self.learning_rate)
 
-        #self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
 
         self.EPS = np.finfo(np.float32).eps.item()
 
@@ -682,7 +682,7 @@ class DeepMaxEnt():
             #pdb.set_trace()
             self.optimizer.step()
 
-            #self.lr_scheduler.step()
+            self.lr_scheduler.step()
 
             print('done')
 
