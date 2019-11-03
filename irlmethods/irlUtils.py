@@ -625,10 +625,12 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
 
 
+
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
-                                gamma=0.99, scale_svf=False):
+                                gamma=0.99, scale_svf=False,
+                                enumerate_all=False):
     
     '''
     calculating the state visitation frequency from sampling. This function
@@ -643,6 +645,11 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         print('Featrue extractor missing. Exiting.')
         return None
 
+    ped_list = []
+
+    if enumerate_all:
+        ped_list = list(env.pedestrian_dict.keys())
+
     rewards_true = np.zeros(no_of_samples) #the true rewards
     rewards = np.zeros(no_of_samples) #the reward according to the reward network if present
 
@@ -655,7 +662,14 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         run_reward_true = 0
         current_svf_dict = {}
         done = False
-        state = env.reset()
+        if enumerate_all:
+            if i < len(ped_list):
+                state = env.reset_and_replace(ped=int(ped_list[i]))
+            else:
+                break
+        else:
+            state = env.reset()
+
         #print('agent position:', state['agent_state'])
         state = feature_extractor.extract_features(state)
         current_svf_dict[feature_extractor.hash_function(state)] = 1

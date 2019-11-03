@@ -226,7 +226,7 @@ class DeepMaxEnt():
     def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
                                 policy_nn=None, reward_nn=None, smoothing_window=None, 
                                 scale_svf=True, episode_length=20, gamma=0.99,
-                                feature_extractor=None):
+                                feature_extractor=None, enumerate_all=False):
 
          
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
@@ -234,7 +234,8 @@ class DeepMaxEnt():
                                             reward_nn=reward_nn, scale_svf=scale_svf,
                                             episode_length=episode_length,
                                             gamma=gamma,
-                                            feature_extractor=feature_extractor)
+                                            feature_extractor=feature_extractor,
+                                            enumerate_all=enumerate_all)
         '''
         return irlUtils.calculate_svf_from_sampling_using_smoothing(no_of_samples=num_of_samples, 
                                                                     env=env, policy_nn=policy_nn, 
@@ -270,7 +271,7 @@ class DeepMaxEnt():
             l1_reg += torch.norm(param,1)
 
         #adding back the regularizer term
-        loss = dot_prod + lamdda1*l1_reg
+        loss = dot_prod + lambda1*l1_reg
         
 
         loss.backward()
@@ -596,7 +597,7 @@ class DeepMaxEnt():
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=500,
+            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=1000,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
@@ -604,7 +605,8 @@ class DeepMaxEnt():
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episode_len,
-                                                             smoothing_window=None)
+                                                             smoothing_window=None,
+                                                             enumerate_all=True)
 
 
             model_performance_list.append(true_reward)

@@ -758,7 +758,7 @@ class GridWorldDrone(GridWorld):
 
         #pygame.image.save(self.gameDisplay,'traced_trajectories')
 
-    def reset_and_replace(self):
+    def reset_and_replace(self, ped=None):
         '''
         Resets the environment and replaces one of the existing pedestrians
         from the video feed in the environment with the agent. 
@@ -766,14 +766,18 @@ class GridWorldDrone(GridWorld):
         '''
         #pdb.set_trace()
         no_of_peds = len(self.pedestrian_dict.keys())
+
         if self.subject is None:
             while True:
-                
-                self.cur_ped = np.random.randint(1,no_of_peds+1)
-                if str(self.cur_ped) in self.pedestrian_dict.keys():
+                if ped is not None:
+                    self.cur_ped=ped
                     break
                 else:
-                    print('Selected pedestrian not available.')
+                    self.cur_ped = np.random.randint(1,no_of_peds+1)
+                    if str(self.cur_ped) in self.pedestrian_dict.keys():
+                        break
+                    else:
+                        print('Selected pedestrian not available.')
         else:
             self.cur_ped = self.subject
 
@@ -789,7 +793,7 @@ class GridWorldDrone(GridWorld):
             self.current_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame']) #frame from the first entry of the list
             self.final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
             self.goal_state = self.pedestrian_dict[str(self.cur_ped)][str(self.final_frame)]['position']
-
+           
         else:
             first_frame = int(self.pedestrian_dict[str(self.cur_ped)]['initial_frame'])
             final_frame = int(self.pedestrian_dict[str(self.cur_ped)]['final_frame'])
