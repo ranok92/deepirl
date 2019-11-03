@@ -235,10 +235,10 @@ def extract_trajectory(annotation_file, feature_extractor,
     if subject is not None:
         subject_list = subject
     for sub in subject_list:
-        trajectory_info = []
         print('Starting for subject :',sub)
+        trajectory_info = []
+        step_counter_segment = 0
 
-        step_counter = 0
         segment_counter = 1
         world.subject=sub
         world.reset()
@@ -246,37 +246,48 @@ def extract_trajectory(annotation_file, feature_extractor,
         path_len = world.final_frame - world.current_frame
         cur_subject_final_frame = world.final_frame
         total_path_len += world.final_frame - world.current_frame
-
+        print('Total trajectory information :\nStarting frame: {},final frame: {}'.format(world.current_frame, cur_subject_final_frame))
+        print('Total path length :', path_len)                                                                               
         if trajectory_length_limit is not None:
 
             traj_seg_length = min(trajectory_length_limit, path_len)
             #change the goal position
             world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
             world.state['goal_state'] = copy.deepcopy(world.goal_state) 
-           
+    
+        print('Segment 1: Start frame :', world.current_frame)    
         while world.current_frame < cur_subject_final_frame:
             state,_,_,_ = world.step()
-            step_counter += 1
+            step_counter_segment += 1
+            #step_counter_trajectory += 1 
             if disp:
                 feature_extractor.overlay_bins(state)
 
             state = feature_extractor.extract_features(state)
-            state = torch.tensor(state)
+            state = state.clone().detach()
             trajectory_info.append(state)
+
             if trajectory_length_limit is not None:
 
-                path_len = cur_subject_final_frame - world.current_frame
-                
-                if step_counter%trajectory_length_limit==0:
+                if step_counter_segment%traj_seg_length==0:
+                    print('Segment {} final frame : {}'.format(segment_counter, world.current_frame))
+                    path_len = cur_subject_final_frame - world.current_frame
                     traj_seg_length = min(trajectory_length_limit, path_len)
+                    print('Length of next path :', traj_seg_length)
+
                     #change the goal position
                     world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
                     world.state['goal_state'] = copy.deepcopy(world.goal_state) 
-                    step_counter = 0 
-
+                    print('Trajectory length : ', len(trajectory_info))
                     state_tensors = torch.stack(trajectory_info)
                     torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
                     segment_counter += 1 
+                    #pdb.set_trace()
+                    step_counter_segment = 0 
+                    trajectory_info = []
+                    print('Segment {}: Start frame : {}'.format(segment_counter, 
+                                                                world.current_frame))    
+
 
 
 
@@ -411,7 +422,7 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     total_len = 0
     avg_speed = np.zeros(6)
     for idx, trajectory in enumerate(trajectories):
-
+        print('The trajectory filename :', trajectory)
         traj = torch.load(trajectory, map_location=DEVICE)
         traj_np = traj.cpu().numpy()
 
@@ -423,6 +434,8 @@ def get_expert_trajectory_info(expert_trajectory_folder):
         avg_speed = np.sum(traj_np[:,-6:],0)
         total_avg_speed += avg_speed
         print(avg_speed)
+        print('Trajectory length :', traj_np.shape[0])
+        #pdb.set_trace()
 
     print('Average speed :', total_avg_speed/len(trajectories))
 
@@ -445,7 +458,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
 
-    feature_extractor = 'DroneFeatureRisk_speed_segments/'
+    feature_extractor = 'DroneFeatureRisk_speed_segments_test/'
     to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
@@ -473,7 +486,7 @@ if __name__=='__main__':
     #print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, feature_extractor, 
                        folder_to_save, show_states=False,
-                       display=False, trajectory_length_limit=50)
+                       display=False, trajectory_length_limit=80)
     
     
     #****************************************************
@@ -554,6 +567,6 @@ if __name__=='__main__':
     #*****************************************************
     #********** getting information of the trajectories
     '''
-    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Continuous_new_drone_env2019-10-29 17:05:55-reg-0-seed-96-lr-0.0005/agent_generated_trajectories'
+    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speed_segments'
     get_expert_trajectory_info(expert_traj_folder)
     '''
