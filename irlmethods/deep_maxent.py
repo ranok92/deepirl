@@ -258,6 +258,8 @@ class DeepMaxEnt():
         self.optimizer.zero_grad()
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
+        #getting the avg of the loss
+        dot_prod = dot_prod/stateRewards.shape[0]
 
         #adding L1 regularization
         lambda1 = self.regularizer
@@ -267,7 +269,10 @@ class DeepMaxEnt():
         for param in self.reward.parameters():
             l1_reg += torch.norm(param,1)
 
-        loss = dot_prod
+        #adding back the regularizer term
+        loss = dot_prod + lamdda1*l1_reg
+        
+
         loss.backward()
 
         #clipping if asked for
