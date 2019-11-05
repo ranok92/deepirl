@@ -723,6 +723,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     total_reward_exp = sum(rewards_exp)
 
     #putting a control on the reweighting as discussed.
+    no_of_samples = len(svf_dict_list)
+
     if scale_svf:
         weights = rewards_exp/total_reward_exp
     else:
@@ -772,14 +774,14 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     plt.plot(state_arr)
     plt.show()
     
-    
+    '''
     svf_sum = 0
     for key in master_dict.keys():
         svf_sum += master_dict[key]
     
     ################################################
-    '''
-    #pdb.set_trace()
+    
+    pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
     return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
