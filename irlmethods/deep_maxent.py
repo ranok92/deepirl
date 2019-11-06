@@ -259,9 +259,6 @@ class DeepMaxEnt():
         self.optimizer.zero_grad()
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
-        #getting the avg of the loss
-        dot_prod = dot_prod/stateRewards.shape[0]
-
         #adding L1 regularization
         lambda1 = self.regularizer
         l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
@@ -271,7 +268,7 @@ class DeepMaxEnt():
             l1_reg += torch.norm(param,1)
 
         #adding back the regularizer term
-        loss = dot_prod + lambda1*l1_reg
+        loss = dot_prod 
         
 
         loss.backward()
@@ -608,7 +605,7 @@ class DeepMaxEnt():
                                                              smoothing_window=None,
                                                              enumerate_all=True)
 
-
+            #pdb.set_trace()
             model_performance_list.append(true_reward)
             self.writer.add_scalar('Log_info/model_performance_true', true_reward, i)
             model_performance_nn.append(nn_reward)
