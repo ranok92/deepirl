@@ -8,8 +8,7 @@ from PIL import Image
 from copy import copy
 from collections import defaultdict
 sys.path.insert(0, '..')
-import utils  # NOQA: E402
-
+import utils as utils # NOQA: E402
 with utils.HiddenPrints():
     import pygame
 
@@ -36,6 +35,10 @@ class Obstacles:
 class MockActionspace:
     def __init__(self, n):
         self.n = n
+
+    def sample(self):
+        return np.random.randint(self.n)
+
 
 class MockSpec:
     def __init__(self, reward_threshold):

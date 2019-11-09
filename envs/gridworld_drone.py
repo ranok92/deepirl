@@ -166,6 +166,10 @@ class GridWorldDrone(GridWorld):
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
+
+        #MockActionspace takes in the total number of actions 
+        #possible and not the dimension of the action space 
+        #(which is 1 in this case)
         self.action_space = MockActionspace(len(self.orientation_array)*len(self.speed_array))
         #self.spec = MockSpec(1.0)
 
@@ -549,7 +553,7 @@ class GridWorldDrone(GridWorld):
                         
                     else:
                         #if the action is a torch
-                        if len(action.shape)==1 and a.shape[0]==1: #check if it the tensor has a single value
+                        if len(action.shape)==1 and action.shape[0]==1: #check if it the tensor has a single value
                             if isinstance(action.item(), int):
                                 action_orient = action%len(self.orientation_array)
                                 action_speed = int(action/len(self.orientation_array))
