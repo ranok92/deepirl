@@ -100,7 +100,7 @@ class SAC(object):
     def __init__(self, env,
                  feat_extractor=None,
                  policy=None,
-                 log_interval=10,
+                 log_interval=3,
                  max_episodes=1000,
                  max_ep_length=200,
                  hidden_dims=[256],
@@ -194,6 +194,7 @@ class SAC(object):
         running_reward = 0
         running_reward_list = []
         total_timesteps = 0
+        action_array = np.zeros(self.env.action_space.n)
 
         for i_episode in count(1):
 
@@ -216,7 +217,7 @@ class SAC(object):
 
 
                 new_state, reward, done, _ = self.env.step(action)
-
+                action_array[action] += 1
                 if self.feature_extractor is not None:
 
                     new_state = self.feature_extractor.extract_features(new_state)
@@ -245,41 +246,41 @@ class SAC(object):
                 if done:
                     break
 
-                running_reward += ep_reward
+            running_reward += ep_reward
 
-                #logging intermediate training information
+            #logging intermediate training information
 
-                if not irl:
+            if not irl:
 
-                    if i_episode >=10 and i_episode %self.log_interval == 0:
+                if i_episode >=1 and i_episode %self.log_interval == 0:
 
-                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, ep_timestep, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
-                        running_reward_list.append(running_reward/self.log_interval)
-                        running_reward = 0
-                        action_array = np.zeros(self.env.action_space.n)
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                        i_episode, ep_timestep, running_reward/self.log_interval))
+                    print('The action frequency array :', action_array)
+                    running_reward_list.append(running_reward/self.log_interval)
+                    running_reward = 0
+                    action_array = np.zeros(self.env.action_space.n)
 
-                    if i_episode > self.max_episodes and self.max_episodes > 0:
+                if i_episode > self.max_episodes and self.max_episodes > 0:
 
-                        break
+                    break
 
-                else:
+            else:
 
-                    assert self.max_episodes > 0
+                assert self.max_episodes > 0
 
-                    if i_episode >= 10 and  i_episode % self.log_interval == 0:
-                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, ep_timestep, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
-                        action_array = np.zeros(self.env.action_space.n)
-                        running_reward_list.append(running_reward/self.log_interval)
+                if i_episode >= 10 and  i_episode % self.log_interval == 0:
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                        i_episode, ep_timestep, running_reward/self.log_interval))
+                    print('The action frequency array :', action_array)
+                    action_array = np.zeros(self.env.action_space.n)
+                    running_reward_list.append(running_reward/self.log_interval)
 
-                        running_reward = 0
+                    running_reward = 0
 
-                    # terminate if max episodes exceeded
-                    if i_episode > self.max_episodes:
-                        break
+                # terminate if max episodes exceeded
+                if i_episode > self.max_episodes:
+                    break
 
         if self.save_folder:
             self.plot_and_save_info((loss_list, running_reward_list), ('Loss', 'rewards_obtained'))
