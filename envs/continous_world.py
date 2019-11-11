@@ -1,23 +1,12 @@
-from featureExtractor.gridworld_featureExtractor import SocialNav, LocalGlobal, FrontBackSideSimple
-import copy
-from envs.gridworld import GridWorld
-from itertools import count
-from alternateController.potential_field_controller import PotentialFieldController as PFController
-from envs.drone_env_utils import InformationCollector
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
-from envs.gridworld_clockless import MockActionspace, MockSpec
-import numpy as np
-import torch
-import time
-import pdb
-import sys
-import sys
-import math
-import os
-sys.path.insert(0, '..')
+"""A continous 2D top down world with continous action space."""
 
+import math
+
+import numpy as np
 
 import utils  # NOQA: E402
+from .gridworld import GridWorld
+
 with utils.HiddenPrints():
     import pygame
     import pygame.freetype
@@ -64,7 +53,6 @@ class GridWorldDrone(GridWorld):
             replace_subject=False,
             external_control=True,
             consider_heading=False,
-            variable_speed=False
     ):
         super().__init__(seed=seed,
                          rows=rows,
@@ -131,7 +119,6 @@ class GridWorldDrone(GridWorld):
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
-        self.action_space = MockActionspace(len(self.actionArray))
         self.step_reward = step_reward
         self.external_control = external_control
         self.replace_subject = replace_subject
@@ -228,13 +215,11 @@ class GridWorldDrone(GridWorld):
         if np.linalg.norm(
                 base_position - next_position) <= self.step_size * math.sqrt(2):
             # draw the stalk
-            arrow_width = self.cellWidth * .1  # in pixels
             base_pos_pixel = (base_position + .5)
             next_pos_pixel = (next_position + .5)
             # pdb.set_trace()
 
             # draw the head
-            ref_pos = base_pos_pixel + (next_pos_pixel - base_pos_pixel) * .35
             arrow_length = 0.7
             arrow_base = base_pos_pixel
             arrow_end = base_pos_pixel + \
@@ -251,9 +236,6 @@ class GridWorldDrone(GridWorld):
 
     def draw_trajectory(self, trajectory=[], color=None):
         # TODO: Parametrized hard-coded stuff below.
-        arrow_length = 1
-        arrow_head_width = 1
-        arrow_width = .1
         # denotes the start and end positions of the trajectory
         rad = int(self.cellWidth * .4)
         start_pos = (trajectory[0]['position'] + .5) * self.cellWidth
@@ -268,6 +250,5 @@ class GridWorldDrone(GridWorld):
                            rad)
 
         for count in range(len(trajectory) - 1):
-            # pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
             self.draw_arrow(trajectory[count]['position'],
                             trajectory[count + 1]['position'], color)
