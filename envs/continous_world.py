@@ -38,10 +38,6 @@ class Pedestrian():
 
 
 class GridWorldDrone(GridWorld):
-
-    # the numbering starts from 0,0 from topleft corner and goes down and right
-    # the obstacles should be a list of 2 dim numpy array stating the position of the
-    # obstacle
     def __init__(
             self,
             seed=7,
@@ -142,34 +138,7 @@ class GridWorldDrone(GridWorld):
 
         self.show_orientation = show_orientation
 
-    def get_state_from_frame(self, frame_info):
-        '''
-        For stanford dataset
-        '''
-        self.obstacles = []
-        for element in frame_info:
-
-            if element[6] != str(1):  # they are visible
-                if int(element[0]) != self.cur_ped:
-
-                    left = int(element[1])
-                    top = int(element[2])
-                    width = int(element[3]) - left
-                    height = int(element[4]) - top
-                    self.obstacles.append(
-                        np.array([int(top + (height / 2)), int(left + (width / 2))]))
-
-                else:
-
-                    left = int(element[1])
-                    top = int(element[2])
-                    width = int(element[3]) - left
-                    height = int(element[4]) - top
-                    self.agent_state = np.array(
-                        [int(top + (height / 2)), int(left + (width / 2))])
-
     def render(self):
-
         # render board
         self.clock.tick(self.tickSpeed)
         font = pygame.freetype.Font(None, 15)
@@ -227,300 +196,29 @@ class GridWorldDrone(GridWorld):
                             10],
                         2)
 
-        if self.ghost_state is not None:
-            pygame.draw.rect(self.gameDisplay,
-                             self.ghost_color,
-                             [self.ghost_state['position'][1] - (self.agent_width / 2),
-                              self.ghost_state['position'][0] - (self.agent_width / 2),
-                                 self.agent_width,
-                                 self.agent_width])
-
         if self.show_trail:
             self.draw_trajectory(self.pos_history, self.black)
 
-            if self.ghost:
-                self.draw_trajectory(
-                    self.ghost_state_history, self.ghost_color)
-
         pygame.display.update()
-        return 0
 
-    def step(self, action=None):
-        '''
-        if external_control: t
-            the state of the agent is updated based on the current action.
-        else:
-            the state of the agent is updated based on the information from the frames
-
-        the rest of the actions, like calculating reward and checking if the episode is done remains as usual.
-        '''
-        self.current_frame += 1
-
-        if str(self.current_frame) in self.annotation_dict.keys():
-            self.get_state_from_frame_universal(
-                self.annotation_dict[str(self.current_frame)])
-
-        if self.external_control:
-
-            if not self.release_control:
-
-                if action is not None:
-                    if isinstance(action, int):
-
-                        if action != 8 and self.consider_heading:
-                            action = (self.cur_heading_dir + action) % 8
-                            self.cur_heading_dir = action
-                        # self.heading_dir_history.append(self.cur_heading_dir)
-                        #self.cur_heading_dir = action
-                        prev_position = self.agent_state['position']
-                        self.agent_state['position'] = np.maximum(
-                            np.minimum(
-                                self.agent_state['position'] +
-                                self.step_size *
-                                self.actionArray[action],
-                                self.upper_limit_agent),
-                            self.lower_limit_agent)
-
-                        self.agent_state['orientation'] = self.agent_state['position'] - prev_position
-                        self.agent_state['speed'] = np.linalg.norm(
-                            self.agent_state['orientation'])
-
-                    else:
-                        # if the action is a torch
-                        # check if it the tensor has a single value
-                        if len(action.shape) == 1 and a.shape[0] == 1:
-                            if isinstance(action.item(), int):
-                                prev_position = self.agent_state['position']
-
-                                if action != 8 and self.consider_heading:
-                                    action = (
-                                        self.cur_heading_dir + action) % 8
-                                    self.cur_heading_dir = action
-                                # self.heading_dir_history.append(self.cur_heading_dir)
-                                #self.cur_heading_dir = action
-
-                                self.agent_state['position'] = np.maximum(
-                                    np.minimum(
-                                        self.agent_state['position'] +
-                                        self.step_size *
-                                        self.actionArray[action],
-                                        self.upper_limit_agent),
-                                    self.lower_limit_agent)
-
-                                self.agent_state['orientation'] = self.agent_state['position'] - prev_position
-                                self.agent_state['speed'] = np.linalg.norm(
-                                    self.agent_state['orientation'])
-                    #print("Agent :",self.agent_state)
-
-            # if not np.array_equal(self.pos_history[-1],self.agent_state):
-            self.heading_dir_history .append(self.cur_heading_dir)
-
-            self.pos_history.append(copy.deepcopy(self.agent_state))
-
-            if self.ghost:
-                self.ghost_state_history.append(
-                    copy.deepcopy(self.ghost_state))
-
-        # calculate the reward and completion condition
-        reward, done = self.calculate_reward(action)
-        self.prev_action = action
-
-        # if you are done ie hit an obstacle or the goal
-        # you leave control of the agent and you are forced to
-        # suffer/enjoy the consequences of your actions for the
-        # rest of your miserable/awesome life
-
-        if self.display:
-            self.render()
-
-        # step should return fourth element 'info'
-        if self.is_onehot:
-            self.state = self.onehotrep()
-        else:
-            # just update the position of the agent
-            # the rest of the information remains the same
-
-            # added new
-            if not self.release_control:
-                self.state['agent_state'] = copy.deepcopy(self.agent_state)
-                if action != 8:
-                    self.state['agent_head_dir'] = action
-
-        if self.is_onehot:
-
-            self.state, reward, done, _ = self.step_wrapper(
-                self.state,
-                reward,
-                done,
-                None
-            )
-
-        if self.external_control:
-            if done:
-                self.release_control = True
-
-        return self.state, reward, done, None
+    def step(self, action):
+        """ Step forward in simulation where agent takes some action.
+        
+        :param action: Action taken by agent
+        :type action: int
+        :return: (next_state, reward, done, info)
+        :rtype: (np.array, Float, Boolean, _)
+        """
+        # TODO: Implement this!
+        raise(NotImplementedError)
 
     def calculate_reward(self, cur_action):
-
-        hit = False
-        done = False
-
-        if self.obstacles is not None:
-            for obs in self.obstacles:
-                if self.check_overlap(
-                        self.agent_state['position'],
-                        obs['position'],
-                        self.obs_width,
-                        self.buffer_from_obs):
-                    hit = True
-
-        if (hit):
-            reward = -1
-            done = True
-
-        elif self.check_overlap(self.agent_state['position'], self.goal_state, self.cellWidth, 0):
-            reward = 1
-            done = True
-
-        else:
-
-            newdist = np.linalg.norm(
-                self.agent_state['position'] - self.goal_state, 1)
-
-            reward = (self.distanceFromgoal - newdist) * self.step_reward
-
-            self.distanceFromgoal = newdist
-
-        if cur_action is not None:
-
-            energy_spent = - \
-                np.sum(
-                    np.square(self.actionArray[cur_action] - self.actionArray[self.prev_action]))
-
-            reward += energy_spent * self.step_reward * 1
-
-        # pdb.set_trace()
-        return reward, done
+        # TODO: Implement reward!
+        raise(NotImplementedError)
 
     def reset(self):
-        '''
-        Resets the environment, starting the obstacles from the start.
-        If subject is specified, then the initial frame and final frame is set
-        to the time frame when the subject is in the scene.
-
-        If no subject is specified then the initial frame is set to the overall
-        initial frame and goes till the last frame available in the annotation file.
-
-        Also, the agent and goal positions are initialized at random.
-
-        Pro tip: Use this function while training the agent.
-        '''
-        # pygame.image.save(self.gameDisplay,'traced_trajectories.png')
-        #########for debugging purposes###########
-        if self.replace_subject:
-
-            return self.reset_and_replace()
-
-        else:
-
-            #self.skip_list = [i for i in range(len(self.pedestrian_dict.keys()))]
-
-            self.current_frame = self.initial_frame
-            self.pos_history = []
-            self.ghost_state_history = []
-            # if this flag is true, the position of the obstacles and the goal
-            # change with each reset
-            dist_g = self.goal_spawn_clearance
-
-            if self.annotation_file:
-                self.get_state_from_frame_universal(
-                    self.annotation_dict[str(self.current_frame)])
-
-            num_obs = len(self.obstacles)
-
-            # placing the obstacles
-
-            # only for the goal and the agent when the subject is not specified
-            # speicfically.
-
-            if self.cur_ped is None:
-
-                # placing the goal
-                while True:
-                    flag = False
-                    self.goal_state = np.asarray(
-                        [
-                            np.random.randint(
-                                self.lower_limit_goal[0],
-                                self.upper_limit_goal[0]),
-                            np.random.randint(
-                                self.lower_limit_goal[1],
-                                self.upper_limit_goal[1])])
-
-                    for i in range(num_obs):
-                        if np.linalg.norm(
-                                self.obstacles[i]['position'] -
-                                self.goal_state) < dist_g:
-
-                            flag = True
-                    if not flag:
-                        break
-
-                # placing the agent
-                dist = self.agent_spawn_clearance
-                while True:
-                    flag = False
-                    # pdb.set_trace()
-                    self.agent_state['position'] = np.asarray(
-                        [
-                            np.random.randint(
-                                self.lower_limit_agent[0],
-                                self.upper_limit_agent[0]),
-                            np.random.randint(
-                                self.lower_limit_agent[1],
-                                self.upper_limit_agent[1])])
-
-                    for i in range(num_obs):
-                        if np.linalg.norm(
-                                self.obstacles[i]['position'] -
-                                self.agent_state['position']) < dist:
-                            flag = True
-
-                    if not flag:
-                        break
-
-            self.release_control = False
-            if self.is_onehot:
-                self.state = self.onehotrep()
-            else:
-                self.state = {}
-                self.state['agent_state'] = copy.deepcopy(self.agent_state)
-                self.state['agent_head_dir'] = 0  # starts heading towards top
-                self.state['goal_state'] = self.goal_state
-
-                self.state['release_control'] = self.release_control
-                # if self.obstacles is not None:
-                self.state['obstacles'] = self.obstacles
-
-            self.pos_history.append(copy.deepcopy(self.agent_state))
-            if self.ghost:
-                self.ghost_state_history.append(
-                    copy.deepcopy(self.ghost_state))
-
-            self.distanceFromgoal = np.linalg.norm(
-                self.agent_state['position'] - self.goal_state, 1)
-            self.cur_heading_dir = 0
-            self.heading_dir_history = []
-            self.heading_dir_history.append(self.cur_heading_dir)
-
-            pygame.display.set_caption('Your friendly grid environment')
-            if self.display:
-                self.render()
-
-            if self.is_onehot:
-                self.state = self.reset_wrapper(self.state)
-            return self.state
+        # TODO: Implement a reset!
+        raise(NotImplementedError)
 
     def close_game(self):
         pygame.quit()
