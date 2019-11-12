@@ -56,7 +56,7 @@ parser.add_argument('--reward-net-hidden-dims', nargs="*", type=int , default=[1
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int , default=[128], help='The dimensions of the \
                      hidden layers of the policy network.')
 
-parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt', help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--lr-rl', type=float, default=1e-3, help='The learning rate for the policy network.')
@@ -87,7 +87,7 @@ def main():
 
     #####for the logger
     ts = time.time()
-    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%H:%M:%S')
     ###################
 
     if not args.save_folder:
@@ -105,10 +105,11 @@ def main():
         reward_net_dims += '-'
 
 
-    parent_dir = './results/'+str(args.save_folder)+st
-    to_save = './results/'+str(args.save_folder)+st+'-reg-'+str(args.regularizer)+ \
-                '-seed-'+str(args.seed)+'-lr-'+str(args.lr_rl)+ \
-                policy_net_dims + reward_net_dims 
+    parent_dir = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims
+    to_save = './results/'+str(args.save_folder)+st+policy_net_dims + reward_net_dims + \
+              '-reg-'+str(args.regularizer)+ \
+              '-seed-'+str(args.seed)+'-lr-'+str(args.lr_irl)
+                
                 
     log_file = 'Experiment_info.txt'
 
@@ -202,10 +203,13 @@ def main():
         print('Specify folder to save the results.')
         exit()
 
+
+    '''
+    environment can now initialize without an annotation file
     if args.annotation_file is None:
         print('Specify annotation file for the environment.')
         exit()
-
+    '''
     if args.exp_trajectory_path is None:
         print('Specify expert trajectory folder.')
         exit()

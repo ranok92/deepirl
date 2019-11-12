@@ -8,6 +8,7 @@ import torch.multiprocessing as mp
 import os
 
 import glob
+import copy
 import math
 from logger.logger import Logger
 import matplotlib
@@ -53,7 +54,11 @@ parser.add_argument('--policy-path', type=str, nargs='?', default=None)
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
 
 #arguments for a potential field agent
-
+'''
+/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/
+Drone_environment_univ_students003_DroneFeatureRisk_updated_risk_v2_general_3kiter2019-09-27 10:24:41-reg-0-seed-8788-lr-0.001/
+saved-models/17.pt
+'''
 
 #argument for some other agent
 
@@ -102,7 +107,7 @@ thresh2 = 15
 step_size = 2
 agent_width = 10
 obs_width = 10
-grid_size = 10
+grid_size = 3
 
 
 #**************************************************
@@ -134,15 +139,14 @@ info_collector = InformationCollector(run_info=args.agent_type,
 from envs.gridworld_drone import GridWorldDrone
 
 consider_heading = True
-if args.agent_type =='Potential_field':
-    consider_heading = False
+np.random.seed(args.seed)
 env = GridWorldDrone(display=args.render, is_onehot = False, 
                     seed=args.seed, obstacles=None, 
                     show_trail=True,
                     is_random=False,
                     subject=args.subject,
                     annotation_file=args.annotation_file,
-                    tick_speed=30, 
+                    tick_speed=50, 
                     obs_width=10,
                     step_size=step_size,
                     agent_width=agent_width,
@@ -235,8 +239,7 @@ if args.agent_type=='Potential_field':
 
     attr_mag = 3
     rep_mag = 2
-    agent = PFController(attr_f_limit=attr_mag,
-                         rep_f_limit=rep_mag)
+    agent = PFController()
 
 if args.agent_type=='Default':
 
@@ -438,8 +441,7 @@ def crash_analysis():
     #info_collector.collab_end_results()
     #info_collector.plot_information()
 
-
-def agent_drift_analysis(pos_reset=2000):
+def agent_drift_analysis(pos_reset=20):
     '''
     step interval after which to reset the position
     '''
@@ -496,6 +498,91 @@ def agent_drift_analysis(pos_reset=2000):
 
 
             #info_collector.collect_information_per_frame(state)
+            print('heading_dir', env.cur_heading_dir)
+            t+=1
+            abs_counter+=1
+            if t%pos_reset==0:
+                #reset the position of the agent
+                print('t :', t)
+                print('resetting')
+                env.agent_state = env.return_position(env.cur_ped, env.current_frame)
+                env.state['agent_state'] = copy.deepcopy(env.agent_state)
+                '''
+                pos = env.agent_state['position']
+                stop_points.append(pos)
+                for pos in stop_points:
+                    pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
+                pygame.display.update()
+                '''
+                env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
+                env.state['goal_state'] = copy.deepcopy(env.goal_state)  
+                state = copy.deepcopy(env.state)
+                env.release_control=False
+                t = 0
+                done = False
+        #info_collector.collab_end_traj_results()
+
+    #info_collector.collab_end_results()
+    #info_collector.plot_information()
+
+
+
+def agent_drift_analysis(pos_reset=2000):
+    '''
+    step interval after which to reset the position
+    '''
+    import pygame
+
+    for i in range(args.num_trajs):
+
+        #reset the world
+        crash_analysis = False
+        state=env.reset()
+        env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
+        env.state['goal_state'] = copy.deepcopy(env.goal_state)        
+        state = copy.deepcopy(env.state)
+        print('Current subject :', env.cur_ped)
+        final_frame = env.final_frame
+        if args.feat_extractor is not None:
+            feat_ext.reset()
+            state_feat = feat_ext.extract_features(state)
+            #pass
+        #reset the information collector
+        info_collector.reset_info(state)
+        done=False
+        t = 0
+        abs_counter = env.current_frame
+        while abs_counter < final_frame:
+            stop_points = []
+            if args.feat_extractor is not None:
+
+                if args.agent_type=='Policy_network':
+                    action, probs = agent.select_action_play(state_feat)
+                else:
+                #action selection for alternate controller namely potential field
+                    action = agent.select_action_play(state)
+
+                '''
+                if args.render:
+                    feat_ext.overlay_bins(state)
+                '''
+            else:
+                action = agent.select_action_play(state) 
+            #pdb.set_trace()
+            state, reward_true, done, _ = env.step(action)
+            
+           
+            if args.feat_extractor is not None:
+                state_feat = feat_ext.extract_features(state)
+
+                if crash_analysis:
+                    pdb.set_trace()
+            if args.reward_path is not None:
+                reward = reward_net(state_feat)
+            else:
+                reward = reward_true
+
+            #info_collector.collect_information_per_frame(state)
             #print('heading_dir', env.cur_heading_dir)
             t+=1
             abs_counter+=1
@@ -533,10 +620,10 @@ if __name__ == '__main__':
 
     #agent_drift_analysis(pos_reset=50)
     '''
+
+    agent_drift_analysis(80)
+    '''
     if args.reward_analysis:
         reward_analysis()
     else:
-        '''
-    crash_analysis()
-    
-
+        agent_drift_analysis(pos_reset=50)

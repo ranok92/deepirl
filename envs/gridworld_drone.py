@@ -115,7 +115,7 @@ class GridWorldDrone(GridWorld):
         self.ghost = None
         self.ghost_state = None
         self.ghost_state_history = []
-        self.ghost_color = (140, 0, 200)
+        self.ghost_color = (140,0,200)
 
 
         self.annotation_file = annotation_file #the file from which the video information will be used
@@ -176,7 +176,9 @@ class GridWorldDrone(GridWorld):
         ######################################################################
         self.step_reward = step_reward
 
+
         if self.annotation_file is not None:
+
             self.generate_annotation_list()
             self.generate_pedestrian_dict()
             self.generate_annotation_dict_universal()
@@ -184,6 +186,7 @@ class GridWorldDrone(GridWorld):
         else:
 
             print('No annotation file provided.')
+
 
         ########### debugging ##############
 
@@ -223,6 +226,7 @@ class GridWorldDrone(GridWorld):
         if self.annotation_file is not None:
             if not os.path.isfile(self.annotation_file):
                 print("The annotation file does not exist.")
+                exit()
                 return 0
 
             with open(self.annotation_file) as f:
@@ -490,11 +494,12 @@ class GridWorldDrone(GridWorld):
                                          [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
                                          2)
         if self.ghost_state is not None:
+
             pygame.draw.rect(self.gameDisplay, self.ghost_color, [self.ghost_state['position'][1]-(self.agent_width/2), self.ghost_state['position'][0]- \
                             (self.agent_width/2), self.agent_width, self.agent_width])
 
-
         if self.show_trail:
+
             self.draw_trajectory(self.pos_history, self.black)
 
             if self.ghost:
@@ -579,12 +584,12 @@ class GridWorldDrone(GridWorld):
                                 self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1, 0]))
             #print("Agent :",self.agent_state)
             #if not np.array_equal(self.pos_history[-1],self.agent_state):
-            self.heading_dir_history.append(self.cur_heading_dir)
+            self.heading_dir_history .append(self.cur_heading_dir)
 
             self.pos_history.append(copy.deepcopy(self.agent_state))
 
-            if self.ghost:
 
+            if self.ghost:
                 self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
         #calculate the reward and completion condition
@@ -682,10 +687,11 @@ class GridWorldDrone(GridWorld):
             #if this flag is true, the position of the obstacles and the goal 
             #change with each reset
             dist_g = self.goal_spawn_clearance
-            
+
             if self.annotation_file:
                 self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
-                
+            
+
             num_obs = len(self.obstacles)
 
             #placing the obstacles
@@ -744,6 +750,8 @@ class GridWorldDrone(GridWorld):
             self.state['obstacles'] = self.obstacles
 
             self.pos_history.append(copy.deepcopy(self.agent_state))
+            if self.ghost:
+                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
             if self.ghost:
                 self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
@@ -833,6 +841,10 @@ class GridWorldDrone(GridWorld):
 
         self.pos_history = []
         self.pos_history.append(copy.deepcopy(self.agent_state))
+        if self.ghost:
+            self.ghost_state_history = []
+            self.ghost_state = copy.deepcopy(self.agent_state)
+            self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
         if self.ghost:
             self.ghost_state_history = []
@@ -959,6 +971,15 @@ class GridWorldDrone(GridWorld):
         return self.state
 
 
+    def return_position(self, ped_id, frame_id):
+
+        print(ped_id, frame_id)
+        try:
+            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
+        except KeyError:
+            while str(frame_id) not in self.pedestrian_dict[str(ped_id)]:
+                frame_id -= 1
+            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
 
 
     def draw_arrow(self, base_position , next_position, color):
@@ -977,6 +998,7 @@ class GridWorldDrone(GridWorld):
             arrow_base = base_pos_pixel
             arrow_end = base_pos_pixel + (next_pos_pixel - base_pos_pixel)* arrow_length
 
+
             '''
             if base_position[0]==next_position[0]:
                 #same row (movement left/right)
@@ -984,7 +1006,7 @@ class GridWorldDrone(GridWorld):
                 pygame.draw.line(self.gameDisplay, (0,0,0),
                                 (base_pos_pixel[1],base_pos_pixel[0]),
                                 (next_pos_pixel[1]-gap,next_pos_pixel[0]))
-                
+     
                 pygame.draw.polygon(self.gameDisplay,(0,0,0),
                                 (
                                 (ref_pos[1],ref_pos[0]+(arrow_width/2)),
@@ -1009,7 +1031,6 @@ class GridWorldDrone(GridWorld):
 
             pygame.draw.line(self.gameDisplay, color, (arrow_base[1], arrow_base[0]),
                              (arrow_end[1], arrow_end[0]), 2)
-
 
  
 
@@ -1081,16 +1102,19 @@ if __name__=="__main__":
                         annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
                         subject=13,
                         tick_speed=10, 
+                        #annotation_file=None,
+
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
                         step_reward=0.01,
-                        show_comparison=False,
+                        show_comparison=True,
                         show_orientation=True,
                         external_control=True,
                         replace_subject=True, 
                         segment_size=50,
                         consider_heading=True,                      
+
                         rows=576, cols=720, width=20)
 
     pf_agent = PFController()
@@ -1131,6 +1155,7 @@ if __name__=="__main__":
             action = np.random.randint(35)
             #action = action_speed+(action_orient*7)
             #print('Action :', action)
+
             state, reward , done, _ = world.step(action)
             #print(reward, done)
             info_collector.collect_information_per_frame(state)
