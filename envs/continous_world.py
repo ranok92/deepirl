@@ -255,4 +255,3 @@ class ContinousWorld(GridWorld):
                 trajectory[count + 1]["position"],
                 color,
             )
-
