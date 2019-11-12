@@ -781,7 +781,6 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     
     ################################################
     
-    pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
     return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
@@ -965,107 +964,72 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
 
 if __name__ == '__main__':
 
-
-    '''
-    r = 10
-    c = 10
-
-    #feat = FrontBackSideSimple(thresh1 = 1, thresh2 = 2,
-    # 						   thresh3 = 3,
-    #						   fieldList = ['agent_state','goal_state'])
-    #feat = OneHot(grid_rows=10,grid_cols=10)
-    np.random.seed(0)
-
-    step_size = 3
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    render = True
     agent_width = 10
+    obs_width = 10
+    step_size = 2
     grid_size = 10
-    obs_width = agent_width  
-    expert_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/LocalGlobal_win5'
+    max_ep_length = 500
+    save_folder = None
+    policy_net_hidden_dims = [256]
+    lr = 0.00
+    total_episodes=1000
+    true_reward_list = []
+    #load the environment
+    env = GridWorldDrone(display=render, is_onehot=False, 
+                        seed=10, obstacles=None, 
+                        show_trail=False,
+                        is_random=True,
+                        annotation_file=annotation_file,
+                        subject=None,
+                        tick_speed=60, 
+                        obs_width=10,
+                        step_size=step_size,
+                        agent_width=agent_width,
+                        replace_subject=True,
+                        segment_size=None,
+                        external_control=True,
+                        step_reward=0.001,
+                        show_comparison=True,
+                        consider_heading=True,
+                        show_orientation=True,
+                        rows=576, cols=720, width=grid_size)
 
-    feat = LocalGlobal(window_size=5, grid_size=grid_size,
-                   agent_width=agent_width, 
-                   obs_width=obs_width,
-                   step_size=step_size,
-                   )
+    #load the feature extractor
+    feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
+                               obs_width=obs_width,
+                               step_size=step_size,
+                               grid_size=grid_size,
+                               show_agent_persp=False,
+                               thresh1=10, thresh2=15)
 
-    env = GridWorld(display=False, reset_wrapper=reset_wrapper, is_random = False,
-    				step_wrapper=step_wrapper,
-    				obstacles=[np.array([2,3])],
-    				goal_state=np.array([5,5]),
-    				is_onehot=False)
-    '''
+    #load the actor critic module
+    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
+                        log_interval=100,max_ep_length=max_ep_length,
+                        hidden_dims=policy_net_hidden_dims,
+                        save_folder=None, 
+                        max_episodes=total_episodes)
 
 
+    policy_folder =''
+
+    #read the files in the folder
+    policy_names = glob.glob(os.path.join(policy_folder, '*.pt'))
+    policy_file_list = sorted(policy_names, key=numericalSort)
+
+    xaxis = np.arange(len(policy_file_list))
+
+    for policy_file in policy_file_list:
+
+        print("Playing for policy : ", policy_file)
+        model.policy.load(policy_file)
+        _, true_reward, _ = calculate_svf_from_sampling(no_of_samples=1000, env=env,
+                                policy_nn=model.policy, reward_nn=None,
+                                episode_length=20, feature_extractor=feat_ext,
+                                gamma=1, scale_svf=False,
+                                enumerate_all=True)
+        true_reward_list.append(true_reward)
     
-    #calculating the SVF for policy
-
-    #calculating the svf for experts
-
-    grid_size=agent_width=obs_width=10
-    step_size = 3
-    expert_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureSAM1_user_played_subject_65_dir_agnostic/'
-    feat_ext = DroneFeatureSAM1(thresh1=10, thresh2=20, grid_size=grid_size,
-                   agent_width=agent_width, 
-                   obs_width=obs_width,
-                   step_size=step_size,
-                   )
-    
-
-    exp_svf = calculate_expert_svf(expert_folder, max_time_steps=500, feature_extractor=feat_ext, gamma=1)
-    pdb.set_trace()
-    exp_svf_3 = calculate_expert_svf(expert_folder, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
-
-    expert_folder_2 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_DroneFeatureSAM_updated_take12019-09-10_15:57:13-reg-0-seed-430-lr-0.001/agent_generated_trajectories/'
-    exp_svf_2 = calculate_expert_svf(expert_folder_2, max_time_steps=600, feature_extractor=feat_ext, gamma=1)
-    
-
-
-    state_list, diff_list = get_states_and_freq_diff(exp_svf, exp_svf_2, feat_ext)
-    #expert_folder_3 = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/IRL Runs/IRL_RUN_LocalGlobal_win3_blank_slate_rectified_take_62019-09-07_19:38:15-reg-0-seed-1198-lr-0.001/agent_generated_trajectories_sample1/'
-    #exp_svf_3 = calculate_expert_svf(expert_folder_3, max_time_steps=60, feature_extractor=feat_ext, gamma=1)
-
-    exp_state_list = []
-    exp_state_list2 = []
-    exp_state_list3 = []
-
-    cur_key_1 = -1
-    cur_key_2 = -1
-
-    for key in exp_svf.keys():
-
-        exp_state_list.append(exp_svf[key])
-
-    for key in exp_svf_2.keys():
-
-        exp_state_list2.append(exp_svf_2[key])
-
-    for key in exp_svf_3.keys():
-
-        exp_state_list3.append(exp_svf_3[key])
-
-
-    '''
-    cum_state_exp1 = np.zeros(feat_ext.state_rep_size)
-    cum_state_exp2 = np.zeros(feat_ext.state_rep_size)
-
-
-    for state in exp_svf.keys():
-
-        cum_state_exp1 += feat_ext.recover_state_from_hash_value(state)*exp_svf[state]
-    
-    for state in exp_svf_2.keys():
-
-        cum_state_exp2 += feat_ext.recover_state_from_hash_value(state)*exp_svf_2[state]
-
-    plt.figure(1)
-    plt.bar(np.arange(feat_ext.state_rep_size), cum_state_exp1)
-    plt.figure(2)
-    plt.bar(np.arange(feat_ext.state_rep_size), cum_state_exp2)
+    plt.plot(true_reward_list)
     plt.show()
-    pdb.set_trace()
-    '''
-    print('printing from the expert :',exp_svf)
-
-
-        #index = feat.state_dictionary[np.array2string(feat.recover_state_from_hash_value(key))]
-        #print(index,' ',exp_svf[key],' ',exp_svf_3[0][index] , ' - ',exp_svf[key]-exp_svf_3[0][index]  )

@@ -13,6 +13,7 @@ from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
 from irlmethods.deep_maxent import RewardNet
 from featureExtractor.gridworld_featureExtractor import LocalGlobal,SocialNav,FrontBackSideSimple
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 import math
 from envs.gridworld import GridWorld
 from envs.gridworld_clockless import GridWorldClockless
@@ -613,6 +614,46 @@ def get_trajectory_information(trajectory_folder, feature_extractor, plot_info=F
 
 
 
+
+def evaluate_policies(policy_folder, 
+                      policy_net_hidden_dims,
+                      reward_net=None,
+                      feat_ext=None, 
+                      env=None,
+                      run_info={}):
+    #run info is a dictionary that contains the following information
+    #episode length, number of samples, replace subject, enumerate all
+
+    policy_names = glob.glob(os.path.join(policy_folder, '*.pt'))
+    policy_file_list = sorted(policy_names, key=numericalSort)
+    state = env.reset()
+    dummy_feat = feat_ext.extract_features(state)
+    state_space_size = dummy_feat.shape[0]
+    policy = Policy(state_space_size, 
+                    env.action_space.n, 
+                    hidden_dims=policy_net_hidden_dims)
+
+    xaxis = np.arange(len(policy_file_list))
+    true_reward_list = []
+    for policy_file in policy_file_list:
+
+        print("Playing for policy : ", policy_file)
+        policy.load(policy_file)
+        _, true_reward, _ = calculate_svf_from_sampling(no_of_samples=run_info['num_of_samples'], 
+                                env=env,
+                                policy_nn=policy, 
+                                reward_nn=reward_net,
+                                episode_length=run_info['max_ep_length'], 
+                                feature_extractor=feat_ext,
+                                gamma=1, 
+                                scale_svf=False,
+                                enumerate_all=run_info['enumerate_all'])
+        true_reward_list.append(true_reward)
+        print('Reward obtained : ',true_reward)
+    plt.plot(true_reward_list)
+    plt.show()
+
+
 def compile_results(reward_info, unknown_state_info, subject_info=None):
 
     '''
@@ -676,62 +717,59 @@ if __name__ == '__main__':
     c = 10
     #initialize environment
     
-    '''
-    env = GridWorld(display=False, is_onehot= False,is_random =False,
-                rows =10,
-                cols =10,
-                seed = 12,
-                obstacles = [np.asarray([5,5])],
-                            
-                goal_state = np.asarray([1,5]))
-    '''
-    annotation_file = './envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed.txt'
+    annotation_file = './envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
 
-    step_size = 10
+    step_size = 2
     agent_width = 10
     grid_size = 10
     obs_width = agent_width
-    '''
-    env = GridWorldDrone(display=False, is_onehot = False, 
-                        seed=999, obstacles=None, 
+    render=False
+    env = GridWorldDrone(display=render, is_onehot=False, 
+                        seed=10, obstacles=None, 
                         show_trail=False,
-                        is_random=False,
+                        is_random=True,
                         annotation_file=annotation_file,
                         subject=None,
-                        tick_speed=90, 
+                        tick_speed=60, 
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
-                        train_exact=True,
-                        show_comparison=True,                       
+                        replace_subject=True,
+                        segment_size=None,
+                        external_control=True,
+                        step_reward=0.001,
+                        show_comparison=True,
+                        consider_heading=True,
+                        show_orientation=True,
                         rows=576, cols=720, width=grid_size)
-    '''
-
-    env = GridWorldClockless(display=False, is_random = True,
-                    rows = 100, cols = 100,
-                    agent_width=agent_width,
-                    step_size=step_size,
-                    obs_width=obs_width,
-                    width=grid_size,
-                    obstacles= './envs/map3.jpg',
-                    goal_state=None, 
-                    step_wrapper=step_wrapper,
-                    seed=6651,
-                    consider_heading=False,
-                    reset_wrapper=reset_wrapper,
-                    is_onehot = False)
-    
 
     #initialize feature extractor
-    feat = LocalGlobal(window_size=3, grid_size=grid_size,
-                       agent_width=agent_width, 
-                       obs_width=obs_width,
-                       step_size=step_size,
-                       )
-    #feat = SocialNav(fieldList = ['agent_state','goal_state'])
-    #feat = FrontBackSideSimple(fieldList = ['agent_state','goal_state','obstacles'])
+    feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
+                                      obs_width=obs_width,
+                                      step_size=step_size,
+                                      grid_size=grid_size,
+                                      show_agent_persp=False,
+                                      thresh1=10, thresh2=15)
+
+    '''
+    #*************uncomment to check the svfs***************
     expert_folder = './experiments/trajs/ac_loc_glob_rectified_win_3_static_map3/'
     agent_policy = './experiments/results/Testing_new_env_quadra-reg-0-seed-6651-lr-0.001/saved-models/'
     agent_reward = './experiments/results/Testing_new_env_quadra-reg-0-seed-6651-lr-0.001/saved-models-rewards/'
 
     compare_svf(expert_folder, agent_policy, env_reward=agent_reward, env=env, feat=feat)
+    #********************************************************
+    '''
+
+    #****************** evaluate policies*******************
+
+    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Continuous_new_drone_env2019-10-29 17:05:55-reg-0-seed-96-lr-0.0005/saved-models'
+    policy_net_hidden_dims = [256]
+    run_info = {'num_of_samples':1000,
+                'enumerate_all':True,
+                'max_ep_length':500}
+    evaluate_policies(policy_folder, policy_net_hidden_dims,
+                      reward_net=None,
+                      feat_ext=feat_ext, 
+                      env=env,
+                      run_info=run_info)

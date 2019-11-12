@@ -148,6 +148,7 @@ env = GridWorldDrone(display=args.render, is_onehot = False,
                     agent_width=agent_width,
                     external_control=True,
                     replace_subject=args.run_exact,
+                    
                     show_comparison=True,
                     consider_heading=consider_heading,
                     show_orientation=True,
@@ -160,7 +161,7 @@ print('Environment initalized successfully.')
 #initialize the feature extractor
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal
 from featureExtractor.drone_feature_extractor import DroneFeatureOccup, DroneFeatureRisk
-from featureExtractor.drone_feature_extractor import DroneFeatureRisk_v2
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_v2, DroneFeatureRisk_speed
 if args.feat_extractor == 'DroneFeatureSAM1':
 
     feat_ext = DroneFeatureSAM1(agent_width=agent_width,
@@ -197,6 +198,14 @@ if args.feat_extractor == 'DroneFeatureRisk_v2':
                                    show_agent_persp=True,
                                    thresh1=thresh1, thresh2=thresh2)
 
+if args.feat_extractor == 'DroneFeatureRisk_speed':
+
+    feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
+                                   obs_width=obs_width,
+                                   step_size=step_size,
+                                   grid_size=grid_size,
+                                   show_agent_persp=True,
+                                   thresh1=thresh1, thresh2=thresh2)
 
 #*************************************************
 #initialize the agent
@@ -430,7 +439,7 @@ def crash_analysis():
     #info_collector.plot_information()
 
 
-def agent_drift_analysis(pos_reset=20):
+def agent_drift_analysis(pos_reset=2000):
     '''
     step interval after which to reset the position
     '''
@@ -522,11 +531,12 @@ def agent_drift_analysis(pos_reset=20):
 
 if __name__ == '__main__':
 
-    agent_drift_analysis(pos_reset=50)
+    #agent_drift_analysis(pos_reset=50)
     '''
     if args.reward_analysis:
         reward_analysis()
     else:
-        crash_analysis()
-    '''
+        '''
+    crash_analysis()
+    
 
