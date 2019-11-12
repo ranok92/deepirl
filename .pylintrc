@@ -140,6 +140,7 @@ disable=print-statement,
         arguments-differ,
         not-callable,
         bad-continuation,
+        trailing-newlines,
 
 
 # Enable the message, report, category or checker with the given id(s). You can

@@ -204,9 +204,9 @@ class ContinousWorld(GridWorld):
 
     def draw_arrow(self, base_position, next_position, color):
         # base_position = (row,col)
-        if np.linalg.norm(base_position - next_position) <= self.step_size * math.sqrt(
-            2
-        ):
+        if np.linalg.norm(
+            base_position - next_position
+        ) <= self.step_size * math.sqrt(2):
             # draw the stalk
             base_pos_pixel = base_position + 0.5
             next_pos_pixel = next_position + 0.5
@@ -216,7 +216,8 @@ class ContinousWorld(GridWorld):
             arrow_length = 0.7
             arrow_base = base_pos_pixel
             arrow_end = (
-                base_pos_pixel + (next_pos_pixel - base_pos_pixel) * arrow_length
+                base_pos_pixel
+                + (next_pos_pixel - base_pos_pixel) * arrow_length
             )
 
             pygame.draw.line(
@@ -235,15 +236,23 @@ class ContinousWorld(GridWorld):
         end_pos = (trajectory[-1]["position"] + 0.5) * self.cellWidth
 
         pygame.draw.circle(
-            self.gameDisplay, (0, 255, 0), (int(start_pos[1]), int(start_pos[0])), rad
+            self.gameDisplay,
+            (0, 255, 0),
+            (int(start_pos[1]), int(start_pos[0])),
+            rad,
         )
 
         pygame.draw.circle(
-            self.gameDisplay, (0, 0, 255), (int(end_pos[1]), int(end_pos[0])), rad
+            self.gameDisplay,
+            (0, 0, 255),
+            (int(end_pos[1]), int(end_pos[0])),
+            rad,
         )
 
         for count in range(len(trajectory) - 1):
             self.draw_arrow(
-                trajectory[count]["position"], trajectory[count + 1]["position"], color
+                trajectory[count]["position"],
+                trajectory[count + 1]["position"],
+                color,
             )
 
