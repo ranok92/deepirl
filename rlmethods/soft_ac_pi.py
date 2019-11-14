@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
-from torch.distributions import Categorical
+from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence
 import numpy as np
 
@@ -130,13 +130,32 @@ class PolicyNetwork(BaseNN):
 
         return probs
 
+    def select_action(self, state):
+        """Generate an action based on state vector using current policy.
+
+        :param state: Current state vector. must be Torch 32 bit float tensor.
+        """
+        dist = self.action_distribution(state)
+        raw_action = dist.rsample() # reparametrization trick
+
+        # enforcing action bounds
+        tanh_action = torch.tanh(raw_action) # prevent recomputation later.
+        action = tanh_action * self.action_scale + self.action_bias
+        
+        # change of variables for log prob
+        raw_log_prob = dist.log_prob(raw_action)        
+        log_prob = raw_log_prob - torch.log(self.action_scale * (1-tanh_action.pow(2)) + FEPS)
+        log_prob = log_prob.sum(1, keepdim=True)
+
+        return action, log_prob, dist
+
     def action_distribution(self, state):
         """Returns a pytorch distribution object based on policy output.
 
         :param state: Input state vector.
         """
-        probs = self.__call__(state)
-        dist = Categorical(probs)
+        means, stds = self.__call__(state)
+        dist = Normal(means, stds)
 
         return dist
 
@@ -216,10 +235,8 @@ class SoftActorCritic:
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
-        dist = self.policy.action_distribution(state)
-        action = dist.sample()
 
-        return action, dist.log_prob(action), dist
+        return self.policy.select_action(state)
 
     def env_reset(self):
         """Reset environment, but return features from feature_extractor.
@@ -294,20 +311,11 @@ class SoftActorCritic:
         q_a_values = self.q_net(state_batch)
 
         # Q net outputs values for all actions, so we index specific actions
-        # TODO: It should be possible to just do MSE over all q_a pairs.
         q_values = get_action_q(q_a_values, action_batch.squeeze())
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        actions, log_actions, action_dist = self.select_action(state_batch)
-        q_a_pi = self.q_net(state_batch)
-        q_pi = get_action_q(q_a_pi, actions)
-        q_probs = F.softmax((1.0 / alpha) * q_a_pi, dim=-1)
-        q_probs = soften_distribution(q_probs, 1e-4)
-        q_dist = Categorical(q_probs)
-
-        policy_loss = kl_divergence(action_dist, q_dist)
-        policy_loss = policy_loss.mean()
+        # TODO: Implement continous policy loss
 
         # update parameters
         self.q_optim.zero_grad()
