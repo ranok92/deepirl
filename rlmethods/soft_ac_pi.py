@@ -151,6 +151,7 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer,
+            max_play_steps,
             buffer_sample_size=10**4,
             gamma=0.99,
             learning_rate=3e-4,
@@ -162,9 +163,11 @@ class SoftActorCritic:
             policy_net=None,
             q_net=None,
     ):
+        # env related settings
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
+        self.max_episode_length = max_play_steps
 
         # buffer
         self.replay_buffer = replay_buffer
@@ -225,7 +228,7 @@ class SoftActorCritic:
         policy.
         """
         while len(self.replay_buffer) < self.buffer_sample_size:
-            self.play()
+            self.play(self.max_episode_length)
 
     def tbx_logger(self, log_dict, training_i):
         """Logs the tag-value pairs in log_dict using TensorboardX.
@@ -332,7 +335,7 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self):
+    def play(self, max_steps):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
@@ -349,7 +352,11 @@ class SoftActorCritic:
             torch_state = torch_state.to(DEVICE)
 
             action, _, _ = self.select_action(torch_state)
-            next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
+            next_state, reward, done, _ = self.env.step(action.item())
+
+            episode_length += 1
+
+            max_steps_elapsed = episode_length > max_steps
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
@@ -370,7 +377,6 @@ class SoftActorCritic:
 
             state = next_state
             total_reward += reward
-            episode_length += 1
 
         self.tbx_writer.add_scalar(
             'rewards/episode_reward',
@@ -398,4 +404,4 @@ class SoftActorCritic:
             self.train_episode()
 
             if self.training_i % play_interval == 0:
-                self.play()
+                self.play(self.max_episode_length)
