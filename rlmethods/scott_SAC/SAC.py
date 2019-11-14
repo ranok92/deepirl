@@ -6,7 +6,7 @@ import torch.nn.functional as F
 #from torch.distributions import Normal
 import math
 import pdb
-from rlmethods.scott_SAC import sac_utils
+import sac_utils
 from itertools import count
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,7 +96,7 @@ class Value(nn.Module):
 
 
 class SAC(object):
-
+    '''
     def __init__(self, env,
                  feat_extractor=None,
                  policy=None,
@@ -106,13 +106,18 @@ class SAC(object):
                  hidden_dims=[256],
                  save_folder=None,
                  reward_scale=5):
-        
+    '''
+    def __init__(self, state_dim, action_dim, max_action):
         #adding more parameters to suit the Social navigation project
-
+        '''
         self.env = env
         self.feature_extractor = feat_extractor 
         self.log_interval = log_interval
 
+        action_dim = 2
+        max_action = 1
+        self.orient_quantization = len(self.env.orientation_array)
+        self.speed_quantization = len(self.env.speed_array)
 
         self.max_ep_length = max_ep_length
         self.max_episodes = max_episodes
@@ -124,17 +129,18 @@ class SAC(object):
             state_dim = env.reset().shape[0] 
 
         self.hidden_dims = hidden_dims
-
+        '''
         self.start_timesteps = 1000
         #**have to fix the action dim thing
         #not using hidden_dims for now
 
-        action_dim = 2
-        max_action = 1
-        self.orient_quantization = len(self.env.orientation_array)
-        self.speed_quantization = len(self.env.speed_array)
+    
 
         #############################################################
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.max_action = max_action
+
 
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
@@ -149,12 +155,14 @@ class SAC(object):
 
         self.criterion = nn.MSELoss()
         self.state_dim = state_dim
-        self.reward_scale = reward_scale
+        self.reward_scale = max_action
 
 
 
 
     def select_action(self, state, test=False):
+
+        state = torch.FloatTensor(state)
         with torch.no_grad():
             state = torch.FloatTensor(state.cpu().reshape(1, -1)).to(device)
             action, log_prob, mean_action = self.actor(state)
@@ -163,13 +171,13 @@ class SAC(object):
             if test:
                 action = mean_action
 
-            action = action.squeeze()
-            orient = self.get_quantization(action[0].item(), -1, 2, self.orient_quantization)
-            speed = self.get_quantization(action[1].item(), -1, 2, self.speed_quantization)
 
-            action_env = speed*self.orient_quantization+orient
-
-            return action_env
+            #action = action.squeeze()
+            #orient = self.get_quantization(action[0].item(), -1, 2, self.orient_quantization)
+            #speed = self.get_quantization(action[1].item(), -1, 2, self.speed_quantization)
+            #action_env = speed*self.orient_quantization+orient
+            print(action)
+            return action.cpu().numpy()
 
 
     def get_quantization(self, raw_inp, min_val, max_val, quantization):
@@ -188,7 +196,7 @@ class SAC(object):
         return np.asarray([env_action%self.orient_quantization, int(env_action/self.orient_quantization)])
 
 
-    def train(self, reward_network=None, irl=False):
+    def train_deepirl(self, reward_network=None, irl=False):
 
         replay_buffer = sac_utils.ReplayBuffer()
         running_reward = 0
@@ -290,7 +298,7 @@ class SAC(object):
 
 
 
-    def finish_episode(self, replay_buffer, iterations, batch_size=256, discount=0.99, tau=0.005): 
+    def train(self, replay_buffer, iterations, batch_size=256, discount=0.99, tau=0.005): 
 
         for it in range(iterations):
 
