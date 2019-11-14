@@ -1,13 +1,10 @@
-import numpy as np
-import torch
-import time
 import pdb
 import sys
 import math
 import os
 sys.path.insert(0, '..')
-
-from envs.gridworld_clockless import MockActionspaceDiscrete, MockActionspaceBox, MockSpec
+import numpy as np
+from gym.spaces import Discrete, Box
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
@@ -42,7 +39,7 @@ class Pedestrian():
                  pos=None,
                  speed=None,
                  orientation=None
-                 ):
+                ):
         self.id = idval
         self.position = pos
         self.speed = speed 
@@ -77,12 +74,11 @@ class GridWorldDrone(GridWorld):
             agent_width=10,
             show_comparison=False,
             tick_speed=30,
-            replace_subject=False, #this option trains the agent for the exact scenarios as seen by the expert
-                              #Not an ideal thing to train on. Introduced as a debugging measure.
+            replace_subject=False, #this option trains the agent for the exact scenarios as seen 
+            #by the expert Not an ideal thing to train on. Introduced as a debugging measure.
             segment_size=None,
             external_control=True,
             consider_heading=False,
-            variable_speed=False,
             continuous_action=False
     ):
         super().__init__(seed=seed,
@@ -156,13 +152,12 @@ class GridWorldDrone(GridWorld):
             min_val = -quantization*(divisions-1)/2
             self.max_speed = 2
             self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
-            self.action_space = MockActionspaceDiscrete(len(self.orientation_array)*len(self.speed_array))
-
+            self.action_space = Discrete(len(self.orientation_array)*len(self.speed_array))
         else:
             self.max_speed = 2
             self.max_orient_change = 30
-            self.action_space = MockActionspaceBox(np.array([-.5, -self.max_orient_change]),
-                                                   np.array([.5, self.max_orient_change]))
+            self.action_space = Box(np.array([-.5, -self.max_orient_change]),
+                                    np.array([.5, self.max_orient_change]))
             #The action array is a 2 dimensional array 
             #        [change in speed, change in orientation]
         '''
@@ -172,19 +167,15 @@ class GridWorldDrone(GridWorld):
             2. "cur_heading_dir" will contain the degree (integer) in which the agent is heading. 
             3. Speed can only be positive and bound within a range
         '''
-
+        #################################
+        '''
+        part used for taking action from user. Needs to be modified
         self.action_dict = {}
         self.prev_action = 8
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
-
-
-        #MockActionspaceDiscrete takes in the total number of actions 
-        #possible and not the dimension of the action space 
-        #(which is 1 in this case)
-  
-
-        ######################################################################
+        '''
+        ##################################
         self.step_reward = step_reward
 
 
@@ -198,36 +189,11 @@ class GridWorldDrone(GridWorld):
 
             print('No annotation file provided.')
 
-
-        ########### debugging ##############
-
         self.external_control = external_control
         self.replace_subject = replace_subject
         self.segment_size = segment_size
         self.show_orientation = show_orientation
-        '''
-        self.ped_start_pos = {} # a dictionary that will store the starting positions of all the pedestrians
-        self.ped_goal_pos = {} # a dictionary that will store the goal positions of all the pedestrians
 
-        if self.train_exact:
-
-            for ped in self.pedestrian_dict.keys():
-
-                self.ped_start_pos[ped] = np.asarray([float(self.pedestrian_dict[ped][0][2]), 
-                                                      float(self.pedestrian_dict[ped][0][3])])
-
-                self.ped_goal_pos[ped] = np.asarray([float(self.pedestrian_dict[ped][-1][2]),
-                                                     float(self.pedestrian_dict[ped][-1][3])])
-        
-        #print('Printing information :')
-        #print('Pedestrian dictionary :', self.pedestrian_dict)
-        #print('Pedestrian starting and ending points :')
-            for ped in self.pedestrian_dict.keys():
-
-                print('Ped :', ped, 'Starting point :', self.ped_start_pos[ped], ', Ending point :', self.ped_goal_pos[ped])
-            print('Pedestrian ending point :', self.ped_goal_pos)
-        '''
-        ################## remove this block ###################
 
 
     def generate_annotation_list(self):
@@ -238,7 +204,6 @@ class GridWorldDrone(GridWorld):
             if not os.path.isfile(self.annotation_file):
                 print("The annotation file does not exist.")
                 exit()
-                return 0
 
             with open(self.annotation_file) as f:
 
@@ -573,31 +538,7 @@ class GridWorldDrone(GridWorld):
                     #print('Current speed :', agent_cur_speed)
                     #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
                     self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
-                    '''     
-                    else:
-                        #if the action is a torch
-                        if len(action.shape)==1 and action.shape[0]==1: #check if it the tensor has a single value
-                            if isinstance(action.item(), int):
-                                action_orient = action%len(self.orientation_array)
-                                action_speed = int(action/len(self.orientation_array))
-
-                                if self.consider_heading:
-                                    #after 360, it comes back to 0
-                                    self.cur_heading_dir = (self.cur_heading_dir+self.orientation_array[action_orient])%360
-                                    agent_cur_speed = max(0,min(self.agent_state['speed'] + self.speed_array[action_speed], self.max_speed))
-                                #self.heading_dir_history.append(self.cur_heading_dir)
-                                #self.cur_heading_dir = action
-                                prev_position = self.agent_state['position']
-                                rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
-                                cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
-                 
-                                self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
-                                                   cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
-
-                                self.agent_state['speed'] = agent_cur_speed
-                                #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
-                                self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1, 0]))
-                    '''
+                   
             #print("Agent :",self.agent_state)
             #if not np.array_equal(self.pos_history[-1],self.agent_state):
             self.heading_dir_history .append(self.cur_heading_dir)
@@ -1130,7 +1071,7 @@ if __name__=="__main__":
                         replace_subject=True, 
                         segment_size=50,
                         consider_heading=True,                      
-                        continuous_action=True,
+                        continuous_action=False,
                         rows=576, cols=720, width=20)
 
     pf_agent = PFController()
