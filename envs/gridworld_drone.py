@@ -7,7 +7,7 @@ import math
 import os
 sys.path.insert(0, '..')
 
-from envs.gridworld_clockless import MockActionspace, MockSpec
+from envs.gridworld_clockless import MockActionspaceDiscrete, MockActionspaceBox, MockSpec
 from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
@@ -82,7 +82,8 @@ class GridWorldDrone(GridWorld):
             segment_size=None,
             external_control=True,
             consider_heading=False,
-            variable_speed=False
+            variable_speed=False,
+            continuous_action=False
     ):
         super().__init__(seed=seed,
                          rows=rows,
@@ -115,10 +116,10 @@ class GridWorldDrone(GridWorld):
         self.ghost = None
         self.ghost_state = None
         self.ghost_state_history = []
-        self.ghost_color = (140,0,200)
+        self.ghost_color = (140, 0, 200)
 
 
-        self.annotation_file = annotation_file #the file from which the video information will be used
+        self.annotation_file = annotation_file#file from which the video information will be used
         self.annotation_dict = {}
         self.pedestrian_dict = {}
         self.current_frame = 0
@@ -144,15 +145,26 @@ class GridWorldDrone(GridWorld):
                             np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
         '''
 
-        divisions = 7
-        quantization = 10
-        min_val = -quantization*(divisions-1)/2
-        self.orientation_array = [min_val+(i*quantization) for i in range(divisions)]
-        divisions = 5
-        quantization = .2
-        min_val = -quantization*(divisions-1)/2
-        self.max_speed = 2
-        self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
+        self.continuous_action = continuous_action
+        if not self.continuous_action:
+            divisions = 7
+            quantization = 10
+            min_val = -quantization*(divisions-1)/2
+            self.orientation_array = [min_val+(i*quantization) for i in range(divisions)]
+            divisions = 5
+            quantization = .2
+            min_val = -quantization*(divisions-1)/2
+            self.max_speed = 2
+            self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
+            self.action_space = MockActionspaceDiscrete(len(self.orientation_array)*len(self.speed_array))
+
+        else:
+            self.max_speed = 2
+            self.max_orient_change = 30
+            self.action_space = MockActionspaceBox(np.array([-.5, -self.max_orient_change]),
+                                                   np.array([.5, self.max_orient_change]))
+            #The action array is a 2 dimensional array 
+            #        [change in speed, change in orientation]
         '''
         Some things to note:
             1. The orientation of the agent will be a 2d vector pointing in the direction in which the 
@@ -167,11 +179,10 @@ class GridWorldDrone(GridWorld):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
 
-        #MockActionspace takes in the total number of actions 
+        #MockActionspaceDiscrete takes in the total number of actions 
         #possible and not the dimension of the action space 
         #(which is 1 in this case)
-        self.action_space = MockActionspace(len(self.orientation_array)*len(self.speed_array))
-        #self.spec = MockSpec(1.0)
+  
 
         ######################################################################
         self.step_reward = step_reward
@@ -529,33 +540,40 @@ class GridWorldDrone(GridWorld):
             if not self.release_control:
 
                 if action is not None:
-                    if isinstance(action, int):
+
+                    if not self.continuous_action:
                         action_orient = action%len(self.orientation_array)
                         action_speed = int(action/len(self.orientation_array))
-                        #pdb.set_trace()
-                        #print('Change in speed :',self.speed_array[action_speed])
+                        orient_change = self.orientation_array[action_orient]
+                        speed_change = self.speed_array[action_speed]
+                    else:
+                        speed_change = action[0]
+                        orient_change = action[1]
 
-                        #if self.consider_heading:
-                            #after 360, it comes back to 0
-                        self.cur_heading_dir = (self.cur_heading_dir+self.orientation_array[action_orient])%360
-                        agent_cur_speed = max(0,min(self.agent_state['speed'] + self.speed_array[action_speed], self.max_speed))
-                        #self.heading_dir_history.append(self.cur_heading_dir)
-                        #self.cur_heading_dir = action
-                        prev_position = self.agent_state['position']
-                        rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
-                        cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
-                        '''
-                        cur_displacement is a 2 dim vector where the displacement is in the form:
-                            [row, col]
-                        '''
-                        self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
-                                           cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
+                    #pdb.set_trace()
+                    #print('Change in speed :',self.speed_array[action_speed])
 
-                        self.agent_state['speed'] = agent_cur_speed
-                        #print('Current speed :', agent_cur_speed)
-                        #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
-                        self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
-                        
+                    #if self.consider_heading:
+                        #after 360, it comes back to 0
+                    self.cur_heading_dir = (self.cur_heading_dir+orient_change)%360
+                    agent_cur_speed = max(0,min(self.agent_state['speed'] + speed_change, self.max_speed))
+                    #self.heading_dir_history.append(self.cur_heading_dir)
+                    #self.cur_heading_dir = action
+                    prev_position = self.agent_state['position']
+                    rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
+                    cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
+                    '''
+                    cur_displacement is a 2 dim vector where the displacement is in the form:
+                        [row, col]
+                    '''
+                    self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
+                                       cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
+
+                    self.agent_state['speed'] = agent_cur_speed
+                    #print('Current speed :', agent_cur_speed)
+                    #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
+                    self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
+                    '''     
                     else:
                         #if the action is a torch
                         if len(action.shape)==1 and action.shape[0]==1: #check if it the tensor has a single value
@@ -572,16 +590,14 @@ class GridWorldDrone(GridWorld):
                                 prev_position = self.agent_state['position']
                                 rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
                                 cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
-                                '''
-                                cur_displacement is a 2 dim vector where the displacement is in the form:
-                                    [row, col]
-                                '''
+                 
                                 self.agent_state['position'] = np.maximum(np.minimum(self.agent_state['position']+ \
                                                    cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
 
                                 self.agent_state['speed'] = agent_cur_speed
                                 #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
                                 self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1, 0]))
+                    '''
             #print("Agent :",self.agent_state)
             #if not np.array_equal(self.pos_history[-1],self.agent_state):
             self.heading_dir_history .append(self.cur_heading_dir)
@@ -1114,7 +1130,7 @@ if __name__=="__main__":
                         replace_subject=True, 
                         segment_size=50,
                         consider_heading=True,                      
-
+                        continuous_action=True,
                         rows=576, cols=720, width=20)
 
     pf_agent = PFController()
@@ -1152,7 +1168,9 @@ if __name__=="__main__":
             #print("current orientation :", world.cur_heading_dir)
             #action_speed = int(input())
             #action_orient = int(input())
-            action = np.random.randint(35)
+            action = world.action_space.sample()
+            print(action)
+            print(world.agent_state)
             #action = action_speed+(action_orient*7)
             #print('Action :', action)
 

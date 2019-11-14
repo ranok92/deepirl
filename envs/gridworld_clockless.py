@@ -32,12 +32,26 @@ class Obstacles:
         self.dynamics_model = None
 '''
 
-class MockActionspace:
+class MockActionspaceDiscrete:
     def __init__(self, n):
         self.n = n
 
     def sample(self):
         return np.random.randint(self.n)
+
+class MockActionspaceBox:
+    def __init__(self, low, high):
+
+        assert low.shape == high.shape, 'box dimension mismatch. '
+        self.shape = low.shape
+        self.low = low
+        self.high = high
+
+    def sample(self):
+        rand_sample = np.random.random(self.shape)
+        rand_sample = rand_sample + self.low 
+        rand_sample = np.multiply(rand_sample, (self.high-self.low))
+        return rand_sample
 
 
 class MockSpec:
@@ -255,7 +269,7 @@ class GridWorldClockless:
         for i in range(len(self.actionArray)):
             self.action_dict[np.array2string(self.actionArray[i])] = i
 
-        self.action_space = MockActionspace(len(self.actionArray))
+        self.action_space = MockActionspaceDiscrete(len(self.actionArray))
 
         #########################################
         
