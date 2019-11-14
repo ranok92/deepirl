@@ -151,7 +151,7 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer,
-            max_play_steps,
+            max_episode_length,
             buffer_sample_size=10**4,
             gamma=0.99,
             learning_rate=3e-4,
@@ -167,7 +167,7 @@ class SoftActorCritic:
         self.env = env
         starting_state = self.env.reset()
         state_size = starting_state.shape[0]
-        self.max_episode_length = max_play_steps
+        self.max_episode_length = max_episode_length
 
         # buffer
         self.replay_buffer = replay_buffer
