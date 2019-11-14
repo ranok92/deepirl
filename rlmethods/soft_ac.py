@@ -4,7 +4,7 @@ et. al 2019.
 """
 import sys
 import copy
-
+import pdb
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -140,9 +140,15 @@ class SoftActorCritic:
             tau=0.005,
             log_alpha=-2.995,
             q_net=None,
+            feat_extractor=None
     ):
         self.env = env
+        self.feat_extractor = feat_extractor
+
         starting_state = self.env.reset()
+
+        if self.feat_extractor is not None:
+            starting_state = self.feat_extractor.extract_features(starting_state)
         state_size = starting_state.shape[0]
 
         # buffer
@@ -159,7 +165,8 @@ class SoftActorCritic:
 
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
-
+        self.q_net.to(DEVICE)
+        self.avg_q_net.to(DEVICE)
         # set hyperparameters
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
@@ -187,6 +194,7 @@ class SoftActorCritic:
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
+        #pdb.set_trace()
         softmax_over_actions = F.softmax(
             (1.0/alpha) * self.q_net(state),
             dim=-1
@@ -301,6 +309,8 @@ class SoftActorCritic:
         done = False
         total_reward = np.zeros(1)
         state = self.env.reset()
+        if self.feat_extractor is not None:
+            state = self.feat_extractor.extract_features(state)
         episode_length = 0
 
         while not done:
@@ -311,6 +321,8 @@ class SoftActorCritic:
             alpha = self.log_alpha.exp().detach()
             action, _, _ = self.select_action(torch_state, alpha)
             next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
+            if self.feat_extractor is not None:
+                next_state = self.feat_extractor.extract_features(next_state)
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
