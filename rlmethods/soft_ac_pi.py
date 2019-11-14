@@ -15,10 +15,10 @@ import numpy as np
 
 from tensorboardX import SummaryWriter
 
-sys.path.insert(0, '..')
+sys.path.insert(0, "..")
 from neural_nets.base_network import BaseNN  # NOQA
 
-DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 MAX_FLOAT = torch.finfo(torch.float32).max
 FEPS = torch.finfo(torch.float32).eps
@@ -58,10 +58,11 @@ def get_action_q(all_q_a, action_indices):
     """
     index_tuple = (
         torch.arange(len(action_indices)),
-        action_indices.type(torch.long)
+        action_indices.type(torch.long),
     )
 
     return all_q_a[index_tuple]
+
 
 def is_degenerate(ten):
     """Returns true if ten contains inf or nan.
@@ -69,9 +70,10 @@ def is_degenerate(ten):
     :param ten: input tensor to check for degeneracies.
     """
     contains_nan = torch.isnan(ten).any()
-    contains_inf = (ten == float('inf')).any()
+    contains_inf = (ten == float("inf")).any()
 
     return contains_nan or contains_inf
+
 
 def soften_distribution(probs, alpha):
     """Apply additive smoothing to discrete probabilities.
@@ -111,12 +113,7 @@ class QNetwork(BaseNN):
 class PolicyNetwork(BaseNN):
     """Policy network for soft actor critic."""
 
-    def __init__(
-            self,
-            num_inputs,
-            hidden_layer_width,
-            out_layer_width
-    ):
+    def __init__(self, num_inputs, hidden_layer_width, out_layer_width):
         super().__init__()
 
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
@@ -148,26 +145,28 @@ class SoftActorCritic:
     """Implementation of soft actor critic."""
 
     def __init__(
-            self,
-            env,
-            replay_buffer,
-            max_episode_length,
-            buffer_sample_size=10**4,
-            gamma=0.99,
-            learning_rate=3e-4,
-            tbx_writer=None,
-            entropy_tuning=False,
-            entropy_target=1.0,
-            tau=0.005,
-            log_alpha=-2.995,
-            policy_net=None,
-            q_net=None,
+        self,
+        env,
+        replay_buffer,
+        max_episode_length,
+        feature_extractor,
+        buffer_sample_size=10 ** 4,
+        gamma=0.99,
+        learning_rate=3e-4,
+        tbx_writer=None,
+        entropy_tuning=False,
+        entropy_target=1.0,
+        tau=0.005,
+        log_alpha=-2.995,
+        policy_net=None,
+        q_net=None,
     ):
         # env related settings
         self.env = env
-        starting_state = self.env.reset()
+        starting_state = self.env_reset()
         state_size = starting_state.shape[0]
         self.max_episode_length = max_episode_length
+        self.feature_extractor = feature_extractor
 
         # buffer
         self.replay_buffer = replay_buffer
@@ -208,7 +207,7 @@ class SoftActorCritic:
 
         # tensorboardX settings
         if not tbx_writer:
-            self.tbx_writer = SummaryWriter('runs/generic_soft_ac')
+            self.tbx_writer = SummaryWriter("runs/generic_soft_ac")
         else:
             self.tbx_writer = tbx_writer
 
@@ -221,6 +220,26 @@ class SoftActorCritic:
         action = dist.sample()
 
         return action, dist.log_prob(action), dist
+
+    def env_reset(self):
+        """Reset environment, but return features from feature_extractor.
+
+        :return: state(features)
+        """
+        state = self.env.reset()
+        return self.feature_extractor(state)
+
+    def env_step(self, action):
+        """Takes action in environment but returns features rather than
+        states, from feature_extractor.
+
+        :param action: action to take.
+        :return: state(features), reward, done, info
+        """
+        state, reward, done, info = self.env.step(action)
+        state = self.feature_extractor(state)
+
+        return state, reward, done, info
 
     def populate_buffer(self):
         """
@@ -261,9 +280,7 @@ class SoftActorCritic:
         alpha = self.log_alpha.exp().detach()
 
         # Figure out value function
-        next_actions, log_next_actions, _ = self.select_action(
-            next_state_batch
-        )
+        next_actions, log_next_actions, _ = self.select_action(next_state_batch)
         next_q_a = self.avg_q_net(next_state_batch)
         next_q = get_action_q(next_q_a, next_actions)
         next_state_values = next_q - alpha * log_next_actions
@@ -302,8 +319,9 @@ class SoftActorCritic:
         self.policy_optim.step()
 
         # automatic entropy tuning
-        alpha_loss = self.log_alpha * \
-            (log_actions + self.entropy_target).detach()
+        alpha_loss = (
+            self.log_alpha * (log_actions + self.entropy_target).detach()
+        )
         alpha_loss = -alpha_loss.mean()
 
         if self.entropy_tuning:
@@ -317,20 +335,20 @@ class SoftActorCritic:
         # logging
         self.tbx_logger(
             {
-                'loss/Q loss': q_loss.item(),
-                'loss/pi loss': policy_loss.item(),
-                'loss/alpha loss': alpha_loss.item(),
-                'Q/avg_q_target': q_target.mean().item(),
-                'Q/avg_q': q_values.mean().item(),
-                'Q/avg_reward': reward_batch.mean().item(),
-                'Q/avg_V': next_state_values.mean().item(),
-                'Q/entropy': q_dist.entropy().mean(),
-                'pi/avg_entropy': action_dist.entropy().mean(),
-                'H/alpha': alpha.item(),
-                'H/Q_entropy': q_dist.entropy().mean(),
-                'H/pi_entropy': action_dist.entropy().mean(),
+                "loss/Q loss": q_loss.item(),
+                "loss/pi loss": policy_loss.item(),
+                "loss/alpha loss": alpha_loss.item(),
+                "Q/avg_q_target": q_target.mean().item(),
+                "Q/avg_q": q_values.mean().item(),
+                "Q/avg_reward": reward_batch.mean().item(),
+                "Q/avg_V": next_state_values.mean().item(),
+                "Q/entropy": q_dist.entropy().mean(),
+                "pi/avg_entropy": action_dist.entropy().mean(),
+                "H/alpha": alpha.item(),
+                "H/Q_entropy": q_dist.entropy().mean(),
+                "H/pi_entropy": action_dist.entropy().mean(),
             },
-            self.training_i
+            self.training_i,
         )
 
         self.training_i += 1
@@ -343,7 +361,7 @@ class SoftActorCritic:
 
         done = False
         total_reward = np.zeros(1)
-        state = self.env.reset()
+        state = self.env_reset()
         episode_length = 0
 
         while not done:
@@ -352,42 +370,30 @@ class SoftActorCritic:
             torch_state = torch_state.to(DEVICE)
 
             action, _, _ = self.select_action(torch_state)
-            next_state, reward, done, _ = self.env.step(action.item())
+            next_state, reward, done, _ = self.env_step(action.item())
 
             episode_length += 1
 
             max_steps_elapsed = episode_length > max_steps
 
             if max_steps_elapsed:
-                self.replay_buffer.push((
-                    state,
-                    action.cpu().numpy(),
-                    reward,
-                    next_state,
-                    done
-                ))
+                self.replay_buffer.push(
+                    (state, action.cpu().numpy(), reward, next_state, done)
+                )
             else:
-                self.replay_buffer.push((
-                    state,
-                    action.cpu().numpy(),
-                    reward,
-                    next_state,
-                    not done
-                ))
+                self.replay_buffer.push(
+                    (state, action.cpu().numpy(), reward, next_state, not done)
+                )
 
             state = next_state
             total_reward += reward
 
         self.tbx_writer.add_scalar(
-            'rewards/episode_reward',
-            total_reward.item(),
-            self.play_i
+            "rewards/episode_reward", total_reward.item(), self.play_i
         )
 
         self.tbx_writer.add_scalar(
-            'rewards/episode_length',
-            episode_length,
-            self.play_i
+            "rewards/episode_length", episode_length, self.play_i
         )
 
         self.play_i += 1
