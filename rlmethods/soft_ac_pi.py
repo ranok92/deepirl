@@ -10,7 +10,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
 from torch.distributions import Normal
-from torch.distributions.kl import kl_divergence
 import numpy as np
 
 from tensorboardX import SummaryWriter
@@ -47,23 +46,6 @@ def move_average(source, target, tau=0.005):
         )
 
 
-def get_action_q(all_q_a, action_indices):
-    """Q network generates all Q values for all possible actions. Use this
-    function to get the Q value of a single specific action, whose index is
-    specific in action_indices. This works with batches.
-
-    :param all_q_a: NxA tensor of Q values for N rows of length A when A is
-    number of actions possible.
-    :param action_indices: 1xN tensor of shape (N,) of action indices.
-    """
-    index_tuple = (
-        torch.arange(len(action_indices)),
-        action_indices.type(torch.long),
-    )
-
-    return all_q_a[index_tuple]
-
-
 def is_degenerate(ten):
     """Returns true if ten contains inf or nan.
 
@@ -93,15 +75,15 @@ class QNetwork(BaseNN):
     def __init__(self, state_length, action_length, hidden_layer_width):
         super().__init__()
 
-        self.action_length = action_length
-
-        self.in_layer = nn.Linear(state_length, hidden_layer_width)
+        self.in_layer = nn.Linear(
+            state_length + action_length, hidden_layer_width
+        )
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, action_length)
 
-    def forward(self, states):
-        # actions need to be byte or long to be used as indices
+    def forward(self, states, actions):
+        x = torch.cat([states, actions], dim=1)
         x = F.relu(self.in_layer(states))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
@@ -113,8 +95,21 @@ class QNetwork(BaseNN):
 class PolicyNetwork(BaseNN):
     """Policy network for soft actor critic."""
 
-    def __init__(self, num_inputs, hidden_layer_width, out_layer_width):
+    def __init__(self, action_space, hidden_layer_width, out_layer_width):
         super().__init__()
+
+        # properties inferred from action space
+        num_inputs = len(action_space.shape)
+        self.action_scale = (
+            torch.tensor((action_space.high - action_space.low) / 2.0)
+            .to(DEVICE)
+            .to(float)
+        )
+        self.action_bias = (
+            torch.tensor((action_space.high + action_space.low) / 2.0)
+            .to(DEVICE)
+            .to(float)
+        )
 
         self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
@@ -136,15 +131,17 @@ class PolicyNetwork(BaseNN):
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
         dist = self.action_distribution(state)
-        raw_action = dist.rsample() # reparametrization trick
+        raw_action = dist.rsample()  # reparametrization trick
 
         # enforcing action bounds
-        tanh_action = torch.tanh(raw_action) # prevent recomputation later.
+        tanh_action = torch.tanh(raw_action)  # prevent recomputation later.
         action = tanh_action * self.action_scale + self.action_bias
-        
+
         # change of variables for log prob
-        raw_log_prob = dist.log_prob(raw_action)        
-        log_prob = raw_log_prob - torch.log(self.action_scale * (1-tanh_action.pow(2)) + FEPS)
+        raw_log_prob = dist.log_prob(raw_action)
+        log_prob = raw_log_prob - torch.log(
+            self.action_scale * (1 - tanh_action.pow(2)) + FEPS
+        )
         log_prob = log_prob.sum(1, keepdim=True)
 
         return action, log_prob, dist
@@ -298,8 +295,7 @@ class SoftActorCritic:
 
         # Figure out value function
         next_actions, log_next_actions, _ = self.select_action(next_state_batch)
-        next_q_a = self.avg_q_net(next_state_batch)
-        next_q = get_action_q(next_q_a, next_actions)
+        next_q = self.avg_q_net(next_state_batch, next_actions)
         next_state_values = next_q - alpha * log_next_actions
 
         # Calculate Q network target
@@ -307,15 +303,16 @@ class SoftActorCritic:
         q_target = reward_batch.clone()
         q_target += self.gamma * done_floats * next_state_values.squeeze()
 
-        # q network loss
-        q_a_values = self.q_net(state_batch)
-
         # Q net outputs values for all actions, so we index specific actions
-        q_values = get_action_q(q_a_values, action_batch.squeeze())
+        q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        # TODO: Implement continous policy loss
+        actions_pi, log_probs_pi, action_dist = self.policy.select_action(
+            state_batch
+        )
+        q_pi = self.q_net(state_batch, actions_pi)
+        policy_loss = ((alpha * log_probs_pi) - q_pi).mean()
 
         # update parameters
         self.q_optim.zero_grad()
@@ -328,7 +325,7 @@ class SoftActorCritic:
 
         # automatic entropy tuning
         alpha_loss = (
-            self.log_alpha * (log_actions + self.entropy_target).detach()
+            self.log_alpha * (log_probs_pi + self.entropy_target).detach()
         )
         alpha_loss = -alpha_loss.mean()
 
@@ -350,10 +347,8 @@ class SoftActorCritic:
                 "Q/avg_q": q_values.mean().item(),
                 "Q/avg_reward": reward_batch.mean().item(),
                 "Q/avg_V": next_state_values.mean().item(),
-                "Q/entropy": q_dist.entropy().mean(),
                 "pi/avg_entropy": action_dist.entropy().mean(),
                 "H/alpha": alpha.item(),
-                "H/Q_entropy": q_dist.entropy().mean(),
                 "H/pi_entropy": action_dist.entropy().mean(),
             },
             self.training_i,
