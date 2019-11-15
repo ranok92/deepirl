@@ -4,6 +4,8 @@ et. al 2019.
 """
 import sys
 import copy
+import operator
+import functools
 
 import torch
 import torch.nn.functional as F
@@ -72,19 +74,22 @@ def soften_distribution(probs, alpha):
 class QNetwork(BaseNN):
     """Q function network."""
 
-    def __init__(self, state_length, action_length, hidden_layer_width):
+    def __init__(self, state_length, action_space, hidden_layer_width):
         super().__init__()
 
+        action_length = functools.reduce(operator.mul, action_space.shape)
         self.in_layer = nn.Linear(
             state_length + action_length, hidden_layer_width
         )
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.head = nn.Linear(hidden_layer_width, action_length)
+        self.head = nn.Linear(hidden_layer_width, 1)
+
+        self.to(DEVICE)
 
     def forward(self, states, actions):
         x = torch.cat([states, actions], dim=1)
-        x = F.relu(self.in_layer(states))
+        x = F.relu(self.in_layer(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
         x = self.head(x)
@@ -95,37 +100,46 @@ class QNetwork(BaseNN):
 class PolicyNetwork(BaseNN):
     """Policy network for soft actor critic."""
 
-    def __init__(self, action_space, hidden_layer_width, out_layer_width):
+    def __init__(self, state_size, action_space, hidden_layer_width):
         super().__init__()
 
         # properties inferred from action space
-        num_inputs = len(action_space.shape)
         self.action_scale = (
             torch.tensor((action_space.high - action_space.low) / 2.0)
             .to(DEVICE)
-            .to(float)
+            .to(torch.float)
         )
+
         self.action_bias = (
             torch.tensor((action_space.high + action_space.low) / 2.0)
             .to(DEVICE)
-            .to(float)
+            .to(torch.float)
         )
 
-        self.in_layer = nn.Linear(num_inputs, hidden_layer_width)
+        action_width = functools.reduce(operator.mul, action_space.shape)
+
+        self.in_layer = nn.Linear(state_size, hidden_layer_width)
         self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.head = nn.Linear(hidden_layer_width, out_layer_width)
+
+        # params for Gaussian
+        self.means = nn.Linear(hidden_layer_width, action_width)
+        self.log_stds = nn.Linear(hidden_layer_width, action_width)
+
+        self.to(DEVICE)
 
     def forward(self, x):
         x = F.relu(self.in_layer(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
-        x = self.head(x)
-        probs = F.softmax(x, dim=-1)
 
-        return probs
+        means = self.means(x)
+        log_stds = self.log_stds(x)
+        log_stds = torch.clamp(log_stds, min=2, max=22)
 
-    def select_action(self, state):
+        return means, log_stds
+
+    def sample(self, state):
         """Generate an action based on state vector using current policy.
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
@@ -145,6 +159,17 @@ class PolicyNetwork(BaseNN):
         log_prob = log_prob.sum(1, keepdim=True)
 
         return action, log_prob, dist
+
+    def select_action(self, state):
+        """Select action for playing. Selects mean action only.
+        
+        :param state: State to select action from.
+        :return: produced action.
+        """
+        means, _ = self.__call__(state)
+        action = self.action_scale * means + self.action_bias
+        
+        return action
 
     def action_distribution(self, state):
         """Returns a pytorch distribution object based on policy output.
@@ -171,7 +196,7 @@ class SoftActorCritic:
         learning_rate=3e-4,
         tbx_writer=None,
         entropy_tuning=False,
-        entropy_target=1.0,
+        entropy_target=-2.0,
         tau=0.005,
         log_alpha=-2.995,
         policy_net=None,
@@ -179,10 +204,11 @@ class SoftActorCritic:
     ):
         # env related settings
         self.env = env
-        starting_state = self.env_reset()
-        state_size = starting_state.shape[0]
-        self.max_episode_length = max_episode_length
         self.feature_extractor = feature_extractor
+        self.max_episode_length = max_episode_length
+        starting_state = self.env_reset()
+        starting_feature = self.feature_extractor.extract_features(starting_state)
+        feature_size = starting_feature.shape[0]
 
         # buffer
         self.replay_buffer = replay_buffer
@@ -190,12 +216,12 @@ class SoftActorCritic:
 
         # NNs
         if not policy_net:
-            self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
+            self.policy = PolicyNetwork(feature_size, env.action_space, 256)
         else:
             self.policy = policy_net
 
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 256)
+            self.q_net = QNetwork(feature_size, env.action_space, 256)
         else:
             self.q_net = q_net
 
@@ -227,21 +253,13 @@ class SoftActorCritic:
         else:
             self.tbx_writer = tbx_writer
 
-    def select_action(self, state):
-        """Generate an action based on state vector using current policy.
-
-        :param state: Current state vector. must be Torch 32 bit float tensor.
-        """
-
-        return self.policy.select_action(state)
-
     def env_reset(self):
         """Reset environment, but return features from feature_extractor.
 
         :return: state(features)
         """
         state = self.env.reset()
-        return self.feature_extractor(state)
+        return self.feature_extractor.extract_features(state)
 
     def env_step(self, action):
         """Takes action in environment but returns features rather than
@@ -251,7 +269,7 @@ class SoftActorCritic:
         :return: state(features), reward, done, info
         """
         state, reward, done, info = self.env.step(action)
-        state = self.feature_extractor(state)
+        state = self.feature_extractor.extract_features(state)
 
         return state, reward, done, info
 
@@ -286,29 +304,29 @@ class SoftActorCritic:
         replay_samples = self.replay_buffer.sample(self.buffer_sample_size)
         state_batch = torch.from_numpy(replay_samples[0]).to(DEVICE)
         action_batch = torch.from_numpy(replay_samples[1]).to(DEVICE)
-        reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
+        reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE).unsqueeze(1)
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
-        dones = torch.from_numpy(replay_samples[4]).type(torch.long).to(DEVICE)
+        dones = torch.from_numpy(replay_samples[4]).type(torch.long).to(DEVICE).unsqueeze(1)
 
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
 
         # Figure out value function
-        next_actions, log_next_actions, _ = self.select_action(next_state_batch)
+        next_actions, log_next_actions, _ = self.policy.sample(next_state_batch)
         next_q = self.avg_q_net(next_state_batch, next_actions)
         next_state_values = next_q - alpha * log_next_actions
 
         # Calculate Q network target
         done_floats = dones.type(torch.float)
         q_target = reward_batch.clone()
-        q_target += self.gamma * done_floats * next_state_values.squeeze()
+        q_target += self.gamma * done_floats * next_state_values
 
         # Q net outputs values for all actions, so we index specific actions
         q_values = self.q_net(state_batch, action_batch)
         q_loss = F.mse_loss(q_values, q_target)
 
         # policy loss
-        actions_pi, log_probs_pi, action_dist = self.policy.select_action(
+        actions_pi, log_probs_pi, action_dist = self.policy.sample(
             state_batch
         )
         q_pi = self.q_net(state_batch, actions_pi)
@@ -347,9 +365,9 @@ class SoftActorCritic:
                 "Q/avg_q": q_values.mean().item(),
                 "Q/avg_reward": reward_batch.mean().item(),
                 "Q/avg_V": next_state_values.mean().item(),
-                "pi/avg_entropy": action_dist.entropy().mean(),
                 "H/alpha": alpha.item(),
                 "H/pi_entropy": action_dist.entropy().mean(),
+                "H/pi_log_pi": log_probs_pi.mean(),
             },
             self.training_i,
         )
@@ -372,8 +390,9 @@ class SoftActorCritic:
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE)
 
-            action, _, _ = self.select_action(torch_state)
-            next_state, reward, done, _ = self.env_step(action.item())
+            action = self.policy.select_action(torch_state)
+            action = action.detach().cpu().numpy()
+            next_state, reward, done, _ = self.env_step(action)
 
             episode_length += 1
 
@@ -381,11 +400,11 @@ class SoftActorCritic:
 
             if max_steps_elapsed:
                 self.replay_buffer.push(
-                    (state, action.cpu().numpy(), reward, next_state, done)
+                    (state, action, reward, next_state, done)
                 )
             else:
                 self.replay_buffer.push(
-                    (state, action.cpu().numpy(), reward, next_state, not done)
+                    (state, action, reward, next_state, not done)
                 )
 
             state = next_state
