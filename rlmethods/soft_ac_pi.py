@@ -135,7 +135,7 @@ class PolicyNetwork(BaseNN):
 
         means = self.means(x)
         log_stds = self.log_stds(x)
-        log_stds = torch.clamp(log_stds, min=2, max=22)
+        log_stds = torch.clamp(log_stds, min=-20.0, max=2.0)
 
         return means, log_stds
 
@@ -162,13 +162,13 @@ class PolicyNetwork(BaseNN):
 
     def select_action(self, state):
         """Select action for playing. Selects mean action only.
-        
+
         :param state: State to select action from.
         :return: produced action.
         """
         means, _ = self.__call__(state)
         action = self.action_scale * means + self.action_bias
-        
+
         return action
 
     def action_distribution(self, state):
@@ -177,7 +177,7 @@ class PolicyNetwork(BaseNN):
         :param state: Input state vector.
         """
         means, stds = self.__call__(state)
-        dist = Normal(means, stds)
+        dist = Normal(means, torch.exp(stds))
 
         return dist
 
