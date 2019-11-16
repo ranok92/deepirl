@@ -15,6 +15,7 @@ parser.add_argument('--log-alpha', type=float, default=-2.995)
 parser.add_argument('--entropy-target', type=float, default=0.008)
 parser.add_argument('--max-episode-length', type=int, default=10**6)
 parser.add_argument('--play-interval', type=int, default=1)
+parser.add_argument('--training-steps', type=int, default=10**4)
 
 args = parser.parse_args()
 
@@ -41,7 +42,7 @@ def main():
         entropy_target=args.entropy_target
     )
 
-    soft_ac.train_and_play(5000, args.play_interval)
+    soft_ac.train_and_play(args.training_steps, args.play_interval)
 
 if __name__ == "__main__":
     main()

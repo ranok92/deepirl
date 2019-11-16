@@ -384,8 +384,9 @@ class SoftActorCritic:
         total_reward = np.zeros(1)
         state = self.env_reset()
         episode_length = 0
+        max_steps_elapsed = False
 
-        while not done:
+        while not (done or max_steps_elapsed):
             # Env returns numpy state so convert to torch
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE)
