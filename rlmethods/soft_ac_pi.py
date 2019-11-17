@@ -78,23 +78,40 @@ class QNetwork(BaseNN):
         super().__init__()
 
         action_length = functools.reduce(operator.mul, action_space.shape)
-        self.in_layer = nn.Linear(
+
+        #q1
+        self.q1_in_layer = nn.Linear(
             state_length + action_length, hidden_layer_width
         )
-        self.hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
-        self.head = nn.Linear(hidden_layer_width, 1)
+        self.q1_hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.q1_hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.q1_head = nn.Linear(hidden_layer_width, 1)
 
+        #q2
+        self.q2_in_layer = nn.Linear(
+            state_length + action_length, hidden_layer_width
+        )
+        self.q2_hidden1 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.q2_hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
+        self.q2_head = nn.Linear(hidden_layer_width, 1)
         self.to(DEVICE)
 
     def forward(self, states, actions):
-        x = torch.cat([states, actions], dim=1)
-        x = F.relu(self.in_layer(x))
-        x = F.relu(self.hidden1(x))
-        x = F.relu(self.hidden2(x))
-        x = self.head(x)
+        state_action = torch.cat([states, actions], dim=1)
 
-        return x
+        #q1
+        q1 = F.relu(self.q1_in_layer(state_action))
+        q1 = F.relu(self.q1_hidden1(q1))
+        q1 = F.relu(self.q1_hidden2(q1))
+        q1 = self.q1_head(q1)
+
+        #q2
+        q2 = F.relu(self.q2_in_layer(state_action))
+        q2 = F.relu(self.q2_hidden1(q2))
+        q2 = F.relu(self.q2_hidden2(q2))
+        q2 = self.q2_head(q2)
+
+        return q1, q2
 
 
 class PolicyNetwork(BaseNN):
@@ -313,30 +330,38 @@ class SoftActorCritic:
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
 
-        # Figure out value function
-        next_actions, log_next_actions, _ = self.policy.sample(next_state_batch)
-        next_q = self.avg_q_net(next_state_batch, next_actions)
-        next_state_values = next_q - alpha * log_next_actions
+        with torch.no_grad():
+            # Figure out value function
+            next_actions, log_next_actions, _ = self.policy.sample(next_state_batch)
+            target_q1, target_q2 = self.avg_q_net(next_state_batch, next_actions)
+            target_q = torch.min(target_q1, target_q2)
+            next_state_values = target_q - alpha * log_next_actions
 
-        # Calculate Q network target
-        done_floats = dones.type(torch.float)
-        q_target = reward_batch.clone()
-        q_target += self.gamma * done_floats * next_state_values
+            # Calculate Q network target
+            done_floats = dones.type(torch.float)
+            q_target = reward_batch.clone()
+            q_target += self.gamma * done_floats * next_state_values
 
         # Q net outputs values for all actions, so we index specific actions
-        q_values = self.q_net(state_batch, action_batch)
-        q_loss = F.mse_loss(q_values, q_target)
+        q1, q2 = self.q_net(state_batch, action_batch)
+        q1_loss = F.mse_loss(q1, q_target)
+        q2_loss = F.mse_loss(q2, q_target)
 
         # policy loss
         actions_pi, log_probs_pi, action_dist = self.policy.sample(
             state_batch
         )
-        q_pi = self.q_net(state_batch, actions_pi)
+        q1_pi, q2_pi = self.q_net(state_batch, actions_pi)
+        q_pi = torch.min(q1_pi, q2_pi)
         policy_loss = ((alpha * log_probs_pi) - q_pi).mean()
 
         # update parameters
         self.q_optim.zero_grad()
-        q_loss.backward()
+        q1_loss.backward()
+        self.q_optim.step()
+
+        self.q_optim.zero_grad()
+        q2_loss.backward()
         self.q_optim.step()
 
         self.policy_optim.zero_grad()
@@ -360,11 +385,13 @@ class SoftActorCritic:
         # logging
         self.tbx_logger(
             {
-                "loss/Q loss": q_loss.item(),
+                "loss/q1 loss": q1_loss.item(),
+                "loss/q2 loss": q2_loss.item(),
                 "loss/pi loss": policy_loss.item(),
                 "loss/alpha loss": alpha_loss.item(),
                 "Q/avg_q_target": q_target.mean().item(),
-                "Q/avg_q": q_values.mean().item(),
+                "Q/avg_q1": q1.mean().item(),
+                "Q/avg_q2": q2.mean().item(),
                 "Q/avg_reward": reward_batch.mean().item(),
                 "Q/avg_V": next_state_values.mean().item(),
                 "H/alpha": alpha.item(),
