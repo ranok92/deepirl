@@ -421,7 +421,9 @@ class SoftActorCritic:
             torch_state = torch_state.to(DEVICE).unsqueeze(0)
 
             action, _, _ = self.policy.sample(torch_state)
-            action = action.detach().squeeze().cpu().numpy()
+            action = action.detach().cpu().numpy()
+            action = action.reshape(self.env.action_space.shape)
+
             next_state, reward, done, _ = self.env_step(action)
 
             episode_length += 1
