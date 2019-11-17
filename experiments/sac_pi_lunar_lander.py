@@ -16,6 +16,7 @@ parser.add_argument('--entropy-target', type=float, default=0.008)
 parser.add_argument('--max-episode-length', type=int, default=10**6)
 parser.add_argument('--play-interval', type=int, default=1)
 parser.add_argument('--training-steps', type=int, default=10**4)
+parser.add_argument('--render', action='store_true')
 
 args = parser.parse_args()
 
@@ -39,10 +40,13 @@ def main():
         tau=0.005,
         log_alpha=args.log_alpha,
         entropy_tuning=True,
-        entropy_target=args.entropy_target
+        entropy_target=args.entropy_target,
+        render=args.render,
     )
 
     soft_ac.train_and_play(args.training_steps, args.play_interval)
+
+    soft_ac.policy.save("./lunar_lander_policy.to")
 
 if __name__ == "__main__":
     main()
