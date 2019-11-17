@@ -13,6 +13,7 @@ from alternateController.potential_field_controller import PotentialFieldControl
 from itertools import count
 import utils  # NOQA: E402
 from envs.gridworld import GridWorld
+from drone_env_utils import angle_between
 import copy
 with utils.HiddenPrints():
     import pygame
@@ -144,14 +145,14 @@ class GridWorldDrone(GridWorld):
         self.continuous_action = continuous_action
         if not self.continuous_action:
             divisions = 7
-            quantization = 10
-            min_val = -quantization*(divisions-1)/2
-            self.orientation_array = [min_val+(i*quantization) for i in range(divisions)]
+            self.orient_quantization = 10
+            min_val = -self.orient_quantization*(divisions-1)/2
+            self.orientation_array = [min_val+(i*self.orient_quantization) for i in range(divisions)]
             divisions = 5
-            quantization = .2
-            min_val = -quantization*(divisions-1)/2
+            self.speed_quantization = .2
+            min_val = -self.speed_quantization*(divisions-1)/2
             self.max_speed = 2
-            self.speed_array = [min_val+(i*quantization) for i in range(divisions)]
+            self.speed_array = [min_val+(i*self.speed_quantization) for i in range(divisions)]
             self.action_space = Discrete(len(self.orientation_array)*len(self.speed_array))
         else:
             self.max_speed = 2
@@ -507,7 +508,7 @@ class GridWorldDrone(GridWorld):
                 if action is not None:
 
                     if not self.continuous_action:
-                        action_orient = action%len(self.orientation_array)
+                        action_orient = int(action%len(self.orientation_array))
                         action_speed = int(action/len(self.orientation_array))
                         orient_change = self.orientation_array[action_orient]
                         speed_change = self.speed_array[action_speed]
@@ -846,35 +847,36 @@ class GridWorldDrone(GridWorld):
             #print('x :',x, 'y :',y)
             x = x - self.agent_state['position'][1]
             y = y - self.agent_state['position'][0]
-
-            x = int(x/self.step_size)
-            y = int(y/self.step_size)
-
-            x = int(np.sign(x))
-            y = int(np.sign(y))
-            #print(x,y)
-            sign_arr = np.array([y,x])
-            def_arr = np.array([1,1])
-            action = sign_arr*def_arr
-
-            #action = (self.prev_action + action)%8
-            '''
-            if np.hypot(x,y)>_max_agent_speed:
-                normalizer = _max_agent_speed/(np.hypot(x,y))
-            #print x,y
-            else:
-                normalizer = 1
-            '''
-            action = self.action_dict[np.array2string(sign_arr*def_arr)]
             #pdb.set_trace()
-            #print( 'absolute action ',action)
-            action = (action - self.cur_heading_dir)%8
-            #print( ' relative action :',action)
-            #self.prev_action = action
-            #print('relative action :', action)
-            return action
+            new_dir_vector_abs = np.asarray([y, x])
+            rot_mat = get_rot_matrix(deg_to_rad(self.cur_heading_dir))
+            rotated_vector = np.matmul(rot_mat, new_dir_vector_abs)
+            rotated_agent_heading_vector = np.matmul(rot_mat, self.agent_state['orientation'])
 
-        return self.action_dict[np.array2string(np.array([0,0]))]
+            action_orient = int(len(self.orientation_array)/2)
+            action_speed = int(len(self.speed_array)/2)
+            #print(self.agent_state)
+            mag_angle = rad_to_deg(angle_between(rotated_agent_heading_vector, rotated_vector))
+            #print("The mag_angle :", mag_angle)
+            orient_action = min( (len(self.orientation_array)-1)/2, mag_angle/self.orient_quantization)
+          
+            if (rotated_vector[1] < rotated_agent_heading_vector[1]): 
+                #the new action wants the agent to move to its relative left
+                #print("moving to left")
+                orient_action = (len(self.orientation_array)-1)/2 - orient_action
+            else:
+                #else to the relative right
+                #print("moving to right")
+                orient_action = (len(self.orientation_array)-1)/2 + orient_action
+
+            target_vel = np.linalg.norm(rotated_agent_heading_vector)
+            change = target_vel - self.agent_state['speed']
+            speed_action = max(min(((len(self.speed_array)-1)/2 + change/self.speed_quantization), len(self.speed_array)-1),0)
+            #print(orient_action, speed_action)
+            #pdb.set_trace()
+            return int(speed_action)*len(self.orientation_array) + int(orient_action)
+
+        return (len(self.orientation_array)-1)/2 + (0*len(self.orientation_array))
 
 
     def return_position(self, ped_id, frame_id):
@@ -1056,9 +1058,9 @@ if __name__=="__main__":
                         seed=0, obstacles=None, 
                         show_trail=True,
                         is_random=False,
-                        annotation_file='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
-                        subject=13,
-                        tick_speed=10, 
+                        annotation_file=None,
+                        subject=None,
+                        tick_speed=60, 
                         #annotation_file=None,
 
                         obs_width=7,
@@ -1068,8 +1070,8 @@ if __name__=="__main__":
                         show_comparison=True,
                         show_orientation=True,
                         external_control=True,
-                        replace_subject=True, 
-                        segment_size=50,
+                        replace_subject=False, 
+                        segment_size=500,
                         consider_heading=True,                      
                         continuous_action=False,
                         rows=576, cols=720, width=20)
@@ -1099,19 +1101,20 @@ if __name__=="__main__":
         init_frame = world.current_frame
         fin_frame = world.final_frame
         t = 1
-        while world.current_frame < fin_frame:
+        #while world.current_frame < fin_frame:
+        while True:
             #action = input()
 
-            #action = world.take_action_from_user()
+            action = world.take_action_from_user()
 
             #action = pf_agent.select_action(state)
             #print("agent state :", world.agent_state)
             #print("current orientation :", world.cur_heading_dir)
             #action_speed = int(input())
             #action_orient = int(input())
-            action = world.action_space.sample()
-            print(action)
-            print(world.agent_state)
+            #action = world.action_space.sample()
+            #print(action)
+            #print(world.agent_state)
             #action = action_speed+(action_orient*7)
             #print('Action :', action)
 
@@ -1124,10 +1127,12 @@ if __name__=="__main__":
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
             #print(feat)
+            '''
             if t%100==0:
                 world.rollback(10)
                 feat_drone.rollback(10, state)
                 t=1
+            '''
             #feat2 = feat_drone_2.extract_features(state)
             #orientation = feat_drone.extract_features(state)
             '''
@@ -1145,7 +1150,7 @@ if __name__=="__main__":
             #print (reward, done)
             t+=1
 
-        info_collector.collab_end_traj_results()
+        #info_collector.collab_end_traj_results()
 
-    info_collector.collab_end_results()
+    #info_collector.collab_end_results()
     
