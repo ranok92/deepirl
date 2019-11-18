@@ -455,7 +455,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train_and_play(self, num_episodes, play_interval):
+    def train_and_play(self, num_episodes, play_interval, halt_at_end=False):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -468,3 +468,6 @@ class SoftActorCritic:
 
             if self.training_i % play_interval == 0:
                 self.play(self.max_episode_length, self.render)
+
+        if halt_at_end:
+            import pdb; pdb.set_trace()

@@ -17,6 +17,7 @@ parser.add_argument('--max-episode-length', type=int, default=10**6)
 parser.add_argument('--play-interval', type=int, default=1)
 parser.add_argument('--training-steps', type=int, default=10**4)
 parser.add_argument('--render', action='store_true')
+parser.add_argument("--halt-at-end", action="store_true")
 
 args = parser.parse_args()
 
@@ -44,7 +45,7 @@ def main():
         render=args.render,
     )
 
-    soft_ac.train_and_play(args.training_steps, args.play_interval)
+    soft_ac.train_and_play(args.training_steps, args.play_interval, halt_at_end=args.halt_at_end)
 
     soft_ac.policy.save("./pendulum_policies")
 
