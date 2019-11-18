@@ -95,7 +95,8 @@ class DeepMaxEnt():
             learning_rate=1e-3,
             scale_svf=False,
             seed=10, 
-            clipping_value=None
+            clipping_value=None,
+            enumerate_all=False
     ):
 
         # pass the actual object of the class of RL method of your choice
@@ -169,7 +170,7 @@ class DeepMaxEnt():
 
         self.clipping = clipping_value
         self.writer = SummaryWriter(self.save_folder_tf)
-
+        self.enumerate_all = enumerate_all
     #******parts being operated on
     ############ array based svf calculation. Not feasible for larger state spaces#######
     #####################################################################################
@@ -228,7 +229,7 @@ class DeepMaxEnt():
                                 scale_svf=True, episode_length=20, gamma=0.99,
                                 feature_extractor=None, enumerate_all=False):
 
-         
+        
         return irlUtils.calculate_svf_from_sampling(no_of_samples=num_of_samples,
                                             env=env, policy_nn=policy_nn,
                                             reward_nn=reward_nn, scale_svf=scale_svf,
@@ -604,9 +605,9 @@ class DeepMaxEnt():
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episode_len,
                                                              smoothing_window=None,
-                                                             enumerate_all=True)
+                                                             enumerate_all=self.enumerate_all)
 
-            #pdb.set_trace()
+            pdb.set_trace()
             model_performance_list.append(true_reward)
             self.writer.add_scalar('Log_info/model_performance_true', true_reward, i)
             model_performance_nn.append(nn_reward)
@@ -630,7 +631,6 @@ class DeepMaxEnt():
             print(self.policy_network_save_folder)
             current_agent_policy.save(self.policy_network_save_folder)
             
-
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
             
             self.writer.add_scalar('Log_info/svf_difference', np.linalg.norm(diff_freq,1), i)

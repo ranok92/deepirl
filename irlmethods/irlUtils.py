@@ -491,6 +491,7 @@ def select_action(policy,state):
 
     :param state: Current state in environment.
     """
+    #state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
     probs, state_value = policy(state)
     m = Categorical(probs)
     action = m.sample()
@@ -672,11 +673,14 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
         #print('agent position:', state['agent_state'])
         state = feature_extractor.extract_features(state)
+        state_tensor = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
+
+        #pdb.set_trace()
         current_svf_dict[feature_extractor.hash_function(state)] = 1
         #print('episode len', episode_length)
         for t in range(episode_length):
 
-            action = select_action(policy_nn, state)
+            action = select_action(policy_nn, state_tensor)
             action = action.item()
             #print(action)
             state, reward, done,_ = env.step(action)
@@ -686,13 +690,15 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             #get the state index
 
             state = feature_extractor.extract_features(state)
+            state_tensor = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
+
             if feature_extractor.hash_function(state) not in current_svf_dict.keys():
                 current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t)
             else:
                 current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t) 
                                                   
             if reward_nn is not None:
-                nn_reward  = reward_nn(state)
+                nn_reward  = reward_nn(state_tensor)
                 run_reward+=nn_reward
 
             if done:
@@ -714,7 +720,6 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
         rewards_true[i] = run_reward_true
         svf_dict_list.append(current_svf_dict)
-
     #rewards = rewards - np.min(rewards)+eps
     #changing it to the more generic exp
     #print('rewards non exp', rewards)
