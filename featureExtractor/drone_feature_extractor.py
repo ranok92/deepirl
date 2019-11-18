@@ -2,7 +2,6 @@ import sys
 import math
 import pdb
 import itertools
-import torch
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
 import os
@@ -337,10 +336,6 @@ class DroneFeatureSAM1():
         This function takes in a state and returns an integer which uniquely identifies that 
         particular state in the entire state space.
         '''
-        if isinstance(state, torch.Tensor):
-
-            state = state.cpu().numpy()
-
         return int(np.dot(self.hash_variable, state))
 
 
@@ -1235,7 +1230,8 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                  obs_width=10, grid_size=10,
                  show_bins=False, 
                  max_speed=2,
-                 show_agent_persp=False
+                 show_agent_persp=False,
+                 return_tensor=False
                  ):
 
         super().__init__(thresh1=thresh1,
@@ -1260,7 +1256,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         self.max_speed = max_speed
         self.speed_divisions = 6
         self.generate_hash_variable()
-
+        self.return_tensor = return_tensor
 
     def get_speed_info(self, agent_state):
 
@@ -1333,6 +1329,9 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         pdb.set_trace()
         #****end block****#
         '''
-        return reset_wrapper(extracted_feature)
+        if self.return_tensor:
+            return reset_wrapper(extracted_feature)
+        else:
+            return extracted_feature
 
 
