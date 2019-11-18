@@ -425,7 +425,7 @@ class ActorCritic:
                             self.env.reset())
             else:
                 state = self.env.reset()
-
+            state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
             # number of timesteps taken
             t = 0
 
@@ -449,6 +449,7 @@ class ActorCritic:
                     #print(reward)
                     reward = reward
                 else:
+                    state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
                     reward = rewardNetwork(state)
                     reward = reward.item()
 
