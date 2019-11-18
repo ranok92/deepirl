@@ -13,7 +13,7 @@ from alternateController.potential_field_controller import PotentialFieldControl
 from itertools import count
 import utils  # NOQA: E402
 from envs.gridworld import GridWorld
-from drone_env_utils import angle_between
+from envs.drone_env_utils import angle_between
 import copy
 with utils.HiddenPrints():
     import pygame
@@ -182,9 +182,14 @@ class GridWorldDrone(GridWorld):
 
         if self.annotation_file is not None:
 
-            self.generate_annotation_list()
-            self.generate_pedestrian_dict()
-            self.generate_annotation_dict_universal()
+            if not os.path.isfile(self.annotation_file):
+                print("The annotation file does not exist.")
+                print("Starting environment without annotation file.")
+                self.annotation_file = None
+            else:
+                self.generate_annotation_list()
+                self.generate_pedestrian_dict()
+                self.generate_annotation_dict_universal()
 
         else:
 
