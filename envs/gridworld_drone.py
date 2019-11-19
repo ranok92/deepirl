@@ -55,8 +55,8 @@ class GridWorldDrone(GridWorld):
     def __init__(
             self,
             seed=7,
-            rows=10,
-            cols=10,
+            rows=100,
+            cols=100,
             width=10,
             goal_state=None,
             obstacles=None,
