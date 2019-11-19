@@ -6,7 +6,7 @@ import sys
 import copy
 import operator
 import functools
-
+import pdb
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -225,8 +225,7 @@ class SoftActorCritic:
         self.render = render
         self.feature_extractor = feature_extractor
         self.max_episode_length = max_episode_length
-        starting_state = self.env_reset()
-        starting_feature = self.feature_extractor.extract_features(starting_state)
+        starting_feature = self.env_reset()
         feature_size = starting_feature.shape[0]
 
         # buffer

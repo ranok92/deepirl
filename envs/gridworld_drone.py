@@ -61,7 +61,7 @@ class GridWorldDrone(GridWorld):
             goal_state=None,
             obstacles=None,
             display=True,
-            is_onehot=True,
+            is_onehot=False,
             is_random=False,
             step_reward=0.001,
             step_wrapper=utils.identity_wrapper,
