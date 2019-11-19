@@ -31,7 +31,7 @@ def main():
 
     feature_extractor = DroneFeatureRisk_speed()
 
-    env = GridWorldDrone(continuous_action=True)
+    env = GridWorldDrone(continuous_action=True, display=args.render)
 
     soft_ac = SoftActorCritic(
         env,
