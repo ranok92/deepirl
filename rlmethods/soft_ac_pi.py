@@ -401,7 +401,7 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self, max_steps, render=False):
+    def play(self, max_steps, render=False, rewardNetwork=None, irl=False):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
@@ -423,6 +423,10 @@ class SoftActorCritic:
             action = action.reshape(self.env.action_space.shape)
 
             next_state, reward, done, _ = self.env_step(action)
+
+            if rewardNetwork and irl:
+                reward = rewardNetwork(torch_state)
+                reward = float(reward.cpu().detach().item())
 
             episode_length += 1
 
@@ -453,7 +457,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train(self, num_episodes, play_interval, halt_at_end=False):
+    def train(self, num_episodes, play_interval, halt_at_end=False, rewardNetwork=None, irl=False):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -465,7 +469,7 @@ class SoftActorCritic:
             self.train_episode()
 
             if self.training_i % play_interval == 0:
-                self.play(self.max_episode_length, self.render)
+                self.play(self.max_episode_length, self.render, rewardNetwork=rewardNetwork, irl=irl)
 
         if halt_at_end:
             import pdb
