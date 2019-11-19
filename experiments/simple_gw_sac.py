@@ -37,7 +37,7 @@ def main():
         entropy_target=0.05,
     )
 
-    soft_ac.train_and_play(args.max_episodes, 1)
+    soft_ac.train(args.max_episodes, 1)
 
 if __name__ == "__main__":
     main()

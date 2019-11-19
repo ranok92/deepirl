@@ -169,7 +169,7 @@ def main():
         policy_net=conv_policy_net
     )
 
-    soft_ac.train_and_play(args.max_episodes, args.play_interval)
+    soft_ac.train(args.max_episodes, args.play_interval)
 
 
 if __name__ == "__main__":

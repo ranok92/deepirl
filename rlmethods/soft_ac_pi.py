@@ -6,7 +6,6 @@ import sys
 import copy
 import operator
 import functools
-import pdb
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -454,7 +453,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train_and_play(self, num_episodes, play_interval, halt_at_end=False):
+    def train(self, num_episodes, play_interval, halt_at_end=False):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -469,4 +468,5 @@ class SoftActorCritic:
                 self.play(self.max_episode_length, self.render)
 
         if halt_at_end:
-            import pdb; pdb.set_trace()
+            import pdb
+            pdb.set_trace()
