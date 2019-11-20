@@ -25,6 +25,8 @@ from utils import to_oh
 
 import collections
 from scipy import signal
+from tqdm import tqdm
+import time
 import re
 #for visual
 import matplotlib.pyplot as plt
@@ -320,7 +322,8 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
 
     # histogram to accumulate state visitations
     svf = {}
-    for idx, state_file in enumerate(states):
+    #traj_weight_by_len = []
+    for idx, state_file in tqdm(enumerate(states)):
 
 
         #load up a trajectory and convert it to numpy
@@ -329,20 +332,21 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
 
         #iterating through each of the states 
         #in the trajectory
-
+        traj_weight_by_len = max_time_steps/traj_np.shape[0]
 
         for i in range(traj_np.shape[0]):
             state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
-                svf[state_hash] = 1*math.pow(gamma,i)
+                svf[state_hash] = 1*math.pow(gamma,i)*traj_weight_by_len
             else:
-                svf[state_hash] += 1*math.pow(gamma,i)
+                svf[state_hash] += 1*math.pow(gamma,i)*traj_weight_by_len
 
+        '''
         for pad_i in range(i+1,max_time_steps):
 
             state_hash = feature_extractor.hash_function(traj_np[i])
             svf[state_hash] += 1*math.pow(gamma,pad_i)
-
+        '''
 
     #normalize the svf
     '''
@@ -657,7 +661,9 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     norm_factor = np.zeros(no_of_samples)
 
     svf_dict_list = []
-    for i in range(no_of_samples):
+    weight_by_traj_len = np.zeros(no_of_samples)
+ 
+    for i in tqdm(range(no_of_samples)):
 
         run_reward = 0
         run_reward_true = 0
@@ -678,7 +684,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         #pdb.set_trace()
         current_svf_dict[feature_extractor.hash_function(state)] = 1
         #print('episode len', episode_length)
-        for t in range(episode_length):
+        t = 1
+        while t < episode_length:
 
             action = select_action(policy_nn, state_tensor)
             action = action.item()
@@ -700,11 +707,14 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
             if reward_nn is not None:
                 nn_reward  = reward_nn(state_tensor)
                 run_reward+=nn_reward
+            t += 1
 
             if done:
                 #pass
                 break
+        weight_by_traj_len[i] = (episode_length)/(t)
 
+        '''
         #for padding to keep the lengths same
         for t_pad in range(episode_length-t-1):
 
@@ -712,7 +722,11 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                 current_svf_dict[feature_extractor.hash_function(state)] = 1*math.pow(gamma,t+t_pad+1)
             else:
                 current_svf_dict[feature_extractor.hash_function(state)] += 1*math.pow(gamma,t+t_pad+1) 
-                     
+        '''
+        #instead of padding scale the visited states based on the steps in the 
+        #current trajectory
+
+
 
 
         if reward_nn is not None:
@@ -720,6 +734,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
         rewards_true[i] = run_reward_true
         svf_dict_list.append(current_svf_dict)
+
     #rewards = rewards - np.min(rewards)+eps
     #changing it to the more generic exp
     #print('rewards non exp', rewards)
@@ -733,7 +748,13 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     if scale_svf:
         weights = rewards_exp/total_reward_exp
     else:
-        weights = np.ones(no_of_samples)/no_of_samples
+        #weights = np.ones(no_of_samples)/no_of_samples
+
+        #the line below is introduced so that trajectories with less states
+        #are given more weights to lack for the number of states present
+        #introduced instead of padding
+
+        weights = weight_by_traj_len/no_of_samples
     #print('weights from svf_dict:',weights)
     #plt.plot(weights)
     #plt.draw()
@@ -754,8 +775,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #print ('The norm factor :', norm_factor)
     for i in range(len(svf_dict_list)):
         dictionary = svf_dict_list[i]
+
         for key in dictionary:
-            #pdb.set_trace()
             if key not in master_dict:
                 master_dict[key] = dictionary[key]*weights[i]/norm_factor[i]
             else:
@@ -785,7 +806,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         svf_sum += master_dict[key]
     
     ################################################
-    
+    pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
     return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
