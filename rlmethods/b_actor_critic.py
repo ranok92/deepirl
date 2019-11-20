@@ -296,7 +296,7 @@ class ActorCritic:
                 if self.env.replace_subject:
                     subject_list.append(self.env.cur_ped)
             states = [state]
-
+            state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
             done = False
             t= 0
             unknown_state_counter = 0
@@ -321,6 +321,8 @@ class ActorCritic:
 
                 if self.feature_extractor is not None:
                     state = self.feature_extractor.extract_features(state)
+                state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
+
                 '''
                 print(state[0:9].reshape((3,3)))
                 print(state[9:18].reshape((3,3)))
