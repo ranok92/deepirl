@@ -45,7 +45,7 @@ def main():
         render=args.render,
     )
 
-    soft_ac.train_and_play(args.training_steps, args.play_interval, halt_at_end=args.halt_at_end)
+    soft_ac.train(args.training_steps, args.play_interval, halt_at_end=args.halt_at_end)
 
     soft_ac.policy.save("./pendulum_policies")
 

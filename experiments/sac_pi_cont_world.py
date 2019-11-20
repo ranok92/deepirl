@@ -31,7 +31,7 @@ def main():
 
     feature_extractor = DroneFeatureRisk_speed()
 
-    env = GridWorldDrone(continuous_action=True)
+    env = GridWorldDrone(continuous_action=True, display=args.render)
 
     soft_ac = SoftActorCritic(
         env,
@@ -47,7 +47,7 @@ def main():
         render=args.render,
     )
 
-    soft_ac.train_and_play(
+    soft_ac.train(
         args.training_steps, args.play_interval, halt_at_end=args.halt_at_end
     )
 

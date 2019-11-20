@@ -47,7 +47,7 @@ def main():
         render=args.render,
     )
 
-    soft_ac.train_and_play(
+    soft_ac.train(
         args.training_steps, args.play_interval, halt_at_end=args.halt_at_end
     )
 
