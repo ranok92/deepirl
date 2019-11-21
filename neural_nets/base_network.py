@@ -1,4 +1,4 @@
-'''defines the base network used in the project'''
+"""defines the base network used in the project"""
 
 import pathlib
 import os
@@ -15,7 +15,8 @@ class BaseNN(nn.Module):
         super(BaseNN, self).__init__()
 
         self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     def save(self, path):
         """Save the model.
@@ -26,10 +27,10 @@ class BaseNN(nn.Module):
 
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-        while os.path.exists(os.path.join(path, '%s.pt' % model_i)):
+        while os.path.exists(os.path.join(path, "%s.pt" % model_i)):
             model_i += 1
 
-        filename = os.path.join(path, '%s.pt' % model_i)
+        filename = os.path.join(path, "%s.pt" % model_i)
 
         torch.save(self.state_dict(), filename)
 
@@ -45,10 +46,12 @@ class BaseNN(nn.Module):
     def forward(self, *inputs):
         raise NotImplementedError
 
+
 class RectangleNN(BaseNN):
     """
     Neural network with rectangular hidden layers (i.e. same widths).
     """
+
     def __init__(self, num_layers, layer_width, activation_func):
         super(RectangleNN, self).__init__()
 
@@ -70,3 +73,35 @@ class RectangleNN(BaseNN):
 
     def forward(self, *inputs):
         raise NotImplementedError
+
+
+class PolicyBase(BaseNN):
+    """Implements a base policy pi(a|s). All policies in RL methods should
+    subclass."""
+
+    def forward(self, *inputs):
+        raise NotImplementedError
+
+    def sample_action(self, state):
+        """ Sample a random action from the policy distirbution.
+
+        :param state: Pytorch tensor, NxS where N is batch size (could be 1)
+        and S is state size.
+        :type state: Pytorch tensor.
+        :return action: Pytorch NxA vector where N is batch size and A is
+        action dimension.
+        """
+        raise NotImplementedError
+
+    def eval_action(self, state):
+        """ Takes an "evaluation" action sample from policy. This evaulation
+        sample should in some sense be the optimal action.
+
+        :param state: Pytorch tensor, NxS where N is batch size (could be 1)
+        and S is state size.
+        :type state: Pytorch tensor.
+        :return action: Pytorch NxA vector where N is batch size and A is
+        action dimension.
+        """
+
+        return self.sample_action(state)
