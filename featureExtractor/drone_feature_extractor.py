@@ -286,7 +286,7 @@ class DroneFeatureSAM1():
         self.state_dictionary = {}
         self.state_str_arr_dict = {}
         self.inv_state_dictionary = {}
-        self.hash_variable = None
+        self.hash_variable_list = []
 
         self.num_of_speed_blocks = 3
         self.num_of_orient_blocks = 4
@@ -308,37 +308,33 @@ class DroneFeatureSAM1():
         This creates an array of the following format:
         [. . .  16 8 4 2 1] and so on.
         '''
-        self.hash_variable = np.zeros(self.state_rep_size)
-        for i in range(self.hash_variable.shape[0]-1, -1, -1):
+        self.hash_variable_list = []
+        for i in range(self.state_rep_size-1, -1, -1):
     
-            self.hash_variable[i] = math.pow(2, self.hash_variable.shape[0]-1-i)
-
-        #print(self.hash_variable)
-
-
+            self.hash_variable_list.append((int(math.pow(2, self.state_rep_size-1-i))))
         
 
     def recover_state_from_hash_value(self, hash_value):
 
         size = self.state_rep_size
-        binary_str = np.binary_repr(hash_value, size)
         state_val = np.zeros(size)
-        i = 0
-        for digit in binary_str:
-            state_val[i] = int(digit) 
-            i += 1
+        i=0
+        while hash_value>0:
+            state_val[i]=int(hash_value)%2
+            hash_value=math.floor((hash_value)//2)
+            i+=1
 
         return state_val
 
 
     def hash_function(self, state):
-        '''
-        This function takes in a state and returns an integer which uniquely identifies that 
-        particular state in the entire state space.
-        '''
-        return int(np.dot(self.hash_variable, state))
 
+        hash_value = 0
+        size = len(self.hash_variable_list)
+        for i in range(size):
+            hash_value+= int(self.hash_variable_list[i]*state[i])
 
+        return hash_value
 
     def get_info_from_state(self, state):
         #read information from the state
@@ -1271,7 +1267,6 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         quantization = self.max_speed/self.speed_divisions
         speed_info[int(cur_speed/quantization)] = 1
-
         return speed_info
 
 
@@ -1321,6 +1316,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                                             collision_info.reshape((-1)),
                                             speed_info
                                             ))
+
         '''
         #***debugging block*****#
         print('Relative orientation :', relative_orientation)
