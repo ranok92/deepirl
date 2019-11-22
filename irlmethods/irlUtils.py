@@ -10,19 +10,18 @@ sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
 from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureSAM1
+from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk_speed
 
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
 import math
-from envs.gridworld import GridWorld
+from envs.gridworld_drone import GridWorldDrone
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 from utils import to_oh
-
 import collections
 from scipy import signal
 from tqdm import tqdm
@@ -479,39 +478,14 @@ def debug_custom_path(traj_path, criteria ,state_dict = None):
 
 	
 
-
-
-'''
-The select_action is a duplicate the the select action in the b_actor_critic.py
-file. But unlike that method, this does not store any of the actions or 
-rewards.
-***Open to suggestions for better way of implementing this***
-
-'''
-
-def select_action(policy,state):
-    """based on current policy, given the current state, select an action
-    from the action space.
-
-    :param state: Current state in environment.
-    """
-    #state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
-    probs, state_value = policy(state)
-    m = Categorical(probs)
-    action = m.sample()
-    #return action.item()
-    val, ind = torch.max(probs,0)
-    return ind
-
-
 #should calculate the SVF of a policy network by running the agent a number of times
 #on the given environment. Once the trajectories are obtained, each of the trajectories 
 #multiplied by a certain weight, w, where w = e^(r)/ sum(e^(r) for r of all the 
 #trajectories played)
 
 def get_svf_from_sampling(no_of_samples = 1000, env = None ,
-                                                 policy_nn = None , reward_nn = None,
-                                                 episode_length = 20, feature_extractor = None, gamma=.99):
+                         policy_nn = None , reward_nn = None,
+                         episode_length = 20, feature_extractor = None, gamma=.99):
 
 
     num_states = 100
@@ -574,7 +548,8 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
                                                                                            #the state for the run
 
         for t in range(episode_length):
-            action = select_action(policy_nn,state)
+            #action = select_action(policy_nn,state)
+            action = policy_nn.eval_action(state)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
 
@@ -681,14 +656,13 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         state = feature_extractor.extract_features(state)
         state_tensor = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
 
-        #pdb.set_trace()
         current_svf_dict[feature_extractor.hash_function(state)] = 1
         #print('episode len', episode_length)
         t = 1
         while t < episode_length:
 
-            action = select_action(policy_nn, state_tensor)
-            action = action.item()
+            action = policy_nn.eval_action(state_tensor)
+            #action = action.item()
             #print(action)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
@@ -806,7 +780,7 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         svf_sum += master_dict[key]
     
     ################################################
-    pdb.set_trace()
+    #pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
     return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
@@ -848,7 +822,7 @@ def calculate_svf_from_sampling_using_smoothing(no_of_samples=1000, env=None,
 
         for t in range(episode_length):
 
-            action = select_action(policy_nn, state)
+            action = policy_nn.eval_action(state)
             state, reward, done,_ = env.step(action)
             #feature_extractor wraps the state in torch tensor so convert that back
 
@@ -990,15 +964,19 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
 
 if __name__ == '__main__':
 
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
-    render = True
+    
+    #***************to compare svfs****************
+    
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    annotation_file = None
+    render = False
     agent_width = 10
     obs_width = 10
     step_size = 2
     grid_size = 10
-    max_ep_length = 500
+    max_ep_length = 200
     save_folder = None
-    policy_net_hidden_dims = [256]
+    policy_net_hidden_dims = [128]
     lr = 0.00
     total_episodes=1000
     true_reward_list = []
@@ -1013,7 +991,7 @@ if __name__ == '__main__':
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
-                        replace_subject=True,
+                        replace_subject=False,
                         segment_size=None,
                         external_control=True,
                         step_reward=0.001,
@@ -1032,30 +1010,50 @@ if __name__ == '__main__':
 
     #load the actor critic module
     model = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
-                        log_interval=100,max_ep_length=max_ep_length,
+                        log_interval=100,max_episode_length=max_ep_length,
                         hidden_dims=policy_net_hidden_dims,
                         save_folder=None, 
                         max_episodes=total_episodes)
 
+    expert_trajectory_folder = '/home/abhisek/Study/Robotics/deepirl/envs/DroneFeatureRisk_speed_blank_slate'
 
-    policy_folder =''
 
+    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-blank-slate-user-played_long_runs_updated_svf2019-11-21_08:19:08-policy_net-128--reward_net-128--reg-0.05-seed-43-lr-0.0005/saved-models/30.pt'
+
+    policy_file_list = []
     #read the files in the folder
-    policy_names = glob.glob(os.path.join(policy_folder, '*.pt'))
-    policy_file_list = sorted(policy_names, key=numericalSort)
+    if os.path.isdir(policy_folder):
+        policy_names = glob.glob(os.path.join(policy_folder, '*.pt'))
+        policy_file_list = sorted(policy_names, key=numericalSort)
 
+    else:
+        policy_file_list.append(policy_folder)
     xaxis = np.arange(len(policy_file_list))
 
-    for policy_file in policy_file_list:
 
+    expert_svf_dict = calculate_expert_svf(expert_trajectory_folder,
+                                           max_time_steps=max_ep_length,
+                                           feature_extractor=feat_ext,
+                                           gamma=1)
+
+    for policy_file in policy_file_list:
         print("Playing for policy : ", policy_file)
         model.policy.load(policy_file)
-        _, true_reward, _ = calculate_svf_from_sampling(no_of_samples=1000, env=env,
+
+        svf_dict, _ , _ = calculate_svf_from_sampling(no_of_samples=100, env=env,
                                 policy_nn=model.policy, reward_nn=None,
-                                episode_length=20, feature_extractor=feat_ext,
+                                episode_length=max_ep_length,
+                                feature_extractor=feat_ext,
                                 gamma=1, scale_svf=False,
-                                enumerate_all=True)
-        true_reward_list.append(true_reward)
+                                enumerate_all=False)
+        #true_reward_list.append(true_reward)
     
+    states, diff = get_states_and_freq_diff(expert_svf_dict, svf_dict, feat_ext)
+    pdb.set_trace()
+    for state in states:
+        print(state)
+        print("the recovered state :")
+        print(feat_ext.recover_state_from_hash_value(feat_ext.hash_function(state)))
+        pdb.set_trace()
     plt.plot(true_reward_list)
     plt.show()
