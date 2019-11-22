@@ -106,6 +106,7 @@ class Policy(BaseNN):
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
 
+
     def graft(self, input_net, hidden_net):
         """Grafts a deep copy of another neural network's body into this
         network. Requires optimizer to be reset after this operation is
@@ -127,11 +128,45 @@ class Policy(BaseNN):
 
 
 
+    def sample_action(self, state):
+        """based on current policy, given the current state, select an action
+        from the action space.
+
+        :param state: Current state in environment.
+        """
+        probs, state_value = self.__call__(state)
+        #print('The probs :', probs)
+        m = Categorical(probs)
+        action = m.sample()
+        self.saved_actions.append(SavedAction(m.log_prob(action),
+                                                     state_value))
+
+        return action.item()
+
+
+    def eval_action(self, state):
+        '''
+        use this function to play, as the other one keeps storing information which is not needed
+        when evaluating.
+        '''
+
+        probs, state_value = self.__call__(state)
+        #print(probs)
+        #m = Categorical(probs)
+        #action = m.sample()
+        val, ind = torch.max(probs,0)
+        #print(ind.item())
+        #pdb.set_trace()
+        return ind.item()
+
+
+
+
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
     def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0, max_ep_length=200, hidden_dims=[128], lr=0.001,
+                 log_interval=100, max_episodes=0, max_episode_length=200, hidden_dims=[128], lr=0.001,
                  reward_threshold_ratio=0.99 , plot_loss = False, save_folder=None):
         """__init__
 
@@ -143,7 +178,7 @@ class ActorCritic:
         self.render = render
         self.log_interval = log_interval
         self.max_episodes = max_episodes
-        self.max_ep_length = max_ep_length
+        self.max_episode_length = max_episode_length
         self.reward_threshold_ratio = reward_threshold_ratio
 
         self.env = env
@@ -194,40 +229,6 @@ class ActorCritic:
 
 
 
-    def select_action(self, state):
-        """based on current policy, given the current state, select an action
-        from the action space.
-
-        :param state: Current state in environment.
-        """
-        probs, state_value = self.policy(state)
-        #print('The probs :', probs)
-        m = Categorical(probs)
-        action = m.sample()
-        self.policy.saved_actions.append(SavedAction(m.log_prob(action),
-                                                     state_value))
-
-        return action.item()
-
-
-    def select_action_play(self, state):
-        '''
-        use this function to play, as the other one keeps storing information which is not needed
-        when evaluating.
-        '''
-
-        probs, state_value = self.policy(state)
-        #print(probs)
-        #m = Categorical(probs)
-        #action = m.sample()
-        val, ind = torch.max(probs,0)
-        #print(ind.item())
-        #pdb.set_trace()
-        return ind.item(), probs
-
-
-
-
     def generate_trajectory_user(self, num_trajs , path):
 
         for traj_i in range(num_trajs):
@@ -241,7 +242,7 @@ class ActorCritic:
             done = False
             for i in count(0):
                 t= 0
-                while t < self.max_ep_length:
+                while t < self.max_episode_length:
                 
                     action,action_flag = self.env.take_action_from_user()
 
@@ -255,7 +256,7 @@ class ActorCritic:
                         print("current state :", state)
                         states.append(state)
                         actions.append(action)
-                    if t >= self.max_ep_length or done:
+                    if t >= self.max_episode_length or done:
                         break
 
                 print ("the states traversed : ", states)
@@ -303,9 +304,9 @@ class ActorCritic:
             total_states = 0
             run_reward = 0
             
-            while not done and t < self.max_ep_length:
+            while not done and t < self.max_episode_length:
                 
-                action,_ = self.select_action_play(state)
+                action = self.policy.eval_action(state)
 
                 if expert_svf is not None:
                     if self.feature_extractor.hash_function(state) not in expert_svf.keys():
@@ -411,7 +412,7 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-    def train(self, rewardNetwork=None, irl=False):
+    def train(self, reward_network=None, irl=False):
         """Train actor critic method on given gym environment."""
         #along with the policy, the train now returns the loss and the 
         #rewards obtained in the form of a list
@@ -432,12 +433,12 @@ class ActorCritic:
             t = 0
 
             # rewards obtained in this episode
-            # ep_reward = self.max_ep_length
+            # ep_reward = self.max_episode_length
             ep_reward = 0
 
-            for t in range(self.max_ep_length):  # Don't infinite loop while learning
+            for t in range(self.max_episode_length):  # Don't infinite loop while learning
 
-                action = self.select_action(state)
+                action = self.policy.sample_action(state)
                 action_array[action] += 1
                 state, reward, done, _ = self.env.step(action)
 
@@ -445,14 +446,14 @@ class ActorCritic:
                 
                     state = self.feature_extractor.extract_features(
                             state)
+                    state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
 
-                if rewardNetwork is None:
+                if reward_network is None:
 
                     #print(reward)
                     reward = reward
                 else:
-                    state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
-                    reward = rewardNetwork(state)
+                    reward = reward_network(state)
                     reward = reward.item()
 
                 ep_reward += reward
@@ -565,7 +566,7 @@ class ActorCritic:
 
         return self.policy
 
-    def train_episode(self, reward_acc, rewardNetwork=None, featureExtractor=None):
+    def train_episode(self, reward_acc, reward_network=None, featureExtractor=None):
         """
         performs a single RL training iterations.
         """
@@ -574,15 +575,15 @@ class ActorCritic:
         # rewards obtained in this episode
         ep_reward = 0
 
-        for t in range(self.max_ep_length):  # Don't infinite loop while learning
-            action = self.select_action(state)
+        for t in range(self.max_episode_length):  # Don't infinite loop while learning
+            action = self.policy.sample_action(state)
             state, reward, done, _ = self.env.step(action)
 
-            if rewardNetwork is None:
+            if reward_network is None:
                 reward = reward
 
             else:
-                reward = rewardNetwork(state)
+                reward = reward_network(state)
                 reward = reward.item()
 
             ep_reward += reward
