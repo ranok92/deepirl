@@ -104,7 +104,7 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episode_len = self.rl.max_ep_length
+        self.rl_max_episode_len = self.rl.max_episode_length
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
@@ -117,7 +117,10 @@ class DeepMaxEnt():
         else:
         '''
         self.state_size = self.rl.feature_extractor.extract_features(self.env.reset()).shape[0]
-        self.action_size = self.env.action_space.n
+        if self.env.continuous_action:
+            self.action_size = self.env.action_space.shape
+        else:
+            self.action_size = self.env.action_space.n
         self.reward = RewardNet(self.state_size, hidden_dims)
 
         #############debug###########
@@ -590,13 +593,13 @@ class DeepMaxEnt():
             #np.random.seed(7)
             print('Starting RL training. . .')
             current_agent_policy = self.rl.train(
-                rewardNetwork=self.reward,
+                reward_network=self.reward,
                 irl=True
             )
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
-            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=1000,
+            current_agent_svf, true_reward, nn_reward = self.agent_svf_sampling_dict(num_of_samples=100,
                                                              env=self.env,
                                                              policy_nn=self.rl.policy,
                                                              reward_nn=self.reward,
