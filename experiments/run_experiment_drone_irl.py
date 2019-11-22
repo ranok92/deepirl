@@ -73,6 +73,14 @@ parser.add_argument('--replace-subject', action='store_true', default=None)
 parser.add_argument('--segment-size', type=int, default=None, help='Size of each trajectory segment.')
 parser.add_argument('--subject', type=int, default=None)
 
+
+parser.add_argument('--rl-method', type=str, default='ActorCritic', help='The RL trainer to be used.')
+parser.add_argument('--play-interval', type=int, default=100)
+parser.add_argument('--replay-buffer-sample-size', type=int, default=1000)
+parser.add_argument('--replay-buffer-size', type=int, default=5000)
+
+
+
 #IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
 #before running on different settings
 def main():
@@ -119,7 +127,13 @@ def main():
 
 
     #from rlmethods.rlutils import LossBasedTermination
+    #for rl
     from rlmethods.b_actor_critic import ActorCritic
+    from rlmethods.soft_ac_pi import SoftActorCritic
+    from rlmethods.rlutils import ReplayBuffer
+
+
+    #for irl
     from irlmethods.deep_maxent import DeepMaxEnt
     import irlmethods.irlUtils as irlUtils
     from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
@@ -241,6 +255,7 @@ def main():
                     replace_subject=args.replace_subject,
                     segment_size=args.segment_size,
                     external_control=True,
+                    continuous_action=False,
                     reset_wrapper=utils.reset_wrapper,
                     consider_heading=True,
                     is_onehot=False)
@@ -256,23 +271,38 @@ def main():
     #initialize loss based termination
     # intialize RL method
     #CHANGE HERE
-    rlMethod = ActorCritic(env, gamma=1,
-                            log_interval=args.rl_log_intervals,
-                            max_episodes=args.rl_episodes,
-                            max_ep_length=args.rl_ep_length,
-                            termination=None,
-                            save_folder=to_save,
-                            lr=args.lr_rl,
-                            hidden_dims=args.policy_net_hidden_dims,
-                            feat_extractor=feat_ext)
+
+    if args.rl_method=='ActorCritic':
+        rl_method = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
+                                log_interval=args.rl_log_intervals,
+                                max_episode_length=args.rl_ep_length,
+                                hidden_dims=args.policy_net_hidden_dims,
+                                save_folder=to_save, 
+                                lr=args.lr_rl,
+                                max_episodes = args.rl_episodes)
+
+    if args.rl_method=='SAC':
+
+        replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
+        rl_method = SoftActorCritic(env, replay_buffer,
+                                    args.rl_ep_length,
+                                    feat_ext,
+                                    max_episodes=100,
+                                    play_interval=500,
+                                    learning_rate=args.lr_rl,
+                                    buffer_sample_size=args.replay_buffer_sample_size)
+
+
+
     print("RL method initialized.")
-    print(rlMethod.policy)
+    print(rl_method.policy)
     if args.policy_path is not None:
-        rlMethod.policy.load(args.policy_path)
+        rl_method.policy.load(args.policy_path)
 
 
     experiment_logger.log_header('Details of the RL method :')
-    experiment_logger.log_info(rlMethod.__dict__)
+    experiment_logger.log_info(rl_method.__dict__)
     
 
     # initialize IRL method
@@ -284,8 +314,8 @@ def main():
     
     if args.scale_svf:
         scale = args.scale_svf
-    irlMethod = DeepMaxEnt(trajectory_path, 
-                           rlmethod=rlMethod, 
+    irl_method = DeepMaxEnt(trajectory_path, 
+                           rlmethod=rl_method, 
                            env=env,
                            iterations=args.irl_iterations,
                            on_server=args.on_server,
@@ -297,12 +327,13 @@ def main():
                            hidden_dims = args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
                            save_folder=parent_dir)
+
     print("IRL method intialized.")
-    print(irlMethod.reward)
+    print(irl_method.reward)
 
     experiment_logger.log_header('Details of the IRL method :')
-    experiment_logger.log_info(irlMethod.__dict__)
-    rewardNetwork = irlMethod.train()
+    experiment_logger.log_info(irl_method.__dict__)
+    rewardNetwork = irl_method.train()
 
     if not args.dont_save:
         pass

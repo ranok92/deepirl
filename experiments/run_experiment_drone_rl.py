@@ -7,6 +7,8 @@ import argparse
 import torch.multiprocessing as mp
 import os
 
+
+import gym
 import glob
 from logger.logger import Logger
 import matplotlib
@@ -54,6 +56,11 @@ parser.add_argument('--exp-trajectory-path', type=str, default=None, help='The n
                     the expert trajectories are stored.(Relative path)')
 
 parser.add_argument('--segment-size', type=int, default=None, help='Size of each trajectory segment.')
+parser.add_argument('--rl-method', type=str, default='ActorCritic', help='The RL trainer to be used.')
+parser.add_argument('--play-interval', type=int, default=100)
+parser.add_argument('--replay-buffer-sample-size', type=int, default=1000)
+parser.add_argument('--replay-buffer-size', type=int, default=5000)
+
 def main():
     
     #####for the logger
@@ -73,6 +80,10 @@ def main():
     mp.set_start_method('spawn')
 
     from rlmethods.b_actor_critic import ActorCritic
+    from rlmethods.soft_ac_pi import SoftActorCritic
+    from rlmethods.rlutils import ReplayBuffer
+
+
     from envs.gridworld_drone import GridWorldDrone
     from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
@@ -177,6 +188,7 @@ def main():
                                        step_size=step_size,
                                        grid_size=grid_size,
                                        show_agent_persp=False,
+                                       return_tensor=False,
                                        thresh1=10, thresh2=15)
 
 
@@ -201,7 +213,7 @@ def main():
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=True,
-                        annotation_file=args.annotation_file,
+                        annotation_file=None,
                         subject=args.subject,
                         tick_speed=60, 
                         obs_width=10,
@@ -215,9 +227,11 @@ def main():
                         consider_heading=True,
                         show_orientation=True,
 
-                        #rows=200, cols=300, width=grid_size)                       
-                        rows=576, cols=720, width=grid_size)
+                        rows=200, cols=200, width=grid_size)                       
+                        #rows=576, cols=720, width=grid_size)
 
+
+    #env = gym.make('Acrobot-v1')
     #log environment info
     if not args.dont_save and not args.play:
 
@@ -225,12 +239,27 @@ def main():
         experiment_logger.log_info(env.__dict__)
 
     #initialize RL 
-    model = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
-                        log_interval=100,max_ep_length=args.max_ep_length,
-                        hidden_dims=args.policy_net_hidden_dims,
-                        save_folder=save_folder, 
-                        lr=args.lr,
-                        max_episodes = args.total_episodes)
+
+    if args.rl_method=='ActorCritic':
+        model = ActorCritic(env, feat_extractor=feat_ext,
+                            gamma=1,
+                            log_interval=100,
+                            max_episode_length=args.max_ep_length,
+                            hidden_dims=args.policy_net_hidden_dims,
+                            save_folder=save_folder, 
+                            lr=args.lr,
+                            max_episodes=args.total_episodes)
+
+    if args.rl_method=='SAC':
+
+        replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
+        model = SoftActorCritic(env, replay_buffer,
+                                args.max_ep_length,
+                                feat_ext,
+                                buffer_sample_size=args.replay_buffer_sample_size)
+
+
 
     #log RL info
     if not args.dont_save and not args.play:
@@ -245,6 +274,7 @@ def main():
         from debugtools import numericalSort
         policy_file_list =  []
         reward_across_models = []
+        #print(args.policy_path)
         if os.path.isfile(args.policy_path):
             policy_file_list.append(args.policy_path)
         if os.path.isdir(args.policy_path):
@@ -253,15 +283,15 @@ def main():
 
         xaxis = np.arange(len(policy_file_list))
 
-
-        
     if not args.play and not args.play_user:
         #no playing of any kind, so training
 
         if args.reward_path is None:
+
             if args.policy_path:
                 model.policy.load(args.policy_path)
             model.train()
+
         else:
             from irlmethods.deep_maxent import RewardNet
             state_size = feat_ext.extract_features(env.reset()).shape[0]
@@ -282,6 +312,7 @@ def main():
         plt.figure(0)
         avg_reward_list = []
         frac_good_run_list = []
+        print(policy_file_list)
         for policy_file in policy_file_list:
 
             print('Playing for policy :', policy_file)
