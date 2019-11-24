@@ -404,6 +404,43 @@ class DeepMaxEnt():
             plt.savefig(file_name)
 
 
+    def save_bar_plot(self, list1, list2, diff_list, iteration):
+
+        list1 = list1.cpu().detach().numpy().squeeze()
+        list2 = list2.cpu().detach().numpy().squeeze()
+        diff_list = diff_list.cpu().detach().numpy()
+        
+        list1 = list1.tolist()
+        list2 = list2.tolist()
+        diff_list = diff_list.tolist()
+        #assert (len(list1)==len(list2)), "Length of both the list should be same."
+        part = 0
+        while len(list1) > 10:
+            part_list1 = list1[0:10]
+            part_list2 = list2[0:10]
+            part_diff_list = diff_list[0:10]
+
+            part_diff_list = [str(round(diff,2)) for diff in part_diff_list]
+
+
+            x_axis = np.arange(10)
+            labels = part_diff_list
+            width = 0.3
+            fig, ax = plt.subplots()
+            rects1 = ax.bar(x_axis - width/2, part_list1, width, label='Prev rewards')
+            rects2 = ax.bar(x_axis + width/2, part_list2, width, label='New rewards')
+            ax.set_xticks(x_axis)
+            ax.set_xticklabels(part_diff_list)
+            ax.legend()
+            file_name = self.plot_save_folder+"reward_difference-iter"+str(iteration)+'-part- '+str(part)+'.jpg'
+            plt.savefig(file_name)
+            part += 1 
+            list1 = list1[10:]
+            list2 = list2[10:]
+            diff_list = diff_list[10:]
+
+
+
 
     def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
         '''
@@ -557,6 +594,8 @@ class DeepMaxEnt():
 
         #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
+        prev_nn_reward_list = []
+        prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
                                               self.rl.feature_extractor,
                                               smoothing_window=None, 
@@ -610,7 +649,6 @@ class DeepMaxEnt():
                                                              smoothing_window=None,
                                                              enumerate_all=self.enumerate_all)
 
-            pdb.set_trace()
             model_performance_list.append(true_reward)
             self.writer.add_scalar('Log_info/model_performance_true', true_reward, i)
             model_performance_nn.append(nn_reward)
@@ -646,6 +684,7 @@ class DeepMaxEnt():
 
 
             state_rewards = self.get_rewards_of_states(self.reward, states_visited)
+
 
             #all_state_rewards = self.per_state_reward(self.reward)
 
@@ -694,8 +733,19 @@ class DeepMaxEnt():
 
             print('done')
 
+            if len(prev_state_list) > 0 and len(prev_nn_reward_list) >0:
 
+                cur_reward_list = self.get_rewards_of_states(self.reward, prev_state_list)
+                self.save_bar_plot(prev_nn_reward_list,cur_reward_list, prev_diff, i)
+
+
+            prev_state_list = states_visited
+            prev_nn_reward_list = state_rewards
+            prev_diff = diff_freq
             #storing the plots in files
+            '''
+            no need for storing files as the plots are being monitored
+            by tensorboard
             if (i+1) % 3 == 0:
 
                 self.save_plot_information(i,
@@ -707,6 +757,6 @@ class DeepMaxEnt():
                               'reward-net-grad-norm', 'model-performance-true',
                               'model-performance-nn')
                             )
-
+            '''
         self.writer.close()
         return self.reward
