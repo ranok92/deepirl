@@ -135,7 +135,7 @@ class DeepMaxEnt():
         self.learning_rate = learning_rate
         self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0.01, lr=self.learning_rate)
 
-        self.lr_scheduler = StepLR(self.optimizer, step_size=1, gamma=0.1)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=4, gamma=0.9)
 
         self.EPS = np.finfo(np.float32).eps.item()
 
@@ -265,14 +265,14 @@ class DeepMaxEnt():
 
         #adding L1 regularization
         lambda1 = self.regularizer
-        l1_reg = torch.tensor(0,dtype=torch.float).to(self.device)
+        l1_reg = torch.tensor(0, dtype=torch.float).to(self.device)
         grad_mag = torch.tensor(0, dtype=torch.float).to(self.device)
 
         for param in self.reward.parameters():
-            l1_reg += torch.norm(param,1)
+            l1_reg += torch.norm(param, 1)
 
         #adding back the regularizer term
-        loss = dot_prod 
+        loss = dot_prod
         
 
         loss.backward()
@@ -283,12 +283,12 @@ class DeepMaxEnt():
 
 
         for param in self.reward.parameters():
-            grad_mag +=torch.norm(param.grad, 1)
+            grad_mag += torch.norm(param.grad, 1)
 
         #print ('The magnitude of gradients after clipping:', grad_mag)
         #print('The magnitude of the parameters :', l1_reg)
         #pdb.set_trace()
-        return loss, dot_prod , l1_reg, grad_mag, torch.norm(stateRewards.squeeze(), 1)
+        return loss, dot_prod, l1_reg, grad_mag, torch.norm(stateRewards.squeeze(), 1)
 
 
     '''
@@ -375,10 +375,10 @@ class DeepMaxEnt():
     def plot_info(self,inp_tuple, name_tuple):
         #pass a tuple containing n number of lists , this function goes through all and plots them
         i = 0
-        color_list  = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
+        color_list = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'r']
         for list_val in inp_tuple:
             plt.figure(name_tuple[i])
-            plt.plot(list_val,color_list[i])
+            plt.plot(list_val, color_list[i])
             plt.draw()
             plt.pause(.0001)
             i += 1
@@ -406,24 +406,41 @@ class DeepMaxEnt():
 
     def save_bar_plot(self, list1, list2, diff_list, iteration):
 
+        #torch to numpy
         list1 = list1.cpu().detach().numpy().squeeze()
         list2 = list2.cpu().detach().numpy().squeeze()
         diff_list = diff_list.cpu().detach().numpy()
-        
+        #sort the lists in ascending order of difference in state visitation
+
+        sort_args = np.abs(diff_list).argsort()
+        diff_list = diff_list[sort_args]
+        list1 = list1[sort_args]
+        list2 = list2[sort_args]
+
+        #as the sort is in ascending, take the last n of the arrays
+        n = 50
+        if list1.shape[0] > n:
+            list1 = list1[-n:]
+            list2 = list2[-n:]
+            diff_list = diff_list[-n:]
+
+
         list1 = list1.tolist()
         list2 = list2.tolist()
         diff_list = diff_list.tolist()
         #assert (len(list1)==len(list2)), "Length of both the list should be same."
         part = 0
-        while len(list1) > 10:
-            part_list1 = list1[0:10]
-            part_list2 = list2[0:10]
-            part_diff_list = diff_list[0:10]
 
-            part_diff_list = [str(round(diff,2)) for diff in part_diff_list]
-
-
-            x_axis = np.arange(10)
+        while len(list1) > 0:
+            if len(list1) >= 10:
+                limval = 10
+            else:
+                limval = len(list1)
+            part_list1 = list1[0:limval]
+            part_list2 = list2[0:limval]
+            part_diff_list = diff_list[0:limval]
+            part_diff_list = [str(round(diff, 2)) for diff in part_diff_list]
+            x_axis = np.arange(limval)
             labels = part_diff_list
             width = 0.3
             fig, ax = plt.subplots()
@@ -434,7 +451,7 @@ class DeepMaxEnt():
             ax.legend()
             file_name = self.plot_save_folder+"reward_difference-iter"+str(iteration)+'-part- '+str(part)+'.jpg'
             plt.savefig(file_name)
-            part += 1 
+            part += 1
             list1 = list1[10:]
             list2 = list2[10:]
             diff_list = diff_list[10:]
@@ -442,7 +459,7 @@ class DeepMaxEnt():
 
 
 
-    def resetTraining(self,inp_size, out_size, hidden_dims, graft=True):
+    def resetTraining(self, inp_size, out_size, hidden_dims, graft=True):
         '''
         if graft:
             newNN = Policy(inp_size, out_size, 
@@ -563,8 +580,8 @@ class DeepMaxEnt():
         return collections.OrderedDict(sorted(state_dict.items()))
 
 
-    ###############################################################################
-    ###############################################################################
+    ########################################################################
+    ########################################################################
 
 
 
@@ -672,6 +689,7 @@ class DeepMaxEnt():
             print(self.policy_network_save_folder)
             current_agent_policy.save(self.policy_network_save_folder)
             
+            #diff_freq = expert - current_agent
             states_visited, diff_freq = irlUtils.get_states_and_freq_diff(expertdemo_svf, current_agent_svf, self.rl.feature_extractor)
             
             self.writer.add_scalar('Log_info/svf_difference', np.linalg.norm(diff_freq,1), i)
@@ -680,6 +698,7 @@ class DeepMaxEnt():
             #print('The norm 2 :', np.linalg.norm(diff_freq,1))
             #print('The norm :',np.sum(np.abs(diff_freq)))
 
+            #now the value is negated, so diff_freq = agent-expert
             diff_freq = -torch.from_numpy(np.array(diff_freq)).type(torch.FloatTensor).to(self.device)
 
 
@@ -730,6 +749,8 @@ class DeepMaxEnt():
             self.optimizer.step()
 
             self.lr_scheduler.step()
+            print("The current learning rate after itertaion : {} is {}".format(i, 
+                                                            self.lr_scheduler.get_lr()))
 
             print('done')
 
