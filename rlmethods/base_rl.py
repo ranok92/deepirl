@@ -4,9 +4,6 @@
 class BaseRL:
     """Base RL class that all other RL methods should subclass."""
 
-    def __init__(self):
-        pass
-
     def train(self, num_episodes, max_episode_length, reward_network=None):
         """Train RL algorithm for num_episode number of episodes, and don't
         exceed max_episode_length when sampling from the environment.
