@@ -17,6 +17,7 @@ from tensorboardX import SummaryWriter
 
 sys.path.insert(0, "..")
 from neural_nets.base_network import BaseNN  # NOQA
+from neural_nets.base_network import BasePolicy
 from rlmethods.base_rl import BaseRL
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -114,7 +115,7 @@ class QNetwork(BaseNN):
         return q1, q2
 
 
-class PolicyNetwork(BaseNN):
+class PolicyNetwork(BasePolicy):
     """Policy network for soft actor critic."""
 
     def __init__(self, state_size, action_space, hidden_layer_width):
@@ -177,7 +178,10 @@ class PolicyNetwork(BaseNN):
 
         return action, log_prob, dist
 
-    def select_action(self, state):
+    def sample_action(self, state):
+        return self.sample(state)[0]
+
+    def eval_action(self, state):
         """Select action for playing. Selects mean action only.
 
         :param state: State to select action from.
