@@ -748,7 +748,13 @@ class GridWorldDrone(GridWorld):
                     self.cur_ped=ped
                     break
                 else:
-                    self.cur_ped = np.random.randint(1,no_of_peds+1)
+                    if self.is_random:
+                        self.cur_ped = np.random.randint(1,no_of_peds+1)
+                    else:
+                        if self.cur_ped is None:
+                            self.cur_ped = 1
+                        else:
+                            self.cur_ped += 1
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
                     else:
@@ -757,9 +763,9 @@ class GridWorldDrone(GridWorld):
             self.cur_ped = self.subject
 
         #print('Replacing agent :', self.cur_ped)
-        if self.display:
-            if self.show_comparison:
-                self.ghost = self.cur_ped
+        #if self.display:
+        if self.show_comparison:
+            self.ghost = self.cur_ped
 
         self.skip_list = [] 
         self.skip_list.append(self.cur_ped)
@@ -883,17 +889,16 @@ class GridWorldDrone(GridWorld):
 
         return (len(self.orientation_array)-1)/2 + (0*len(self.orientation_array))
 
-
+    '''
     def return_position(self, ped_id, frame_id):
 
-        print(ped_id, frame_id)
         try:
             return self.pedestrian_dict[str(ped_id)][str(frame_id)]
         except KeyError:
             while str(frame_id) not in self.pedestrian_dict[str(ped_id)]:
                 frame_id -= 1
             return self.pedestrian_dict[str(ped_id)][str(frame_id)]
-
+    '''
 
     def close_game(self):
 
@@ -937,13 +942,12 @@ class GridWorldDrone(GridWorld):
 
     def return_position(self, ped_id, frame_id):
 
-        print(ped_id, frame_id)
         try:
-            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
+            return copy.deepcopy(self.pedestrian_dict[str(ped_id)][str(frame_id)])
         except KeyError:
             while str(frame_id) not in self.pedestrian_dict[str(ped_id)]:
                 frame_id -= 1
-            return self.pedestrian_dict[str(ped_id)][str(frame_id)]
+            return copy.deepcopy(self.pedestrian_dict[str(ped_id)][str(frame_id)])
 
 
     def draw_arrow(self, base_position , next_position, color):
@@ -1044,30 +1048,28 @@ if __name__=="__main__":
     info_collector = InformationCollector(thresh=60,
                                           run_info='Potential field controller',
                                           disp_info=True)
-
+    '''
     feat_drone = DroneFeatureSAM1(step_size=2,
                                   thresh1=10,
                                   thresh2=20)
     
     feat_drone = DroneFeatureRisk_v2(step_size=2,
                                   thresh1=35,
-                                  thresh2=60,
+                                  thresh2=60,s
                                   show_agent_persp=True)
-
+    '''
     feat_drone = DroneFeatureRisk_speed(step_size=2,
                                         thresh1=20,
                                         thresh2=30,
                                         show_agent_persp=True)
-
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
     world = GridWorldDrone(display=True, 
                         seed=0, obstacles=None, 
                         show_trail=True,
                         is_random=False,
-                        annotation_file=None,
+                        annotation_file=annotation_file,
                         subject=None,
-                        tick_speed=60, 
-                        #annotation_file=None,
-
+                        tick_speed=5, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1075,7 +1077,7 @@ if __name__=="__main__":
                         show_comparison=True,
                         show_orientation=True,
                         external_control=True,
-                        replace_subject=False, 
+                        replace_subject=True, 
                         segment_size=500,
                         consider_heading=True,                      
                         continuous_action=False,
@@ -1110,7 +1112,8 @@ if __name__=="__main__":
         while True:
             #action = input()
 
-            action = world.take_action_from_user()
+            action = world.action_space.sample()
+
 
             #action = pf_agent.select_action(state)
             #print("agent state :", world.agent_state)
@@ -1131,6 +1134,7 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
+            pdb.set_trace()
             #print(feat)
             '''
             if t%100==0:
