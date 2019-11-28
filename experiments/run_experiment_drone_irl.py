@@ -272,8 +272,8 @@ def main():
     # intialize RL method
     #CHANGE HERE
 
-    if args.rl_method=='ActorCritic':
-        rl_method = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
+    if args.rl_method == 'ActorCritic':
+        rl_method = ActorCritic(env, feat_extractor=feat_ext, gamma=1,
                                 log_interval=args.rl_log_intervals,
                                 max_episode_length=args.rl_ep_length,
                                 hidden_dims=args.policy_net_hidden_dims,
@@ -281,7 +281,7 @@ def main():
                                 lr=args.lr_rl,
                                 max_episodes = args.rl_episodes)
 
-    if args.rl_method=='SAC':
+    if args.rl_method == 'SAC':
 
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
@@ -291,7 +291,7 @@ def main():
                                     max_episodes=100,
                                     play_interval=500,
                                     learning_rate=args.lr_rl,
-                                    buffer_sample_size=args.replay_buffer_sample_size)
+                                   buffer_sample_size=args.replay_buffer_sample_size)
 
 
 
@@ -324,7 +324,7 @@ def main():
                            seed=args.seed,
                            graft=False,
                            scale_svf=scale,
-                           hidden_dims = args.reward_net_hidden_dims,
+                           hidden_dims=args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
                            save_folder=parent_dir)
 
