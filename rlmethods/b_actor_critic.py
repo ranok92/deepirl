@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, '..')
 from gym_envs import np_frozenlake  # NOQA: E402
 import utils  # NOQA: E402
-from neural_nets.base_network import PolicyBase
+from neural_nets.base_network import BasePolicy
 #from rlmethods.rlutils import LossBasedTermination
 
 
@@ -70,7 +70,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
 
 
-class Policy(PolicyBase):
+class Policy(BasePolicy):
     """Policy network"""
 
     def __init__(self, state_dims, action_dims, hidden_dims=[128], 

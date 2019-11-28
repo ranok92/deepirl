@@ -75,7 +75,7 @@ class RectangleNN(BaseNN):
         raise NotImplementedError
 
 
-class PolicyBase(BaseNN):
+class BasePolicy(BaseNN):
     """Implements a base policy pi(a|s). All policies in RL methods should
     subclass."""
 
