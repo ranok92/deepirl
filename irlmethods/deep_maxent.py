@@ -57,7 +57,7 @@ class RewardNet(BaseNN):
         self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.head = nn.Sequential(
             nn.Linear(hidden_dims[-1], 1),
-            nn.Tanh(),
+            nn.ReLU(),
         )
 
     def forward(self, x):
@@ -328,7 +328,7 @@ class DeepMaxEnt():
 
     def get_rewards_of_states(self, reward_function, state_list):
         '''
-        Calculates the rewards of the states provided in the state_list. 
+        Calculates the rewards of the states provided in the state_list.
         More in line to handle bigger state spaces
         '''
 
@@ -402,61 +402,6 @@ class DeepMaxEnt():
             plt.figure(name_tuple[i])
             file_name = self.plot_save_folder+name_tuple[i]+str(iteration)+'.jpg'
             plt.savefig(file_name)
-
-
-    def save_bar_plot(self, list1, list2, diff_list, iteration):
-
-        #torch to numpy
-        list1 = list1.cpu().detach().numpy().squeeze()
-        list2 = list2.cpu().detach().numpy().squeeze()
-        diff_list = diff_list.cpu().detach().numpy()
-        #sort the lists in ascending order of difference in state visitation
-
-        sort_args = np.abs(diff_list).argsort()
-        diff_list = diff_list[sort_args]
-        list1 = list1[sort_args]
-        list2 = list2[sort_args]
-
-        #as the sort is in ascending, take the last n of the arrays
-        n = 50
-        if list1.shape[0] > n:
-            list1 = list1[-n:]
-            list2 = list2[-n:]
-            diff_list = diff_list[-n:]
-
-
-        list1 = list1.tolist()
-        list2 = list2.tolist()
-        diff_list = diff_list.tolist()
-        #assert (len(list1)==len(list2)), "Length of both the list should be same."
-        part = 0
-
-        while len(list1) > 0:
-            if len(list1) >= 10:
-                limval = 10
-            else:
-                limval = len(list1)
-            part_list1 = list1[0:limval]
-            part_list2 = list2[0:limval]
-            part_diff_list = diff_list[0:limval]
-            part_diff_list = [str(round(diff, 2)) for diff in part_diff_list]
-            x_axis = np.arange(limval)
-            labels = part_diff_list
-            width = 0.3
-            fig, ax = plt.subplots()
-            rects1 = ax.bar(x_axis - width/2, part_list1, width, label='Prev rewards')
-            rects2 = ax.bar(x_axis + width/2, part_list2, width, label='New rewards')
-            ax.set_xticks(x_axis)
-            ax.set_xticklabels(part_diff_list)
-            ax.legend()
-            file_name = self.plot_save_folder+"reward_difference-iter"+str(iteration)+'-part- '+str(part)+'.jpg'
-            plt.savefig(file_name)
-            part += 1
-            list1 = list1[10:]
-            list2 = list2[10:]
-            diff_list = diff_list[10:]
-
-
 
 
     def resetTraining(self, inp_size, out_size, hidden_dims, graft=True):
@@ -757,7 +702,8 @@ class DeepMaxEnt():
             if len(prev_state_list) > 0 and len(prev_nn_reward_list) >0:
 
                 cur_reward_list = self.get_rewards_of_states(self.reward, prev_state_list)
-                self.save_bar_plot(prev_nn_reward_list,cur_reward_list, prev_diff, i)
+                irlUtils.save_bar_plot(prev_nn_reward_list,cur_reward_list, 
+                                   prev_diff, i, self.plot_save_folder)
 
 
             prev_state_list = states_visited

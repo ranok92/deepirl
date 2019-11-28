@@ -40,38 +40,6 @@ It is also assumed that we know all the possible states.
 '''
 
 
-class RewardNet(BaseNN):
-    """Reward network"""
-
-    def __init__(self, state_dims, hidden_dims=[128]):
-        super(RewardNet, self).__init__()
-
-        self.input = nn.Sequential(
-            nn.Linear(state_dims, hidden_dims[0]),
-            nn.ELU(),
-        )
-        self.hidden_layers = []
-        for i in range(1,len(hidden_dims)):
-            self.hidden_layers.append(nn.Sequential(
-                                                    nn.Linear(hidden_dims[i-1], hidden_dims[i]),
-                                                    nn.ELU(),
-                                                    )
-                                      )
-        self.hidden_layers = nn.ModuleList(self.hidden_layers)
-        self.head = nn.Sequential(
-            nn.Linear(hidden_dims[-1], 1),
-            nn.Tanh(),
-        )
-
-    def forward(self, x):
-        x = self.input(x)
-        for i in range(len(self.hidden_layers)):
-            x = self.hidden_layers[i](x)
-
-        x = self.head(x)
-
-        return x
-
 def createStateActionTable(policy , rows= 10 , cols=10 , num_actions = 4):
     '''
     given a particular policy and info about the environment on which it is trained
@@ -334,6 +302,7 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
         traj_weight_by_len = max_time_steps/traj_np.shape[0]
 
         for i in range(traj_np.shape[0]):
+            #pdb.set_trace()
             state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
                 svf[state_hash] = 1*math.pow(gamma,i)*traj_weight_by_len
@@ -958,8 +927,57 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                 break
     return state_list , diff_list
 
-        
+def save_bar_plot(self, list1, list2, diff_list, iteration, save_folder):
 
+    #torch to numpy
+    list1 = list1.cpu().detach().numpy().squeeze()
+    list2 = list2.cpu().detach().numpy().squeeze()
+    diff_list = diff_list.cpu().detach().numpy()
+    #sort the lists in ascending order of difference in state visitation
+
+    sort_args = np.abs(diff_list).argsort()
+    diff_list = diff_list[sort_args]
+    list1 = list1[sort_args]
+    list2 = list2[sort_args]
+
+    #as the sort is in ascending, take the last n of the arrays
+    n = 50
+    if list1.shape[0] > n:
+        list1 = list1[-n:]
+        list2 = list2[-n:]
+        diff_list = diff_list[-n:]
+
+
+    list1 = list1.tolist()
+    list2 = list2.tolist()
+    diff_list = diff_list.tolist()
+    #assert (len(list1)==len(list2)), "Length of both the list should be same."
+    part = 0
+
+    while len(list1) > 0:
+        if len(list1) >= 10:
+            limval = 10
+        else:
+            limval = len(list1)
+        part_list1 = list1[0:limval]
+        part_list2 = list2[0:limval]
+        part_diff_list = diff_list[0:limval]
+        part_diff_list = [str(round(diff, 2)) for diff in part_diff_list]
+        x_axis = np.arange(limval)
+        labels = part_diff_list
+        width = 0.3
+        fig, ax = plt.subplots()
+        rects1 = ax.bar(x_axis - width/2, part_list1, width, label='Prev rewards')
+        rects2 = ax.bar(x_axis + width/2, part_list2, width, label='New rewards')
+        ax.set_xticks(x_axis)
+        ax.set_xticklabels(part_diff_list)
+        ax.legend()
+        file_name = save_folder+"reward_difference-iter"+str(iteration)+'-part- '+str(part)+'.jpg'
+        plt.savefig(file_name)
+        part += 1
+        list1 = list1[10:]
+        list2 = list2[10:]
+        diff_list = diff_list[10:]    
 
 
 if __name__ == '__main__':
@@ -998,7 +1016,7 @@ if __name__ == '__main__':
                         show_comparison=True,
                         consider_heading=True,
                         show_orientation=True,
-                        rows=576, cols=720, width=grid_size)
+                        rows=100, cols=100, width=grid_size)
 
     #load the feature extractor
     feat_ext = DroneFeatureRisk_speed(agent_width=agent_width,
@@ -1018,8 +1036,7 @@ if __name__ == '__main__':
     expert_trajectory_folder = '/home/abhisek/Study/Robotics/deepirl/envs/DroneFeatureRisk_speed_blank_slate'
 
 
-    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-blank-slate-user-played_long_runs_updated_svf2019-11-21_08:19:08-policy_net-128--reward_net-128--reg-0.05-seed-43-lr-0.0005/saved-models/30.pt'
-
+    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-blank-slate-user-played_long_runs_updated_svf_fixed_feature_extractor2019-11-23_01:07:44-policy_net-128--reward_net-128--reg-0.05-seed-43-lr-0.0005/saved-models/6.pt'
     policy_file_list = []
     #read the files in the folder
     if os.path.isdir(policy_folder):
@@ -1040,14 +1057,14 @@ if __name__ == '__main__':
         print("Playing for policy : ", policy_file)
         model.policy.load(policy_file)
 
-        svf_dict, _ , _ = calculate_svf_from_sampling(no_of_samples=100, env=env,
+        svf_dict, rewards , _ = calculate_svf_from_sampling(no_of_samples=100, env=env,
                                 policy_nn=model.policy, reward_nn=None,
                                 episode_length=max_ep_length,
                                 feature_extractor=feat_ext,
                                 gamma=1, scale_svf=False,
                                 enumerate_all=False)
         #true_reward_list.append(true_reward)
-    
+        print("The rewards obtained by this model : ", rewards)
     states, diff = get_states_and_freq_diff(expert_svf_dict, svf_dict, feat_ext)
     pdb.set_trace()
     for state in states:
