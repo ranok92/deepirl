@@ -17,6 +17,11 @@ import datetime, time
 #from debugtools import compile_results
 from utils import step_wrapper, reset_wrapper
 import copy
+import pygame
+from alternateController.potential_field_controller import PotentialFieldController as PFController
+from rlmethods.b_actor_critic import ActorCritic
+from rlmethods.b_actor_critic import Policy
+from tqdm import tqdm
 parser = argparse.ArgumentParser()
 #general arguments 
 
@@ -35,7 +40,7 @@ parser.add_argument('--on-server', action='store_true')
 #**************************************************************************#
 #arguments related to the environment
 
-parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt', help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--reward-path' , type=str, nargs='?', default= None)
@@ -140,19 +145,18 @@ from envs.gridworld_drone import GridWorldDrone
 
 consider_heading = True
 np.random.seed(args.seed)
-env = GridWorldDrone(display=args.render, is_onehot = False, 
-                    seed=args.seed, obstacles=None, 
+env = GridWorldDrone(display=args.render, is_onehot=False,
+                    seed=args.seed, obstacles=None,
                     show_trail=True,
                     is_random=False,
                     subject=args.subject,
                     annotation_file=args.annotation_file,
-                    tick_speed=50, 
+                    tick_speed=60,
                     obs_width=10,
                     step_size=step_size,
                     agent_width=agent_width,
                     external_control=True,
                     replace_subject=args.run_exact,
-                    
                     show_comparison=True,
                     consider_heading=consider_heading,
                     show_orientation=True,
@@ -199,7 +203,7 @@ if args.feat_extractor == 'DroneFeatureRisk_v2':
                                    obs_width=obs_width,
                                    step_size=step_size,
                                    grid_size=grid_size,
-                                   show_agent_persp=True,
+                                   show_agent_persp=False,
                                    thresh1=thresh1, thresh2=thresh2)
 
 if args.feat_extractor == 'DroneFeatureRisk_speed':
@@ -214,19 +218,13 @@ if args.feat_extractor == 'DroneFeatureRisk_speed':
 #*************************************************
 #initialize the agent
 
-
 if args.agent_type=='Policy_network':
     #initialize the network
-    from rlmethods.b_actor_critic import ActorCritic
-
-    agent = ActorCritic(env, feat_extractor=feat_ext,  gamma=1,
-                        log_interval=100,max_ep_length=args.max_ep_length,
-                        hidden_dims=args.policy_net_hidden_dims,
-                        )
+    agent = Policy(feat_ext.state_rep_size, env.action_space, hidden_dims=args.policy_net_hidden_dims)
 
     if args.policy_path:
 
-        agent.policy.load(args.policy_path)
+        agent.load(args.policy_path)
 
     else:
 
@@ -235,11 +233,15 @@ if args.agent_type=='Policy_network':
 
 if args.agent_type=='Potential_field':
     #initialize the PF agent
-    from alternateController.potential_field_controller import PotentialFieldController as PFController
+    max_speed = env.max_speed
+    orient_quant = env.orient_quantization
+    orient_div = len(env.orientation_array)
+    speed_quant = env.speed_quantization
+    speed_div = len(env.speed_array)
 
     attr_mag = 3
     rep_mag = 2
-    agent = PFController()
+    agent = PFController(speed_div, orient_div, orient_quant)
 
 if args.agent_type=='Default':
 
@@ -260,7 +262,10 @@ if args.reward_path is not None:
 #play
 
 def reward_analysis():
-
+    '''
+    A function to analysis the rewards against actions for a given policy.
+    A helpful visualization/ debugging tool
+    '''
     for i in range(args.num_trajs):
 
         #reset the world
@@ -306,10 +311,10 @@ def reward_analysis():
                 #action selection for network
                 if args.agent_type=='Policy_network':
                     #pdb.set_trace()
-                    action, probs = agent.select_action_play(state_feat)
+                    action = agent.eval_action(state_feat)
                 else:
                 #action selection for alternate controller namely potential field
-                    action = agent.select_action_play(state)
+                    action = agent.eval_action(state)
                 #pdb.set_trace()
                 #print('The action finally taken :', action)
                 #action = int(np.argmax(reward_arr_true))
@@ -335,7 +340,7 @@ def reward_analysis():
                     feat_ext.overlay_bins(state)
 
             else:
-                action = agent.select_action_play(state) 
+                action = agent.eval_action(state) 
             #pdb.set_trace()
             state, reward, done, _ = env.step(action)
            
@@ -359,7 +364,10 @@ def reward_analysis():
 
 
 def crash_analysis():
-
+    '''
+    A visualizing/ debugging tool to analyse with ease the states and conditions
+    right before an agent crashes
+    '''
     for i in range(args.num_trajs):
 
         #reset the world
@@ -380,16 +388,16 @@ def crash_analysis():
 
             
                 if args.agent_type=='Policy_network':
-                    action, probs = agent.select_action_play(state_feat)
+                    action = agent.eval_action(state_feat)
                 else:
                 #action selection for alternate controller namely potential field
-                    action = agent.select_action_play(state)
+                    action = agent.eval_action(state)
 
                 if args.render:
                     feat_ext.overlay_bins(state)
 
             else:
-                action = agent.select_action_play(state) 
+                action = agent.eval_action(state) 
             #pdb.set_trace()
             state, reward_true, done, _ = env.step(action)
             
@@ -432,30 +440,34 @@ def crash_analysis():
                 else:
                     break
 
-            #info_collector.collect_information_per_frame(state)
-
             t+=1
 
-        #info_collector.collab_end_traj_results()
 
-    #info_collector.collab_end_results()
-    #info_collector.plot_information()
 
-def agent_drift_analysis(pos_reset=20):
+def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
     '''
     step interval after which to reset the position
+    input : agent, agent_type and pos_reset.
+        Plays the agent on the provided environment with the assigned reset value
+        for the assigned number of trajectories. Can be played with or without render
+    returns :
+        The avg total deviation of the agent over those runs from the ground truth.
     '''
-    import pygame
 
-    for i in range(args.num_trajs):
+    drift_value = 0
+    segment_counter = 0
+    env.cur_ped = None
+    print('Starting drift analysis of agent :{}. Reset\
+ interval :{}'.format(agent_type, pos_reset))
+    for i in tqdm(range(args.num_trajs)):
 
         #reset the world
         crash_analysis = False
-        state=env.reset()
-        env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
-        env.state['goal_state'] = copy.deepcopy(env.goal_state)        
+        state = env.reset()
+        env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])
+        env.state['goal_state'] = copy.deepcopy(env.goal_state)
         state = copy.deepcopy(env.state)
-        print('Current subject :', env.cur_ped)
+        #print('Current subject :', env.cur_ped)
         final_frame = env.final_frame
         if args.feat_extractor is not None:
             feat_ext.reset()
@@ -463,29 +475,27 @@ def agent_drift_analysis(pos_reset=20):
             #pass
         #reset the information collector
         info_collector.reset_info(state)
-        done=False
+        done = False
         t = 0
         abs_counter = env.current_frame
         while abs_counter < final_frame:
             stop_points = []
             if args.feat_extractor is not None:
 
-                if args.agent_type=='Policy_network':
-                    action, probs = agent.select_action_play(state_feat)
+                if agent_type == 'Policy_network':
+                    action = agent.eval_action(state_feat)
                 else:
                 #action selection for alternate controller namely potential field
-                    action = agent.select_action_play(state)
+                    action = agent.eval_action(state)
 
                 '''
                 if args.render:
                     feat_ext.overlay_bins(state)
                 '''
             else:
-                action = agent.select_action_play(state) 
-            #pdb.set_trace()
+                action = agent.eval_action(state)
             state, reward_true, done, _ = env.step(action)
-            
-           
+            drift_value += np.linalg.norm(env.ghost_state['position'] - env.agent_state['position'], 2)
             if args.feat_extractor is not None:
                 state_feat = feat_ext.extract_features(state)
 
@@ -498,13 +508,14 @@ def agent_drift_analysis(pos_reset=20):
 
 
             #info_collector.collect_information_per_frame(state)
-            print('heading_dir', env.cur_heading_dir)
-            t+=1
-            abs_counter+=1
-            if t%pos_reset==0:
+            t += 1
+            abs_counter += 1
+            if t%pos_reset == 0:
                 #reset the position of the agent
-                print('t :', t)
-                print('resetting')
+                #print('t :', t)
+                #print('resetting')
+                segment_counter += 1
+                #print('Drift value : {} for segment {}'.format(drift_value, segment_counter))
                 env.agent_state = env.return_position(env.cur_ped, env.current_frame)
                 env.state['agent_state'] = copy.deepcopy(env.agent_state)
                 '''
@@ -514,103 +525,42 @@ def agent_drift_analysis(pos_reset=20):
                     pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
                 pygame.display.update()
                 '''
-                env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
-                env.state['goal_state'] = copy.deepcopy(env.goal_state)  
+                env.goal_state = env.return_position(env.cur_ped, env.current_frame + pos_reset)['position']
+                env.state['goal_state'] = copy.deepcopy(env.goal_state)
                 state = copy.deepcopy(env.state)
-                env.release_control=False
+                env.release_control = False
                 t = 0
                 done = False
-        #info_collector.collab_end_traj_results()
 
-    #info_collector.collab_end_results()
-    #info_collector.plot_information()
+    return drift_value/segment_counter
 
 
 
-def agent_drift_analysis(pos_reset=2000):
+def drift_analysis(agent_list, agent_type_list, 
+                   start_interval=10, 
+                   reset_interval=10, 
+                   max_interval=100):
     '''
-    step interval after which to reset the position
+    input : a list of agents and the reset interval
+    returns :
+        n lists of size total_ep_length/reset_interval which contains
+        the avg total drift value for that agent in that reset value
     '''
-    import pygame
+    
+    drift_lists = []
+    cur_reset_interval = start_interval
+    reset_interval_limit = max_interval
+    for i in range(len(agent_list)):
+        drift_list_per_agent = []
+        while cur_reset_interval <= reset_interval_limit:
+            drift_list_per_agent.append(agent_drift_analysis(agent_list[i], agent_type_list[i], pos_reset=cur_reset_interval))
+            cur_reset_interval += reset_interval
+        drift_lists.append(drift_list_per_agent)
+        cur_reset_interval = start_interval
+    #plot drift_lists
 
-    for i in range(args.num_trajs):
-
-        #reset the world
-        crash_analysis = False
-        state=env.reset()
-        env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
-        env.state['goal_state'] = copy.deepcopy(env.goal_state)        
-        state = copy.deepcopy(env.state)
-        print('Current subject :', env.cur_ped)
-        final_frame = env.final_frame
-        if args.feat_extractor is not None:
-            feat_ext.reset()
-            state_feat = feat_ext.extract_features(state)
-            #pass
-        #reset the information collector
-        info_collector.reset_info(state)
-        done=False
-        t = 0
-        abs_counter = env.current_frame
-        while abs_counter < final_frame:
-            stop_points = []
-            if args.feat_extractor is not None:
-
-                if args.agent_type=='Policy_network':
-                    action, probs = agent.select_action_play(state_feat)
-                else:
-                #action selection for alternate controller namely potential field
-                    action = agent.select_action_play(state)
-
-                '''
-                if args.render:
-                    feat_ext.overlay_bins(state)
-                '''
-            else:
-                action = agent.select_action_play(state) 
-            #pdb.set_trace()
-            state, reward_true, done, _ = env.step(action)
-            
-           
-            if args.feat_extractor is not None:
-                state_feat = feat_ext.extract_features(state)
-
-                if crash_analysis:
-                    pdb.set_trace()
-            if args.reward_path is not None:
-                reward = reward_net(state_feat)
-            else:
-                reward = reward_true
-
-            #info_collector.collect_information_per_frame(state)
-            #print('heading_dir', env.cur_heading_dir)
-            t+=1
-            abs_counter+=1
-            if t%pos_reset==0:
-                #reset the position of the agent
-                print('t :', t)
-                print('resetting')
-                env.agent_state = env.return_position(env.cur_ped, env.current_frame)
-                env.state['agent_state'] = copy.deepcopy(env.agent_state)
-                '''
-                pos = env.agent_state['position']
-                stop_points.append(pos)
-                for pos in stop_points:
-                    pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
-                pygame.display.update()
-                '''
-                env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])        
-                env.state['goal_state'] = copy.deepcopy(env.goal_state)  
-                state = copy.deepcopy(env.state)
-                env.release_control=False
-                t = 0
-                done = False
-        #info_collector.collab_end_traj_results()
-
-    #info_collector.collab_end_results()
-    #info_collector.plot_information()
-
-
+    return drift_lists
+    
 
 
 
@@ -618,12 +568,47 @@ def agent_drift_analysis(pos_reset=2000):
 
 if __name__ == '__main__':
 
-    #agent_drift_analysis(pos_reset=50)
     '''
 
     agent_drift_analysis(80)
     '''
-    if args.reward_analysis:
-        reward_analysis()
-    else:
-        agent_drift_analysis(pos_reset=50)
+    #**************** performing reward analysis
+    '''
+    reward_analysis()
+    '''
+    #************ performing drift analysis **************
+
+    #initialize the agents
+    #for potential field agent
+    attr_mag = 3
+    rep_mag = 2
+    #agent = PFController()
+
+    agent_list = [agent]
+
+
+    agent_type_list = ['Potential_field']
+    #agent initialized from the commandline
+    agent_file_list = ['/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Continuous_new_drone_env2019-10-28 17:58:23-reg-0-seed-96-lr-0.0005/saved-models/19.pt']
+    for agent_file in agent_file_list:
+        
+        agent_temp = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
+        agent_temp.load(agent_file)
+        agent_list.append(agent_temp)
+        agent_type_list.append('Policy_network')
+    
+    start_interval = 10
+    reset_int = 20
+    reset_lim = 80
+    drift_lists = drift_analysis(agent_list, agent_type_list, start_interval=start_interval, reset_interval=reset_int, max_interval=reset_lim)
+    
+    x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
+    fig, ax = plt.subplots()
+    for i in range(len(drift_lists)):
+        pdb.set_trace()
+        ax.plot(x_axis, drift_lists[i], label=agent_type_list[i])
+    ax.set_xticks(x_axis)
+    ax.set_xticklabels(start_interval+x_axis*reset_int)
+    
+    ax.legend()
+    plt.show()
