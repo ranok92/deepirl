@@ -711,6 +711,73 @@ def compile_results(reward_info, unknown_state_info, subject_info=None):
     return avg_reward, len(good_runs)/len(reward_info)
 
 
+def plot_expert_state_reward_across_models(expert_trajectory_folder,
+                                          reward_network_folder,
+                                          feature_extractor,
+                                          save_folder,
+                                          max_time_steps=100):
+    '''
+    A function that helps visualize the evolution of the rewards of the states visited by 
+    the expert in the shown demonstrations.
+    input : the expert trajectory folder, the folder/file for reward network
+
+    output : bunch of plots showing the rewards for the states 
+    '''
+    #check if the save folder exist, if not create one
+
+    if os.path.exists(save_folder):
+        pass
+    else:
+        os.makedirs(save_folder)
+
+    #initialize a reward network
+    state_size = feature_extractor.state_rep_size
+    hidden_dim_list = [128]
+
+    reward_net = RewardNet(state_size, hidden_dims=hidden_dim_list)
+
+
+    #prepare the array of states visited by the expert
+    expert_svf_dict = calculate_expert_svf(expert_trajectory_folder,
+                                        max_time_steps=max_time_steps,
+                                        feature_extractor=feat_ext,
+                                        gamma=1)
+
+    dummy_dict = expert_svf_dict
+    for key in dummy_dict.keys():
+        dummy_dict[key] = 0
+
+    states, diff = get_states_and_freq_diff(expert_svf_dict, dummy_dict, feat_ext)
+    state_tensors = torch.tensor(states, dtype=torch.float).to(DEVICE)
+
+    #start reading the reward networks from the folder
+    reward_network_list = []
+    if os.path.isfile(reward_network_folder):
+        reward_network_list.append(reward_network_folder)
+    if os.path.isdir(reward_network_folder):
+        reward_network_list = glob.glob(os.path.join(reward_network_folder, '*.pt'))
+        reward_network_list = sorted(reward_network_list, key=numericalSort)
+
+    
+    #iterate through all the entries in the list
+    bar_width =0.3
+    xaxis = np.arange(len(states))
+    network_counter = 0
+    for reward_network in reward_network_list:
+        fig, ax = plt.subplots(figsize=(20,3))
+        print('Reading from network file :', reward_network)
+        reward_net.load(reward_network)
+        rewards = reward_net(state_tensors)
+        
+        rewards = rewards.detach().cpu().numpy().squeeze()
+        ax.bar(xaxis, rewards, width=bar_width)
+        file_name = save_folder + str(network_counter) + '.jpg'
+        plt.savefig(file_name)
+        network_counter += 1
+        plt.close()
+
+
+
 if __name__ == '__main__':
 
     r = 10
@@ -760,7 +827,7 @@ if __name__ == '__main__':
     compare_svf(expert_folder, agent_policy, env_reward=agent_reward, env=env, feat=feat)
     #********************************************************
     '''
-
+    '''
     #****************** evaluate policies*******************
 
     policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Continuous_new_drone_env2019-10-29 17:05:55-reg-0-seed-96-lr-0.0005/saved-models'
@@ -771,5 +838,17 @@ if __name__ == '__main__':
     evaluate_policies(policy_folder, policy_net_hidden_dims,
                       reward_net=None,
                       feat_ext=feat_ext, 
-                      env=env,
+                      env=env,ss
                       run_info=run_info)
+    '''
+    #****** plotting the rewards for expert states across reward networks *******
+
+    expert_trajectory_folder = '/home/abhisek/Study/Robotics/deepirl/envs/DroneFeatureRisk_speed_blank_slate'
+    reward_network_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-blank-slate_fixed_feature_extractor_extended_LR_ReLU2019-11-26_21:20:27-policy_net-128--reward_net-128--reg-0.05-seed-81-lr-0.0005/saved-models-rewards/'
+    feature_extractor = feat_ext
+
+    plot_expert_state_reward_across_models(expert_trajectory_folder,
+                                          reward_network_folder,
+                                          feature_extractor,
+                                          './Reward_plots_relu81/',
+                                          max_time_steps=100)
