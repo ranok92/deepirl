@@ -22,6 +22,10 @@ from alternateController.potential_field_controller import PotentialFieldControl
 from rlmethods.b_actor_critic import ActorCritic
 from rlmethods.b_actor_critic import Policy
 from tqdm import tqdm
+from envs.drone_data_utils import classify_pedestrians
+from envs.drone_data_utils import get_pedestrians_in_viscinity
+
+
 parser = argparse.ArgumentParser()
 #general arguments 
 
@@ -444,14 +448,21 @@ def crash_analysis():
 
 
 
-def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
+def agent_drift_analysis(agent=agent,
+                        agent_type=args.agent_type,
+                        ped_list=None,
+                        pos_reset=20,
+                        ):
     '''
+    if order='by_ped' the drift information is collected per pedestrian
+    if order='by_density' the drift information is collected per density of nearby peds 
     step interval after which to reset the position
     input : agent, agent_type and pos_reset.
         Plays the agent on the provided environment with the assigned reset value
         for the assigned number of trajectories. Can be played with or without render
     returns :
-        The avg total deviation of the agent over those runs from the ground truth.
+        The an array that contains the drift analysis for each of the
+        pedestrians in the list for the given pos_reset.
     '''
 
     drift_value = 0
@@ -459,11 +470,142 @@ def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
     env.cur_ped = None
     print('Starting drift analysis of agent :{}. Reset\
  interval :{}'.format(agent_type, pos_reset))
-    for i in tqdm(range(args.num_trajs)):
+
+    if ped_list is not None:
+        num_trajs = len(ped_list)
+    else:
+        num_trajs = args.num_trajs
+
+    #an array containing the drift value for each pedestrian
+    drift_info_detailed = np.zeros(num_trajs)
+    for i in tqdm(range(num_trajs)):
 
         #reset the world
         crash_analysis = False
-        state = env.reset()
+        if ped_list is None:
+            state = env.reset()
+        else:
+            state = env.reset_and_replace(ped=ped_list[i])
+
+        env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])
+        env.state['goal_state'] = copy.deepcopy(env.goal_state)
+        state = copy.deepcopy(env.state)
+        #print('Current subject :', env.cur_ped)
+        final_frame = env.final_frame
+        if args.feat_extractor is not None:
+            feat_ext.reset()
+            state_feat = feat_ext.extract_features(state)
+            #pass
+        #reset the information collector
+        info_collector.reset_info(state)
+        done = False
+        t = 0
+        drift_per_ped = 0
+        segment_counter_per_ped = 0
+        abs_counter = env.current_frame
+        while abs_counter < final_frame:
+            stop_points = []
+            if args.feat_extractor is not None:
+
+                if agent_type == 'Policy_network':
+                    action = agent.eval_action(state_feat)
+                else:
+                #action selection for alternate controller namely potential field
+                    action = agent.eval_action(state)
+
+                '''
+                if args.render:
+                    feat_ext.overlay_bins(state)
+                '''
+            else:
+                action = agent.eval_action(state)
+            state, reward_true, done, _ = env.step(action)
+            drift_value += np.linalg.norm(env.ghost_state['position'] - env.agent_state['position'], 2)
+            drift_per_ped += np.linalg.norm(env.ghost_state['position'] - env.agent_state['position'], 2)
+            if args.feat_extractor is not None:
+                state_feat = feat_ext.extract_features(state)
+
+                if crash_analysis:
+                    pdb.set_trace()
+            if args.reward_path is not None:
+                reward = reward_net(state_feat)
+            else:
+                reward = reward_true
+
+
+            #info_collector.collect_information_per_frame(state)
+            t += 1
+            abs_counter += 1
+            if t%pos_reset == 0:
+                #reset the position of the agent
+                #print('t :', t)
+                #print('resetting')
+                segment_counter += 1
+                segment_counter_per_ped += 1
+                #print('Drift value : {} for segment {}'.format(drift_value, segment_counter))
+                env.agent_state = env.return_position(env.cur_ped, env.current_frame)
+                env.state['agent_state'] = copy.deepcopy(env.agent_state)
+                '''
+                pos = env.agent_state['position']
+                stop_points.append(pos)
+                for pos in stop_points:
+                    pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
+                pygame.display.update()
+                '''
+                env.goal_state = env.return_position(env.cur_ped, env.current_frame + pos_reset)['position']
+                env.state['goal_state'] = copy.deepcopy(env.goal_state)
+                state = copy.deepcopy(env.state)
+                env.release_control = False
+                t = 0
+                done = False
+            
+        drift_info_detailed[i] = drift_per_ped/segment_counter_per_ped
+    return drift_info_detailed
+
+
+'''
+def agent_drift_analysis_by_density(agent=agent,
+                        agent_type=args.agent_type,
+                        ped_list=None,
+                        viscinity=30,
+                        pos_reset=20):
+    '''
+
+    step interval after which to reset the position
+    input : agent, agent_type, 
+        ped_list (optional) - list of pedestrians
+        viscinity (optional) - radius around the agent to get pedestrian density
+        pos_reset - frames after which to reset the agent
+
+        Plays the agent on the provided environment with the assigned reset value
+        for the assigned number of trajectories. Can be played with or without render
+    returns :
+        The an array that contains the drift analysis for each of the
+        pedestrians in the list for the given pos_reset.
+    '''
+
+    drift_value = 0
+    segment_counter = 0
+    env.cur_ped = None
+    print('Starting drift analysis of agent :{}. Reset\
+ interval :{}'.format(agent_type, pos_reset))
+
+    if ped_list is not None:
+        num_trajs = len(ped_list)
+    else:
+        num_trajs = args.num_trajs
+
+    #an array containing the drift value for each pedestrian
+    drift_info_detailed = {}
+    for i in tqdm(range(num_trajs)):
+
+        #reset the world
+        crash_analysis = False
+        if ped_list is None:
+            state = env.reset()
+        else:
+            state = env.reset_and_replace(ped=ped_list[i])
+
         env.goal_state = copy.deepcopy(env.return_position(env.cur_ped, env.current_frame + pos_reset)['position'])
         env.state['goal_state'] = copy.deepcopy(env.goal_state)
         state = copy.deepcopy(env.state)
@@ -495,7 +637,16 @@ def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
             else:
                 action = agent.eval_action(state)
             state, reward_true, done, _ = env.step(action)
-            drift_value += np.linalg.norm(env.ghost_state['position'] - env.agent_state['position'], 2)
+            #use the state to get the nearby density
+            #use the density to classify the frame and store the dirft information
+            #accordingly
+            
+            peds_nearby = get_pedestrians_in_viscinity(state, viscinity)
+            drift_value = np.linalg.norm(env.ghost_state['position'] - env.agent_state['position'], 2)
+            if str(peds_nearby) in drift_info_detailed.keys():
+                drift_info_detailed[str(peds_nearby)] += drift_value
+            else:
+                drift_info_detailed[str(peds_nearby)] = drift_value
             if args.feat_extractor is not None:
                 state_feat = feat_ext.extract_features(state)
 
@@ -515,6 +666,7 @@ def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
                 #print('t :', t)
                 #print('resetting')
                 segment_counter += 1
+                segment_counter_per_ped += 1
                 #print('Drift value : {} for segment {}'.format(drift_value, segment_counter))
                 env.agent_state = env.return_position(env.cur_ped, env.current_frame)
                 env.state['agent_state'] = copy.deepcopy(env.agent_state)
@@ -531,12 +683,15 @@ def agent_drift_analysis(agent=agent, agent_type=args.agent_type, pos_reset=20):
                 env.release_control = False
                 t = 0
                 done = False
-
-    return drift_value/segment_counter
+            
+        drift_info_detailed[i] = drift_per_ped/segment_counter_per_ped
+    return drift_info_detailed
+'''
 
 
 
 def drift_analysis(agent_list, agent_type_list, 
+                   ped_list=None,
                    start_interval=10, 
                    reset_interval=10, 
                    max_interval=100):
@@ -546,14 +701,15 @@ def drift_analysis(agent_list, agent_type_list,
         n lists of size total_ep_length/reset_interval which contains
         the avg total drift value for that agent in that reset value
     '''
-    
+    #drift_list is a list that contains arrays which contain drift information of
+    #individual pedestrians
     drift_lists = []
     cur_reset_interval = start_interval
     reset_interval_limit = max_interval
     for i in range(len(agent_list)):
         drift_list_per_agent = []
         while cur_reset_interval <= reset_interval_limit:
-            drift_list_per_agent.append(agent_drift_analysis(agent_list[i], agent_type_list[i], pos_reset=cur_reset_interval))
+            drift_list_per_agent.append(agent_drift_analysis(agent_list[i], agent_type_list[i], ped_list=ped_list, pos_reset=cur_reset_interval))
             cur_reset_interval += reset_interval
         drift_lists.append(drift_list_per_agent)
         cur_reset_interval = start_interval
@@ -586,6 +742,7 @@ if __name__ == '__main__':
 
     agent_list = [agent]
 
+    easy, med, hard = classify_pedestrians(args.annotation_file, 30)
 
     agent_type_list = ['Potential_field']
     #agent initialized from the commandline
@@ -600,15 +757,22 @@ if __name__ == '__main__':
     start_interval = 10
     reset_int = 20
     reset_lim = 80
-    drift_lists = drift_analysis(agent_list, agent_type_list, start_interval=start_interval, reset_interval=reset_int, max_interval=reset_lim)
-    
+    #dirft list is list where [[agent1_drift info][agent2_drift_info]]
+    #where agent1_dirft_info = [[array containing drift info of peds for a given reset pos]]
+    drift_lists = drift_analysis(agent_list, agent_type_list, ped_list=easy, start_interval=start_interval, reset_interval=reset_int, max_interval=reset_lim)
     x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
+    #get the mean and std deviation of pedestrians from drift_lists
+
     fig, ax = plt.subplots()
     for i in range(len(drift_lists)):
-        pdb.set_trace()
-        ax.plot(x_axis, drift_lists[i], label=agent_type_list[i])
+        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in drift_lists[i]]
+        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in drift_lists[i]]
+        
+        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i],
+                    capsize=5, capthick=3, alpha=0.5)
     ax.set_xticks(x_axis)
     ax.set_xticklabels(start_interval+x_axis*reset_int)
-    
+    ax.set_xlabel('Reset interval (in frames)')
+    ax.set_ylabel('Divergence from ground truth')
     ax.legend()
     plt.show()
