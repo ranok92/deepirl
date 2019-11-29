@@ -4,6 +4,7 @@ import pdb
 import itertools
 import numpy as np 
 from utils import reset_wrapper, step_wrapper
+from scipy.ndimage.filters import convolve1d as convolve
 import os
 import copy
 import pygame
@@ -12,8 +13,8 @@ import pygame
 
 
 def unit_vector(vector):
-        """ Returns the unit vector of the vector.  """
-        return vector / np.linalg.norm(vector)
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
 
 
 
@@ -247,13 +248,26 @@ class DroneFeatureSAM1():
             0 1 2 
             3   4
             5 6 7
-        '''
-
+        
+        
         self.orientation_approximator = [np.array([-2, -2]), np.array([-2,0]),
                                          np.array([-2, 2]), np.array([0, -2]),
                                          np.array([0, 2]), np.array([2, -2]),
                                          np.array([2, 0]), np.array([2,2])]
-
+        
+        '''
+        '''
+        orientation approximator format
+            0 1 2
+            7   3
+            6 5 4
+        '''
+        
+        self.orientation_approximator = [np.array([-2, -2]), np.array([-2,0]),
+                                         np.array([-2, 2]), np.array([0, 2]),
+                                         np.array([2, 2]), np.array([2, 0]),
+                                         np.array([2, -2]), np.array([0, -2])]
+        
         '''
             0
         3       1
@@ -300,6 +314,17 @@ class DroneFeatureSAM1():
         #print('Done!')
 
 
+    def smooth_state(self, state):
+        '''
+        A smoothing function for a given state
+        depending how the feature extractor is depicting the state.
+        Each feature extractor should ideally have one.
+
+        input - state(numpy)
+        output - a smoothed version of the state vector(numpy) based on how the 
+        state feature has been designed in the first place
+        '''
+        return state
 
 
     def generate_hash_variable(self):
@@ -318,11 +343,11 @@ class DroneFeatureSAM1():
 
         size = self.state_rep_size
         state_val = np.zeros(size)
-        i=0
-        while hash_value>0:
-            state_val[i]=int(hash_value)%2
-            hash_value=math.floor((hash_value)//2)
-            i+=1
+        i = 0
+        while hash_value > 0:
+            state_val[i] = int(hash_value)%2
+            hash_value = math.floor((hash_value)//2)
+            i += 1
 
         return state_val
 
@@ -332,7 +357,7 @@ class DroneFeatureSAM1():
         hash_value = 0
         size = len(self.hash_variable_list)
         for i in range(size):
-            hash_value+= int(self.hash_variable_list[i]*state[i])
+            hash_value += int(self.hash_variable_list[i]*state[i])
 
         return hash_value
 
@@ -342,7 +367,7 @@ class DroneFeatureSAM1():
         goal_state = state['goal_state']
         obstacles = state['obstacles']
 
-        return agent_state, goal_state, obstacles 
+        return agent_state, goal_state, obstacles
 
 
 
@@ -355,11 +380,17 @@ class DroneFeatureSAM1():
 
 
     def populate_orientation_bin(self, agent_orientation_val, agent_state, obs_state_list):
-        #given an obstacle, the agent state and orientation, 
-        #populates the self.bins dictionary with the appropriate obstacles 
-        #self.bins is a dictionary where against each key of the dictionary 
+        '''
+        #given an obstacle, the agent state and orientation,
+        #populates the self.bins dictionary with the appropriate obstacles
+        #self.bins is a dictionary where against each key of the dictionary
         #is a list of obstacles that are present in that particular bin
+        Bin informations:
+            Bins from the inner ring 0:7
+            Bins from the outer ring 8:15
+            Bin value in each of the ring is based on the orientation_approximator
 
+        '''
         #for debugging purposes
         #print('***INSIDE populate_orientation_bin ***')
         
@@ -1094,8 +1125,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
             risk_vector[int(key)][risk_val] = 1
 
-        #print(risk_vector.reshape(16,3))
-        #pdb.set_trace()
         return risk_vector
 
 
@@ -1248,11 +1277,127 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         collision_info 48
         speed_info 6
         '''
-        self.state_rep_size = 9+4+5+16*3+6
+        self.state_rep_size = 4+9+5+16*3+6
         self.max_speed = max_speed
         self.speed_divisions = 6
         self.generate_hash_variable()
         self.return_tensor = return_tensor
+
+
+    def smooth_state(self, state):
+
+        '''
+        Drone feature risk has 5 parts;
+            relative orientation
+            relative orientation goal
+            change in orientation 
+            collision info
+            speed info
+
+        Divide the state vector into the above define parts and each of the
+        cases separately. Finally concatenate to get the final smoothened state
+        '''
+        #relative orientation : asymmetric features, so kind of hacky
+        rel_orient = state[0:4]
+        if rel_orient[0]==1:
+            smoothing_kernel = np.array([.7, .3])
+        if rel_orient[1]==1:
+            smoothing_kernel = np.array([.3, .7, 0])
+        if rel_orient[2]==1:
+            smoothing_kernel = np.array([.1, .8, .1])
+        if rel_orient[3]==1:
+            smoothing_kernel = np.array([.2, .8, 0])
+
+        rel_orient_smooth = np.convolve(rel_orient, smoothing_kernel, 'same')
+
+        #relative_orientation_goal
+        #just take the first 8 and do the convolve
+        relative_orientation_goal = state[4:13].astype(np.float)
+        smoothing_kernel = np.array([0.15, 0.7, 0.15])
+
+        relative_orientation_goal_smooth = convolve(relative_orientation_goal, 
+                                                    smoothing_kernel, mode='wrap')
+
+        #change in orientation
+        #no wrap this time
+        change_in_orientation = state[13:13+5]
+        smoothing_kernel = np.array([0.15, 0.7, 0.15])
+        change_in_orientation_smooth = np.convolve(change_in_orientation,
+                                                  smoothing_kernel,'same')
+        #normalize the weights so that the sum remains 1
+        change_in_orientation_smooth = change_in_orientation_smooth/np.sum(change_in_orientation_smooth)
+
+
+        #local bin information
+        #bin information comes in a matrix of size 16 * 3 
+        #the convolution will happen in axis = 1
+        #bin information are in two concentric cicle
+        #so have to separate the two circles before smoothing
+        risk_info = state[18:18+48].reshape([16,3]).astype(np.float)
+        risk_info_inner_circle = risk_info[0:8,:]
+        risk_info_outer_circle = risk_info[8:,:]
+        smoothing_kernel = np.array([0.15, 0.7, .15])
+        #smooth the risk values spatially. ie. moderate risk in a bin will be
+        #smoothened to moderate risk to nearby bins. Moderate risk will not be 
+        #smoothened to low or high risk
+        risk_info_inner_circle_smooth = np.zeros(risk_info_inner_circle.shape)
+        risk_info_outer_circle_smooth = np.zeros(risk_info_outer_circle.shape)
+
+        #going through each of the columns (ie the risk levels)
+        #the smoothing does not smooth over the risk levels
+        #ie. high risk at a bin never smoothens to be a medium or low risk
+        #in someother bin.
+        for i in range(risk_info_inner_circle.shape[1]):
+            risk_info_part = risk_info_inner_circle[:,i]
+            risk_info_part_smooth = convolve(risk_info_part, smoothing_kernel, mode='wrap')
+            risk_info_inner_circle_smooth[:,i] = risk_info_part_smooth
+
+        for i in range(risk_info_outer_circle.shape[1]):
+            risk_info_part = risk_info_outer_circle[:,i]
+            risk_info_part_smooth = convolve(risk_info_part, smoothing_kernel, mode='wrap')
+            risk_info_outer_circle_smooth[:,i] = risk_info_part_smooth
+
+        #speed information
+        #no wrap in the smoothing function
+        speed_information = state[-6:]
+        smoothing_kernel = np.array([0.15, 0.7, 0.15])
+        speed_information_smooth = np.convolve(speed_information, smoothing_kernel, 'same')
+        #normalize the weights so that the sum remains 1
+        speed_information_smooth = speed_information_smooth/np.sum(speed_information_smooth)
+        
+        #********* for debugging purposes *********
+        
+        print('State information :')
+        print ("relative orientation")
+        print(rel_orient, " ", rel_orient_smooth)
+        
+        print("relative_orientation_goal")
+        print(relative_orientation_goal, "  " , relative_orientation_goal_smooth)
+
+        print("change in orienatation")
+        print(change_in_orientation, "  ", change_in_orientation_smooth)
+
+        print("risk information")
+        print("inner circle")
+        print(np.c_[risk_info_inner_circle, risk_info_inner_circle_smooth])
+
+        print("outer circle")
+        print(np.c_[risk_info_outer_circle, risk_info_outer_circle_smooth])
+
+        print("speed information")
+        print(speed_information, '  ', speed_information_smooth)
+        
+        #*******************************************
+
+        return np.concatenate((rel_orient_smooth,
+                              relative_orientation_goal_smooth,
+                              change_in_orientation_smooth,
+                              risk_info_inner_circle_smooth.reshape((-1)),
+                              risk_info_outer_circle_smooth.reshape((-1)),
+                              speed_information_smooth))
+
+
+
 
     def get_speed_info(self, agent_state):
 
