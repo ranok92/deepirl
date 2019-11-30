@@ -276,12 +276,14 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     return svf
 
 
-def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, gamma=0.99):
+def calculate_expert_svf(traj_path, max_time_steps=30, 
+                        feature_extractor=None,
+                        smoothing=False, gamma=0.99):
     '''
-    Does the state visitation frequency calculation without creating a dictionary or storing the 
-    entire state space.
-
-    returns a dictionary where the keys are only the states that the expert has seen
+    Does the state visitation frequency calculation without creating a
+    dictionary or storing the entire state space.
+    returns a dictionary where the keys are only 
+    the states that the expert has seen
     and the coressponding value is its visitation.
     '''
     actions = glob.glob(os.path.join(traj_path, '*.acts'))
@@ -305,9 +307,9 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
             #pdb.set_trace()
             state_hash = feature_extractor.hash_function(traj_np[i])
             if state_hash not in svf.keys():
-                svf[state_hash] = 1*math.pow(gamma,i)*traj_weight_by_len
+                svf[state_hash] = 1*math.pow(gamma, i)*traj_weight_by_len
             else:
-                svf[state_hash] += 1*math.pow(gamma,i)*traj_weight_by_len
+                svf[state_hash] += 1*math.pow(gamma, i)*traj_weight_by_len
 
         '''
         for pad_i in range(i+1,max_time_steps):
@@ -328,7 +330,68 @@ def calculate_expert_svf(traj_path, max_time_steps=30, feature_extractor=None, g
 
         svf[state] /= total_trajectories
 
-    return collections.OrderedDict(sorted(svf.items()))
+    if smoothing:
+        return smooth_svf(collections.OrderedDict(sorted(svf.items())), feature_extractor)
+    else:
+        return collections.OrderedDict(sorted(svf.items()))
+
+
+def smooth_svf(svf_dictionary, feature_extractor):
+    '''
+    takes in a svf dictionary of the format {'state_hash':freqency} and
+    the feature extractor corresponding to the state and returns a 
+    smoothened version of the state visitation frequency in the form of 
+    another dictionary of the same format {'state_hash': frequency}
+    '''
+    state_numpy = np.asarray([feature_extractor.recover_state_from_hash_value(hash_value)
+                            for hash_value in svf_dictionary.keys()])
+
+    visitation_array = np.asarray([svf_dictionary[key] for key in svf_dictionary.keys()])
+    state_numpy_bool = state_numpy.astype(bool)
+    smoothed_state_counts = np.zeros(visitation_array.shape)
+    #iterate through each of the states in the svf dictionary
+
+
+    for i in range(state_numpy.shape[0]):
+        cur_state = state_numpy[i]
+        #get the smoothened value
+        smooth_state = feature_extractor.smooth_state(cur_state)
+        #array to store the weights of all the visited states
+        #wrt to the current state
+        weighing = np.zeros(len(svf_dictionary.keys()))
+        for j in range(weighing.shape[0]):
+            weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
+        
+        #normalize the weights to be 1
+        weighing = weighing/sum(weighing)
+        weighted_svf = weighing * visitation_array[i]
+        smoothed_state_counts += weighted_svf
+
+        '''
+        #****** for debugging *********
+        print('The state :', cur_state)
+        print('The smooth version :', smooth_state)
+        print('The weight distribution after smoothing :', weighing)
+        print('Normalizing the weights :', weighing)
+        print('Before reweighing : ', visitation_array[i])
+        print('Reweighting the visitation :', weighted_svf)
+        pdb.set_trace()
+        #******************************
+        '''
+
+    counter = 0
+    for key in svf_dictionary.keys():
+
+        svf_dictionary[key] = smoothed_state_counts[counter]
+        counter += 1
+    svf_sum = 0
+    for key in svf_dictionary.keys():
+        svf_sum += svf_dictionary[key]
+    
+
+    pdb.set_trace()
+    return svf_dictionary
+
 
 
 def calculate_expert_svf_with_smoothing(traj_path, 
@@ -382,27 +445,28 @@ def calculate_expert_svf_with_smoothing(traj_path,
 
 
 
-
+'''
+obsolete function
 def debug_custom_path(traj_path, criteria ,state_dict = None):
 
     #function for sanity check for the states generated in the trajectories in the traj_path 
     #mainly for debugging/visualizing the states in the path.
     #Update Oct 13 2019 : This function is of no use.
 
-	actions = glob.glob(os.path.join(traj_path, '*.acts'))
-	states = glob.glob(os.path.join(traj_path, '*.states'))
+    actions = glob.glob(os.path.join(traj_path, '*.acts'))
+    states = glob.glob(os.path.join(traj_path, '*.states'))
 
 
-	if criteria=='distance':
-		histogram_bin = np.zeros(3)
-		xaxis = np.arange(3)
-	if criteria=='orientation':
-		histogram_bin = np.zeros(12)
-		xaxis = np.arange(4)
-	if criteria=='both':
-		histogram_bin = np.zeros(12)
-		xaxis = np.arange(12)
-	for idx, state_file in enumerate(states):
+    if criteria=='distance':
+        histogram_bin = np.zeros(3)
+        xaxis = np.arange(3)
+    if criteria=='orientation':
+        histogram_bin = np.zeros(12)
+        xaxis = np.arange(4)
+    if criteria=='both':
+        histogram_bin = np.zeros(12)
+        xaxis = np.arange(12)
+    for idx, state_file in enumerate(states):
 
 	    # traj_svf stores the state hist
 	    traj_hist = np.zeros((1,len(state_dict.keys())))
@@ -431,10 +495,9 @@ def debug_custom_path(traj_path, criteria ,state_dict = None):
 	    	else:
 
 	    		histogram_bin+= traj_np[i][12:24]
-
-	if criteria=='orientation':
-
-		orient_bin = np.zeros(4)
+                
+    if criteria=='orientation':
+        orient_bin = np.zeros(4)
 		for i in range(12):
 
 			orient_bin[i%4]+=histogram_bin[i]
@@ -444,7 +507,7 @@ def debug_custom_path(traj_path, criteria ,state_dict = None):
 	print(histogram_bin)
 	plt.bar(xaxis,histogram_bin)
 	plt.show()
-
+'''
 	
 
 #should calculate the SVF of a policy network by running the agent a number of times
@@ -927,7 +990,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                 break
     return state_list , diff_list
 
-def save_bar_plot(self, list1, list2, diff_list, iteration, save_folder):
+def save_bar_plot(list1, list2, diff_list, iteration, save_folder):
 
     #torch to numpy
     list1 = list1.cpu().detach().numpy().squeeze()
@@ -992,7 +1055,7 @@ if __name__ == '__main__':
     obs_width = 10
     step_size = 2
     grid_size = 10
-    max_ep_length = 200
+    max_ep_length = 400
     save_folder = None
     policy_net_hidden_dims = [128]
     lr = 0.00
@@ -1051,6 +1114,7 @@ if __name__ == '__main__':
     expert_svf_dict = calculate_expert_svf(expert_trajectory_folder,
                                            max_time_steps=max_ep_length,
                                            feature_extractor=feat_ext,
+                                           smoothing=True,
                                            gamma=1)
 
     for policy_file in policy_file_list:

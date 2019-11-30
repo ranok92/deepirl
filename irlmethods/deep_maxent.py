@@ -94,7 +94,8 @@ class DeepMaxEnt():
             regularizer=0.1,
             learning_rate=1e-3,
             scale_svf=False,
-            seed=10, 
+            seed=10,
+            max_episode_length=100,
             clipping_value=None,
             enumerate_all=False
     ):
@@ -104,7 +105,7 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episode_len = self.rl.max_episode_length
+        self.max_episode_len = max_episode_length
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
@@ -167,7 +168,7 @@ class DeepMaxEnt():
         if os.path.exists(self.plot_save_folder):
             pass
         else:
-            print(self.plot_save_folder)
+            #print(self.plot_save_folder)
             os.makedirs(self.plot_save_folder)
 
 
@@ -428,7 +429,7 @@ class DeepMaxEnt():
     #******************Following are a bunch of debugging methods****************
     '''does not contribute to the main workings of the algorithm '''
     
-    def extract_svf_difference(self,svf_dict, svf_array):
+    def extract_svf_difference(self, svf_dict, svf_array):
         #here the dict is converted to array and the difference is taken
         #diff = array - dict
         svf_diff = []
@@ -509,7 +510,7 @@ class DeepMaxEnt():
         return svf_diff_list
 
 
-    def array_to_state_dict(self,narray):
+    def array_to_state_dict(self, narray):
 
         narray = np.squeeze(narray)
         state_dict = {}
@@ -544,7 +545,7 @@ class DeepMaxEnt():
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/g5_5_o1_2.pt')
-        expertdemo_svf = self.calc_svf_absolute( expert_policy, 
+        expertdemo_svf = self.calc_svf_absolute( expert_policy,
                                          rows=self.env.rows,
                                          cols=self.env.cols,
                                          goalState = self.env.goal_state,
@@ -558,9 +559,9 @@ class DeepMaxEnt():
         print('Reading expert-svf . . ')
         prev_nn_reward_list = []
         prev_state_list = []
-        expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
+        expertdemo_svf = self.expert_svf_dict(self.max_episode_len,
                                               self.rl.feature_extractor,
-                                              smoothing_window=None, 
+                                              smoothing_window=None,
                                               gamma=1)
         print('Done reading expert-svf.')
 
@@ -607,7 +608,7 @@ class DeepMaxEnt():
                                                              gamma=1,
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
-                                                             episode_length=self.rl_max_episode_len,
+                                                             episode_length=self.max_episode_len,
                                                              smoothing_window=None,
                                                              enumerate_all=self.enumerate_all)
 
@@ -631,7 +632,6 @@ class DeepMaxEnt():
             
             #policy_network_folder = './saved-models/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(self.policy_network_save_folder).mkdir(parents=True, exist_ok=True)
-            print(self.policy_network_save_folder)
             current_agent_policy.save(self.policy_network_save_folder)
             
             #diff_freq = expert - current_agent
@@ -694,8 +694,8 @@ class DeepMaxEnt():
             self.optimizer.step()
 
             self.lr_scheduler.step()
-            print("The current learning rate after itertaion : {} is {}".format(i, 
-                                                            self.lr_scheduler.get_lr()))
+            #print("The current learning rate after itertaion : {} is {}".format(i, 
+            #                                                self.lr_scheduler.get_lr()))
 
             print('done')
 
