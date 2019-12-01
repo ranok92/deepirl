@@ -23,7 +23,7 @@ import pdb
 from utils import to_oh
 from irlmethods.irlUtils import toTorch
 
-from irlmethods.irlUtils import expert_svf, get_svf_from_sampling
+#from irlmethods.irlUtils import expert_svf, get_svf_from_sampling
 from irlmethods.irlUtils import get_states_and_freq_diff, calculate_expert_svf, calculate_svf_from_sampling
 import re
 numbers = re.compile(r'(\d+)')

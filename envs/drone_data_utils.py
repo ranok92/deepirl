@@ -14,7 +14,7 @@ from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from scipy.interpolate import splev, splprep
 
 
-
+from matplotlib import pyplot as plt
 import os
 import pdb
 import pathlib
@@ -442,7 +442,66 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     print('Average len of trajectories :', total_len/len(trajectories))
 
 
+def get_pedestrians_in_viscinity(state, viscinity):
 
+    counter = 0
+    for obs in state['obstacles']:
+
+        dist = np.linalg.norm(obs['position']-state['agent_state']['position'], 1)
+        if dist < viscinity:
+            counter += 1
+
+    return counter
+
+
+
+def classify_pedestrians(annotation_file, viscinity):
+    '''
+    reads the annotation file and spits out important stats about the data
+    '''
+
+    tick_speed = 30
+    #initialize world
+    env = GridWorldDrone(display=False, is_onehot=False, 
+                        seed=10, obstacles=None,
+                        show_trail=False,
+                        is_random=False,
+                        show_orientation=True,
+                        annotation_file=annotation_file,
+                        subject=None,
+                        external_control=False,
+                        replace_subject=True,      
+                        tick_speed=tick_speed,                  
+                        rows=576, cols=720,
+                        width=10)    
+    
+    subject_set = extract_subjects_from_file(annotation_file)
+    avg_ped_per_subject = []
+    for subject in subject_set:
+        print(' Subject :', subject)
+        state = env.reset_and_replace(ped=subject)
+
+        nearby_peds_in_frame = 0
+        total_frames = env.final_frame - env.current_frame
+        while env.current_frame < env.final_frame:
+
+            state, _, _, _ = env.step()
+            
+            nearby_peds_in_frame += get_pedestrians_in_viscinity(state, viscinity)
+        
+        avg_peds_per_frame = nearby_peds_in_frame/total_frames
+        avg_ped_per_subject.append(avg_peds_per_frame)
+        print('Avg peds nearby :', avg_peds_per_frame)
+
+    subject_array = np.asarray(list(subject_set))
+    avg_peds_per_subject_arr = np.asarray(avg_ped_per_subject)
+    subject_array = subject_array[avg_peds_per_subject_arr.argsort()]
+    avg_peds_per_subject_arr.sort()
+    easy_arr = subject_array[0:200]
+    medium_arr = subject_array[200:380]
+    hard_arr = subject_array[380:]
+
+    return easy_arr, medium_arr, hard_arr
 
 
 
@@ -492,6 +551,7 @@ if __name__=='__main__':
     #****************************************************
     #******** section to record trajectories
     
+
     step_size = 2
     agent_size = 10
     grid_size = 10
@@ -499,7 +559,7 @@ if __name__=='__main__':
     window_size = 15
     
     num_trajs = 50
-    path_to_save = './DroneFeatureRisk_speed_blank_slate'
+    path_to_save = './DroneFeatureRisk_speed_blank_slate_new'
     
     '''
     feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
@@ -570,4 +630,12 @@ if __name__=='__main__':
     '''
     expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speed_segments'
     get_expert_trajectory_info(expert_traj_folder)
-    '''
+    ''' 
+
+    #*****************************************************
+    #************* classify pedestrians based on presence of nearby obstacles
+
+
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+
+    classify_pedestrians(annotation_file, 30)
