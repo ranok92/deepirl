@@ -223,7 +223,8 @@ def getStateVisitationFreq(policy, rows=10, cols=10, num_actions=5,
 
     return np.sum(stateVisitationMatrix,axis=1)/TIMESTEPS
 
-
+'''
+****obsolete function***
 #This is a more general function and should work with any
 #state representation provided the state dictionary
 #corresponding to that state representation is provided
@@ -274,7 +275,7 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
     svf /= len(states)
 
     return svf
-
+'''
 
 def calculate_expert_svf(traj_path, max_time_steps=30, 
                         feature_extractor=None,
@@ -389,7 +390,6 @@ def smooth_svf(svf_dictionary, feature_extractor):
         svf_sum += svf_dictionary[key]
     
 
-    pdb.set_trace()
     return svf_dictionary
 
 
@@ -509,11 +509,14 @@ def debug_custom_path(traj_path, criteria ,state_dict = None):
 	plt.show()
 '''
 	
+'''
+****obsolete function***
 
 #should calculate the SVF of a policy network by running the agent a number of times
 #on the given environment. Once the trajectories are obtained, each of the trajectories 
 #multiplied by a certain weight, w, where w = e^(r)/ sum(e^(r) for r of all the 
 #trajectories played)
+
 
 def get_svf_from_sampling(no_of_samples = 1000, env = None ,
                          policy_nn = None , reward_nn = None,
@@ -538,7 +541,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
     #as of now the code focuses on starting from all possible states uniformly
 
     start_state = np.zeros(num_states)
-    '''
+    #################
     need a non decreasing function that is always positive.
     get the range of rewards obtained and normalize it?
       The state space changes with the feature_extractor being used. 
@@ -547,8 +550,7 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
     all possible states.
 
     The default feature for the environment for now is onehot.
-
-    '''
+    #################
 
     xaxis = np.arange(num_states)
     for i in range(no_of_samples):
@@ -635,13 +637,14 @@ def get_svf_from_sampling(no_of_samples = 1000, env = None ,
 
     return svf_policy
 
-
+'''
 
 
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
                                 gamma=0.99, scale_svf=False,
+                                smoothing=False,
                                 enumerate_all=False):
     
     '''
@@ -815,7 +818,11 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #pdb.set_trace()
     #print(rewards)
     #print(rewards_true)
-    return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
+    if smoothing:
+        return smooth_svf(collections.OrderedDict(sorted(master_dict.items())), feature_extractor), np.mean(rewards_true), np.mean(rewards)
+
+    else:
+        return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
 
 
 

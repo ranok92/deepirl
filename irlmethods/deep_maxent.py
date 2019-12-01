@@ -215,12 +215,13 @@ class DeepMaxEnt():
     ##################################################################################
     def expert_svf_dict(self, max_time_steps,
                         feature_extractor, 
-                        smoothing_window=None,
+                        smoothing=False,
                         gamma=1):
         
         return irlUtils.calculate_expert_svf(self.traj_path, 
                                              max_time_steps=max_time_steps,
                                              feature_extractor=feature_extractor,
+                                             smoothing=smoothing,
                                              gamma=gamma)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
@@ -229,7 +230,7 @@ class DeepMaxEnt():
         
         '''
     def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
-                                policy_nn=None, reward_nn=None, smoothing_window=None, 
+                                policy_nn=None, reward_nn=None, smoothing=False, 
                                 scale_svf=True, episode_length=20, gamma=0.99,
                                 feature_extractor=None, enumerate_all=False):
 
@@ -239,6 +240,7 @@ class DeepMaxEnt():
                                             reward_nn=reward_nn, scale_svf=scale_svf,
                                             episode_length=episode_length,
                                             gamma=gamma,
+                                            smoothing=smoothing,
                                             feature_extractor=feature_extractor,
                                             enumerate_all=enumerate_all)
         '''
@@ -554,14 +556,12 @@ class DeepMaxEnt():
         '''
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
-
-        #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
         prev_nn_reward_list = []
         prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.max_episode_len,
                                               self.rl.feature_extractor,
-                                              smoothing_window=None,
+                                              smoothing=True,
                                               gamma=1)
         print('Done reading expert-svf.')
 
@@ -609,7 +609,7 @@ class DeepMaxEnt():
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.max_episode_len,
-                                                             smoothing_window=None,
+                                                             smoothing=True,
                                                              enumerate_all=self.enumerate_all)
 
             model_performance_list.append(true_reward)
