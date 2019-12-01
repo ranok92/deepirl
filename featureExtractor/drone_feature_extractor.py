@@ -48,7 +48,8 @@ def rad_to_deg(rad):
 def get_rot_matrix(theta):
     '''
     returns the rotation matrix given a theta value
-'''
+    rotates in the counter clockwise direction
+    '''
     return np.asarray([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
 
@@ -68,13 +69,17 @@ def arange_orientation_info(dim_vector_8):
     return orient_disp_vector
 
 
-
+'''
 def get_abs_orientation(agent_state, orientation_approximator):
     #returns the current absolute binned orientation of the agent
     #one of the 8 directions. Dim:8 (this is the default case)
     #for the default case, it additionally returns a 9 dimensional vector
     #if no orientation information is provided it returns 4.
-
+    #works for the orientation approximator
+    0 1 2
+    3   4
+    5 6 7 
+    ############
     #for other cases, it just returns the orientation.
     #if no orientation information is provided, it returns -1.
 
@@ -109,6 +114,48 @@ def get_abs_orientation(agent_state, orientation_approximator):
             abs_approx_orientation[orientation] = 1
 
             return abs_approx_orientation, orientation
+
+    return abs_approx_orientation, orientation
+'''
+
+def get_abs_orientation(agent_state, orientation_approximator):
+    '''
+    #returns the current absolute binned orientation of the agent
+    #one of the 8 directions. Dim:8 (this is the default case)
+    #for the default case, it additionally returns a 9 dimensional vector
+    #if no orientation information is provided it returns 4.
+    #works for the orientation approximator
+    0 1 2
+    7   3
+    6 5 4 
+    ############
+    #for other cases, it just returns the orientation.
+    #if no orientation information is provided, it returns -1.
+    '''
+    no_of_directions = len(orientation_approximator)
+    angle_diff = np.zeros(no_of_directions)
+
+    min_thresh = 0.001
+    abs_approx_orientation = None
+    if no_of_directions == 8: #the default
+        #will return the vector only if the orientation_approximator is the default 8-dir one.
+        abs_approx_orientation = np.zeros(9)
+    else:
+        abs_approx_orientation = np.zeros(no_of_directions)
+    orientation = agent_state['orientation']
+    if orientation is None:
+        #straight up
+        orientation = 1
+
+    else:
+        for i in range(len(orientation_approximator)):
+            #print('The orientation val')
+            #print(orientation)
+            angle_diff[i] = angle_between(orientation_approximator[i], orientation)
+
+        orientation = np.argmin(angle_diff)
+            
+        abs_approx_orientation[orientation] = 1
 
     return abs_approx_orientation, orientation
 
@@ -150,8 +197,6 @@ def get_rel_goal_orientation(orientation_approximator, rel_orient_conv, agent_st
     angle_diff = np.zeros(no_of_directions)
     relative_orientation_vector = np.zeros(no_of_directions)
 
-    if agent_abs_orientation >4:
-        agent_abs_orientation-=1
 
     rot_matrix = get_rot_matrix(rel_orient_conv[agent_abs_orientation])
 
@@ -276,10 +321,18 @@ class DroneFeatureSAM1():
         self.orientation_approximator_4 = [np.array([-2, 0]), np.array([0, 2]),
                                            np.array([2, 0]), np.array([0, -2])]
         
-        self.rel_orient_conv = [7*np.pi/4, 0, 
-                                np.pi/4, 6*np.pi/4, 
+        '''
+        self.rel_orient_conv = [7*np.pi/4, 0,
+                                np.pi/4, 6*np.pi/4,
                                 np.pi/2, 5*np.pi/4,
                                 np.pi, 3*np.pi/4]
+        '''
+
+        self.rel_orient_conv = [7*np.pi/4, 0,
+                                1*np.pi/4, 2*np.pi/4,
+                                3*np.pi/4, 4*np.pi/4,
+                                5*np.pi/4, 6*np.pi/4 ]
+
         '''
         self.rel_orient_conv = [np.pi/4, 0, 7*np.pi/4,
                                 2*np.pi/4, 6*np.pi/4,
@@ -1315,11 +1368,13 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         #relative_orientation_goal
         #just take the first 8 and do the convolve
-        relative_orientation_goal = state[4:13].astype(np.float)
+        relative_orientation_goal = state[4:4+8].astype(np.float)
+        relative_orientation_goal_full = state[4:4+9]
         smoothing_kernel = smoothing_kernel_general
         relative_orientation_goal_smooth = convolve(relative_orientation_goal, 
                                                     smoothing_kernel, mode='wrap')
-
+        relative_orientation_goal_smooth_9 = np.zeros(9)
+        relative_orientation_goal_smooth_9[0:8] = relative_orientation_goal_smooth
         #change in orientation
         #no wrap this time
         change_in_orientation = state[13:13+5]
@@ -1374,7 +1429,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         print(rel_orient, " ", rel_orient_smooth)
         
         print("relative_orientation_goal")
-        print(relative_orientation_goal, "  " , relative_orientation_goal_smooth)
+        print(relative_orientation_goal_full, "  " , relative_orientation_goal_smooth_9)
 
         print("change in orienatation")
         print(change_in_orientation, "  ", change_in_orientation_smooth)
@@ -1388,11 +1443,11 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         print("speed information")
         print(speed_information, '  ', speed_information_smooth)
-        '''
+        pdb.set_trace()
         #*******************************************
-
+        '''
         return np.concatenate((rel_orient_smooth,
-                              relative_orientation_goal_smooth,
+                              relative_orientation_goal_smooth_9,
                               change_in_orientation_smooth,
                               risk_info_inner_circle_smooth.reshape((-1)),
                               risk_info_outer_circle_smooth.reshape((-1)),
@@ -1423,7 +1478,12 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         '''
         agent_state, goal_state, obstacles = self.get_info_from_state(state)
-        abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+        if agent_state['speed'] == 0 and len(self.agent_state_history) > 0:
+            abs_approx_orientation, agent_orientation_index = get_abs_orientation(self.agent_state_history[-1], 
+                                                                                self.orientation_approximator)
+        else:
+            abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
 
 
         agent_orientation_angle = state['agent_head_dir']
