@@ -1297,31 +1297,33 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         Divide the state vector into the above define parts and each of the
         cases separately. Finally concatenate to get the final smoothened state
         '''
+
+        smoothing_kernel_general = np.array([0.1, .8, .1])
+        
         #relative orientation : asymmetric features, so kind of hacky
         rel_orient = state[0:4]
         if rel_orient[0]==1:
-            smoothing_kernel = np.array([.7, .3])
+            smoothing_kernel = np.array([.9, .1])#.8, .2
         if rel_orient[1]==1:
-            smoothing_kernel = np.array([.3, .7, 0])
+            smoothing_kernel = np.array([.1, .9, 0]) #.2, .8
         if rel_orient[2]==1:
-            smoothing_kernel = np.array([.1, .8, .1])
+            smoothing_kernel = np.array([0.05, .9, 0.05]) #.05, .9, .05
         if rel_orient[3]==1:
-            smoothing_kernel = np.array([.2, .8, 0])
+            smoothing_kernel = np.array([0.1, .9, 0]) #[.1, .9, 0]
 
         rel_orient_smooth = np.convolve(rel_orient, smoothing_kernel, 'same')
 
         #relative_orientation_goal
         #just take the first 8 and do the convolve
         relative_orientation_goal = state[4:13].astype(np.float)
-        smoothing_kernel = np.array([0.15, 0.7, 0.15])
-
+        smoothing_kernel = smoothing_kernel_general
         relative_orientation_goal_smooth = convolve(relative_orientation_goal, 
                                                     smoothing_kernel, mode='wrap')
 
         #change in orientation
         #no wrap this time
         change_in_orientation = state[13:13+5]
-        smoothing_kernel = np.array([0.15, 0.7, 0.15])
+        smoothing_kernel = smoothing_kernel_general
         change_in_orientation_smooth = np.convolve(change_in_orientation,
                                                   smoothing_kernel,'same')
         #normalize the weights so that the sum remains 1
@@ -1336,7 +1338,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         risk_info = state[18:18+48].reshape([16,3]).astype(np.float)
         risk_info_inner_circle = risk_info[0:8,:]
         risk_info_outer_circle = risk_info[8:,:]
-        smoothing_kernel = np.array([0.15, 0.7, .15])
+        smoothing_kernel = smoothing_kernel_general
         #smooth the risk values spatially. ie. moderate risk in a bin will be
         #smoothened to moderate risk to nearby bins. Moderate risk will not be 
         #smoothened to low or high risk
@@ -1360,13 +1362,13 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         #speed information
         #no wrap in the smoothing function
         speed_information = state[-6:]
-        smoothing_kernel = np.array([0.15, 0.7, 0.15])
+        smoothing_kernel = smoothing_kernel_general
         speed_information_smooth = np.convolve(speed_information, smoothing_kernel, 'same')
         #normalize the weights so that the sum remains 1
         speed_information_smooth = speed_information_smooth/np.sum(speed_information_smooth)
         
         #********* for debugging purposes *********
-        
+        '''
         print('State information :')
         print ("relative orientation")
         print(rel_orient, " ", rel_orient_smooth)
@@ -1386,7 +1388,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         print("speed information")
         print(speed_information, '  ', speed_information_smooth)
-        
+        '''
         #*******************************************
 
         return np.concatenate((rel_orient_smooth,
