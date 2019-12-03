@@ -57,7 +57,7 @@ class RewardNet(BaseNN):
         self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.head = nn.Sequential(
             nn.Linear(hidden_dims[-1], 1),
-            nn.ReLU(),
+            nn.Tanh(),
         )
 
     def forward(self, x):
@@ -134,9 +134,9 @@ class DeepMaxEnt():
         self.hidden_dims = hidden_dims
 
         self.learning_rate = learning_rate
-        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0.01, lr=self.learning_rate)
+        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0, lr=self.learning_rate)
 
-        self.lr_scheduler = StepLR(self.optimizer, step_size=4, gamma=0.9)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=2, gamma=0.9)
 
         self.EPS = np.finfo(np.float32).eps.item()
 
