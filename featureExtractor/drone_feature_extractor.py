@@ -1393,7 +1393,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         risk_info = state[18:18+48].reshape([16,3]).astype(np.float)
         risk_info_inner_circle = risk_info[0:8,:]
         risk_info_outer_circle = risk_info[8:,:]
-        smoothing_kernel = smoothing_kernel_general
+        smoothing_kernel = np.array([0, 1, 0])
         #smooth the risk values spatially. ie. moderate risk in a bin will be
         #smoothened to moderate risk to nearby bins. Moderate risk will not be 
         #smoothened to low or high risk
@@ -1443,7 +1443,8 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
 
         print("speed information")
         print(speed_information, '  ', speed_information_smooth)
-        pdb.set_trace()
+        if sum(risk_info[:,0]) < 15:
+            pdb.set_trace()
         #*******************************************
         '''
         return np.concatenate((rel_orient_smooth,

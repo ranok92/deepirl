@@ -376,7 +376,7 @@ def smooth_svf(svf_dictionary, feature_extractor):
         print('Normalizing the weights :', weighing)
         print('Before reweighing : ', visitation_array[i])
         print('Reweighting the visitation :', weighted_svf)
-        pdb.set_trace()
+        #pdb.set_trace()
         #******************************
         '''
 
@@ -664,7 +664,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
     if enumerate_all:
         ped_list = list(env.pedestrian_dict.keys())
-
+        no_of_samples = len(ped_list)
+        #pdb.set_trace()
     rewards_true = np.zeros(no_of_samples) #the true rewards
     rewards = np.zeros(no_of_samples) #the reward according to the reward network if present
 
@@ -672,7 +673,8 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
 
     svf_dict_list = []
     weight_by_traj_len = np.zeros(no_of_samples)
- 
+    
+
     for i in tqdm(range(no_of_samples)):
 
         run_reward = 0
@@ -1055,16 +1057,16 @@ if __name__ == '__main__':
     
     #***************to compare svfs****************
     
-    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
-    annotation_file = None
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    #annotation_file = None
     render = False
     agent_width = 10
     obs_width = 10
     step_size = 2
     grid_size = 10
-    max_ep_length = 400
+    max_ep_length = 100
     save_folder = None
-    policy_net_hidden_dims = [128]
+    policy_net_hidden_dims = [256]
     lr = 0.00
     total_episodes=1000
     true_reward_list = []
@@ -1103,10 +1105,10 @@ if __name__ == '__main__':
                         save_folder=None, 
                         max_episodes=total_episodes)
 
-    expert_trajectory_folder = '/home/abhisek/Study/Robotics/deepirl/envs/DroneFeatureRisk_speed_blank_slate'
+    expert_trajectory_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speed_smooth_state/'
 
 
-    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-blank-slate-user-played_long_runs_updated_svf_fixed_feature_extractor2019-11-23_01:07:44-policy_net-128--reward_net-128--reg-0.05-seed-43-lr-0.0005/saved-models/6.pt'
+    policy_folder = '/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-full-run2019-12-06_02:04:17-policy_net-256--reward_net-256--reg-0.05-seed-9-lr-0.0005/saved-models/33.pt'
     policy_file_list = []
     #read the files in the folder
     if os.path.isdir(policy_folder):
@@ -1133,7 +1135,8 @@ if __name__ == '__main__':
                                 episode_length=max_ep_length,
                                 feature_extractor=feat_ext,
                                 gamma=1, scale_svf=False,
-                                enumerate_all=False)
+                                smoothing=True,
+                                enumerate_all=True)
         #true_reward_list.append(true_reward)
         print("The rewards obtained by this model : ", rewards)
     states, diff = get_states_and_freq_diff(expert_svf_dict, svf_dict, feat_ext)
