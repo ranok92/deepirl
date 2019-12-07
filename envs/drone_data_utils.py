@@ -264,7 +264,7 @@ def extract_trajectory(annotation_file, feature_extractor,
                 feature_extractor.overlay_bins(state)
 
             state = feature_extractor.extract_features(state)
-            state = state.clone().detach()
+            state = torch.tensor(state)
             trajectory_info.append(state)
 
             if trajectory_length_limit is not None:
@@ -293,7 +293,7 @@ def extract_trajectory(annotation_file, feature_extractor,
 
         if trajectory_length_limit is None:
             state_tensors = torch.stack(trajectory_info)
-            torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_%s.states' % str(sub)))
+            torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_%s.states' % str(sub)))
 
     print('The average path length :', total_path_len/len(subject_list))
 
@@ -321,15 +321,6 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
     Let user play in an environment simulated from the data taken from a dataset
     '''
 
-    '''
-
-    feature_extractor = FrontBackSideSimple(thresh1=1, thresh2=2,
-                                      thresh3=5, agent_width=agent_size,
-                                      step_size=step_size, grid_size=grid_size,
-                                      fieldList=['agent_state','goal_state','obstacles'])
-
-    '''
-
     i = 0
     avg_len = 0
     while i < num_of_trajs:
@@ -350,8 +341,11 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
         while not done:
 
             action = env.take_action_from_user()
-            if action !=8:
-                record_flag=True
+            if action != None:
+                record_flag = True
+                print('Recording')
+            else:
+                record_flag = False
 
             if record_flag:
                 actions.append(action)
@@ -511,24 +505,21 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    '''
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
 
-    feature_extractor = 'DroneFeatureRisk_speed_segments_test/'
+    feature_extractor = 'DroneFeatureRisk_speed_smooth_state/'
     to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
-    folder_to_save = folder_name + dataset_name + to_save + feature_extractor 
+    folder_to_save = folder_name + dataset_name + to_save + feature_extractor
     
     grid_size=agent_width=obs_width = 10
     step_size = 2
-    
-    feature_extractor = DroneFeatureRisk_v2(thresh1=10, thresh2=15,
-                                        agent_width=10, obs_width=10,
-                                        grid_size=10, step_size=step_size)
+
 
     feature_extractor = DroneFeatureRisk_speed(thresh1=10, thresh2=15,
                                                agent_width=10, obs_width=10,
@@ -545,23 +536,22 @@ if __name__=='__main__':
     #print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, feature_extractor, 
                        folder_to_save, show_states=False,
-                       display=False, trajectory_length_limit=80)
+                       display=False, trajectory_length_limit=None)
     
-    '''
+    
     #****************************************************
     #******** section to record trajectories
-    
-
+    '''
     step_size = 2
     agent_size = 10
     grid_size = 10
     obs_size = 10
     window_size = 15
     
-    num_trajs = 50
-    path_to_save = './DroneFeatureRisk_speed_blank_slate_new'
+    num_trajs = 60
+    path_to_save = './DroneFeatureRisk_speed_blank_slate_test'
+
     
-    '''
     feature_extractor = LocalGlobal(window_size=window_size, agent_width=agent_size,
                                     step_size=step_size, 
                                     obs_width=obs_size,
@@ -584,7 +574,7 @@ if __name__=='__main__':
                                      grid_size=grid_size,
                                      obs_width=obs_size,
                                      )
-    '''
+    
     feature_extractor = DroneFeatureRisk_speed(step_size=step_size,
                                                thresh1=10,
                                                thresh2=15,
@@ -609,7 +599,7 @@ if __name__=='__main__':
 
     
     record_trajectories(num_trajs, env, feature_extractor, path_to_save)
-    
+    '''
     #***************************************************** 
 
     
@@ -634,8 +624,9 @@ if __name__=='__main__':
 
     #*****************************************************
     #************* classify pedestrians based on presence of nearby obstacles
-
+    '''
 
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
 
     classify_pedestrians(annotation_file, 30)
+    '''
