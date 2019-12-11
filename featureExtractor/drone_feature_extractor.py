@@ -538,9 +538,10 @@ class DroneFeatureSAM1():
         #pdb.set_trace()
         center =  np.array([int(state['agent_state']['position'][1]),
                   int(state['agent_state']['position'][0])])
-        pygame.draw.circle(pygame.display.get_surface(), (0,0,0), center, self.thresh1,2) 
+        pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, self.thresh1, 2) 
         #draw outer ring 
-        pygame.draw.circle(pygame.display.get_surface(), (0,0,0), center, self.thresh2,2)
+        pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, self.thresh2, 2)
+        pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, int(self.step_size+(self.agent_width + self.obs_width)//2),2)
 
         line_start_point = np.array([0, -self.thresh2])
         line_end_point = np.array([0,self.thresh2])
@@ -1015,7 +1016,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             prev_frame_info = None
         if prev_frame_info is not None and cur_agent_orientation is not None:
             prev_agent_orient = prev_frame_info['orientation']
-            angle_diffs = np.array([0, np.pi/4, np.pi/2, np.pi*3/4, np.pi])
+            angle_diffs = np.array([0, np.pi/9, 2*np.pi/9, np.pi*3/9, 4*np.pi/9])
             diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
             index = np.argmin(np.abs(angle_diffs - diff_in_angle))
 
@@ -1041,6 +1042,9 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         thresh_value += self.agent_width #padding
         #pdb.set_trace()
 
+        intimate_space_dist = int(self.step_size+(self.agent_width + self.obs_width)//2)
+        intimate_space_occupancy = np.zeros(8)
+        
         rot_matrix = get_rot_matrix(-agent_orientation_val)
         if agent_state['orientation'] is None:
             agent_state['orientation'] = np.array([1, 0])
@@ -1093,6 +1097,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             #draw the cicles
             #spdb.set_trace()
             self.overlay_bins(dummy_state)
+
             #draw the agent
             pygame.draw.rect(pygame.display.get_surface(), (0,0,0), 
                             [center[1]-self.agent_width/2, center[0]-self.agent_width/2, 
@@ -1123,6 +1128,10 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 #print('Relative orientation :', rel_orient)
                 #relative position of the agent wrt the obstacle
                 rel_dist = -obs['position']
+
+                rel_dist_mag = np.linalg.norm(rel_dist, 1)
+                if rel_dist_mag < intimate_space_dist:
+                    intimate_space_occupancy[int(key)%8] = 1
 
                 ang = angle_between(rel_orient, rel_dist)
                 
@@ -1178,7 +1187,7 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
             risk_vector[int(key)][risk_val] = 1
 
-        return risk_vector
+        return risk_vector, intimate_space_occupancy
 
 
     def extract_features(self, state):
@@ -1328,9 +1337,10 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         relative_orientation_goal 4 
         change_in_orientation 5
         collision_info 48
+        hit_info 8
         speed_info 6
         '''
-        self.state_rep_size = 4+9+5+16*3+6
+        self.state_rep_size = 4+9+5+16*3+8+6
         self.max_speed = max_speed
         self.speed_divisions = 6
         self.generate_hash_variable()
@@ -1413,7 +1423,9 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
             risk_info_part = risk_info_outer_circle[:,i]
             risk_info_part_smooth = convolve(risk_info_part, smoothing_kernel, mode='wrap')
             risk_info_outer_circle_smooth[:,i] = risk_info_part_smooth
+        #hit information
 
+        hit_info = state[66:66+8]
         #speed information
         #no wrap in the smoothing function
         speed_information = state[-6:]
@@ -1452,6 +1464,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                               change_in_orientation_smooth,
                               risk_info_inner_circle_smooth.reshape((-1)),
                               risk_info_outer_circle_smooth.reshape((-1)),
+                              hit_info,
                               speed_information_smooth))
 
 
@@ -1511,7 +1524,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
         self.populate_orientation_bin(agent_orientation_angle, agent_state, obstacles)
 
-        collision_info = self.compute_bin_info(agent_orientation_angle, agent_state)
+        collision_info, hit_info = self.compute_bin_info(agent_orientation_angle, agent_state)
 
         #adding speed information
         speed_info = self.get_speed_info(agent_state)
@@ -1522,6 +1535,7 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                                             relative_orientation_goal,
                                             change_in_orientation,
                                             collision_info.reshape((-1)),
+                                            hit_info,
                                             speed_info
                                             ))
 
