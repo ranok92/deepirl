@@ -48,7 +48,7 @@ class RewardNet(BaseNN):
             nn.ELU(),
         )
         self.hidden_layers = []
-        for i in range(1,len(hidden_dims)):
+        for i in range(1, len(hidden_dims)):
             self.hidden_layers.append(nn.Sequential(
                                                     nn.Linear(hidden_dims[i-1], hidden_dims[i]),
                                                     nn.ELU(),
@@ -91,7 +91,7 @@ class DeepMaxEnt():
             save_folder=None,
             graft=True,
             hidden_dims=[128],
-            regularizer=0.1,
+            l1regularizer=0.1,
             learning_rate=1e-3,
             scale_svf=False,
             seed=10,
@@ -134,7 +134,7 @@ class DeepMaxEnt():
         self.hidden_dims = hidden_dims
 
         self.learning_rate = learning_rate
-        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0.01, lr=self.learning_rate)
+        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0, lr=self.learning_rate)
 
         self.lr_scheduler = StepLR(self.optimizer, step_size=4, gamma=0.9)
 
@@ -149,7 +149,7 @@ class DeepMaxEnt():
         #making it run on server
         self.on_server = on_server
 
-        self.regularizer = regularizer
+        self.l1regularizer = l1regularizer
         #folders for saving purposes
 
         self.save_folder_tf = save_folder+'-reg-'+str(self.regularizer)+\
@@ -267,7 +267,7 @@ class DeepMaxEnt():
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
         #adding L1 regularization
-        lambda1 = self.regularizer
+        lambda1 = self.l1regularizer
         l1_reg = torch.tensor(0, dtype=torch.float).to(self.device)
         grad_mag = torch.tensor(0, dtype=torch.float).to(self.device)
 
@@ -275,7 +275,7 @@ class DeepMaxEnt():
             l1_reg += torch.norm(param, 1)
 
         #adding back the regularizer term
-        loss = dot_prod
+        loss = dot_prod + lambda1*l1_reg
         
 
         loss.backward()
