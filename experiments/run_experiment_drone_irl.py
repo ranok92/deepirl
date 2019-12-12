@@ -206,6 +206,13 @@ def main():
                             grid_size=grid_size,
                             thresh1=10, thresh2=15)
 
+    if args.feat_extractor == 'DroneFeatureRisk_speedv2':
+
+        feat_ext = DroneFeatureRisk_speedv2(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            thresh1=10, thresh2=15)
 
 
     experiment_logger.log_header('Parameters of the feature extractor :')

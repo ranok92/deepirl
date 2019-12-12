@@ -541,7 +541,7 @@ class DroneFeatureSAM1():
         pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, self.thresh1, 2) 
         #draw outer ring 
         pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, self.thresh2, 2)
-        pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, int(self.step_size+(self.agent_width + self.obs_width)//2),2)
+        pygame.draw.circle(pygame.display.get_surface(), (0, 0, 0), center, int(self.step_size+(self.agent_width + self.obs_width)*1.4//2), 2)
 
         line_start_point = np.array([0, -self.thresh2])
         line_end_point = np.array([0,self.thresh2])
@@ -1016,7 +1016,9 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             prev_frame_info = None
         if prev_frame_info is not None and cur_agent_orientation is not None:
             prev_agent_orient = prev_frame_info['orientation']
-            angle_diffs = np.array([0, np.pi/9, 2*np.pi/9, np.pi*3/9, 4*np.pi/9])
+            #angle_diffs = np.array([0, np.pi/9, 2*np.pi/9, np.pi*3/9, 4*np.pi/9])
+            angle_diffs = np.array([0, np.pi/4, 2*np.pi/4, np.pi*3/4, 4*np.pi/4])
+
             diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
             index = np.argmin(np.abs(angle_diffs - diff_in_angle))
 
@@ -1038,28 +1040,31 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
         risk_vector = np.zeros((len(self.bins.keys()),3))
         #rotate the agent's orientation to match that of the obstacles
-        thresh_value = self.agent_width/2 + self.obs_width/2 + self.step_size
-        thresh_value += self.agent_width #padding
+        thresh_value = 1.4*(self.agent_width/2 + self.obs_width/2) + self.step_size
+        #thresh_value += self.agent_width #padding
         #pdb.set_trace()
 
-        intimate_space_dist = int(self.step_size+(self.agent_width + self.obs_width)//2)
+        intimate_space_dist = int(self.step_size+(self.agent_width + self.obs_width)*1.4//2)
         intimate_space_occupancy = np.zeros(8)
         
-        rot_matrix = get_rot_matrix(-agent_orientation_val)
+        rot_matrix = get_rot_matrix(deg_to_rad(agent_orientation_val))
         if agent_state['orientation'] is None:
-            agent_state['orientation'] = np.array([1, 0])
+            agent_state['orientation'] = np.array([-1, 0])
         rotated_agent_orientation = np.matmul(rot_matrix, agent_state['orientation'])
 
-        '''
+        
         #***for debugging purposes****
-        print('The orientation val :', agent_orientation_val)
+        '''
         print('Agent orientation val :', agent_orientation_val)
+        print('Agent orientation :', agent_state['orientation'])
         print('Rotated agent orientation :', rotated_agent_orientation)
+        print('Current agent speed :', agent_state['speed'], np.linalg.norm(agent_state['orientation']))
         #*****************************
         '''
+        rotated_agent_orientation = rotated_agent_orientation * agent_state['speed']
 
         pad = 80
-        mag = 1 #magnification of the orientation lines
+        mag = 20 #magnification of the orientation lines
         
         ################################
         #code for the agent view
@@ -1105,11 +1110,11 @@ class DroneFeatureRisk(DroneFeatureSAM1):
 
 
             #draw the orientation
-            '''
+            
             pygame.draw.line(pygame.display.get_surface(), (0,0,0), (center[1], center[0]),
                              ((center[1]+rotated_agent_orientation[1]*mag), (center[0]+rotated_agent_orientation[0]*mag)
-                             ), 2)
-            '''
+                             ), 4)
+            
             pygame.display.update()
         
         #################################
@@ -1129,18 +1134,24 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                 #relative position of the agent wrt the obstacle
                 rel_dist = -obs['position']
 
-                rel_dist_mag = np.linalg.norm(rel_dist, 1)
+                rel_dist_mag = np.linalg.norm(rel_dist, 2)
+
                 if rel_dist_mag < intimate_space_dist:
                     intimate_space_occupancy[int(key)%8] = 1
 
                 ang = angle_between(rel_orient, rel_dist)
                 
                 #if np.linalg.norm(rel_dist) < (self.agent_width+self.obs_width)/2+self.step_size:
-                if np.linalg.norm(rel_dist) < (self.agent_width/math.sqrt(2) + self.obs_width/math.sqrt(2) + self.step_size*math.sqrt(2)):
-                    risk_val = max(risk_val, 2)
                 
-                if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist) < thresh_value:
-                #if ang < np.pi/8:
+                #if the pedestrian is too close, ie invading intimate space: high risk
+                #swapped this for a intimate space detector ring: intimate_space_occupancy
+                #if np.linalg.norm(rel_dist) < (self.agent_width/math.sqrt(2) + self.obs_width/math.sqrt(2) + self.step_size*math.sqrt(2)):
+                #    risk_val = max(risk_val, 2)
+            
+                #
+                #if ang < np.pi/4 and math.tan(ang)*np.linalg.norm(rel_dist) < thresh_value:
+                if ang < np.pi/2 and abs(math.tan(ang)*np.linalg.norm(rel_dist)) < thresh_value:
+
                     #print('Moving towards')
                     #high risk
                     #adding to it, the rel_distance in both row and 
@@ -1163,6 +1174,8 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                         color_val = (0, 0, 255)
                     if risk_val==2:
                         color_val = (255, 0, 0)
+                    if rel_dist_mag < intimate_space_dist:
+                        color_val = (0, 255, 255)
 
                     #draw the obstacle in the agent persepective window
                     shifted_obs_pos = (center[0]+obs['position'][0], center[1]+obs['position'][1])
@@ -1180,9 +1193,10 @@ class DroneFeatureRisk(DroneFeatureSAM1):
                                     2
                                     )
 
-                    pygame.display.update()
+                    self.overlay_bins(dummy_state)
 
-                #
+                    pygame.display.update()
+                
             #pdb.set_trace()
 
             risk_vector[int(key)][risk_val] = 1
@@ -1337,7 +1351,245 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         relative_orientation_goal 4 
         change_in_orientation 5
         collision_info 48
-        hit_info 8
+        speed_info 6
+        '''
+        self.state_rep_size = 4+9+5+16*3+6
+        self.max_speed = max_speed
+        self.speed_divisions = 6
+        self.generate_hash_variable()
+        self.return_tensor = return_tensor
+
+
+    def smooth_state(self, state):
+
+        '''
+        Drone feature risk has 5 parts;
+            relative orientation
+            relative orientation goal
+            change in orientation 
+            collision info
+            speed info
+
+        Divide the state vector into the above define parts and each of the
+        cases separately. Finally concatenate to get the final smoothened state
+        '''
+
+        smoothing_kernel_general = np.array([0.1, .8, .1])
+        
+        #relative orientation : asymmetric features, so kind of hacky
+        rel_orient = state[0:4]
+        if rel_orient[0]==1:
+            smoothing_kernel = np.array([.9, .1])#.8, .2
+        if rel_orient[1]==1:
+            smoothing_kernel = np.array([.1, .9, 0]) #.2, .8
+        if rel_orient[2]==1:
+            smoothing_kernel = np.array([0.05, .9, 0.05]) #.05, .9, .05
+        if rel_orient[3]==1:
+            smoothing_kernel = np.array([0.1, .9, 0]) #[.1, .9, 0]
+
+        rel_orient_smooth = np.convolve(rel_orient, smoothing_kernel, 'same')
+
+        #relative_orientation_goal
+        #just take the first 8 and do the convolve
+        relative_orientation_goal = state[4:4+8].astype(np.float)
+        relative_orientation_goal_full = state[4:4+9]
+        smoothing_kernel = smoothing_kernel_general
+        relative_orientation_goal_smooth = convolve(relative_orientation_goal, 
+                                                    smoothing_kernel, mode='wrap')
+        relative_orientation_goal_smooth_9 = np.zeros(9)
+        relative_orientation_goal_smooth_9[0:8] = relative_orientation_goal_smooth
+        #change in orientation
+        #no wrap this time
+        change_in_orientation = state[13:13+5]
+        smoothing_kernel = smoothing_kernel_general
+        change_in_orientation_smooth = np.convolve(change_in_orientation,
+                                                  smoothing_kernel,'same')
+        #normalize the weights so that the sum remains 1
+        change_in_orientation_smooth = change_in_orientation_smooth/np.sum(change_in_orientation_smooth)
+
+
+        #local bin information
+        #bin information comes in a matrix of size 16 * 3 
+        #the convolution will happen in axis = 1
+        #bin information are in two concentric cicle
+        #so have to separate the two circles before smoothing
+        risk_info = state[18:18+48].reshape([16,3]).astype(np.float)
+        risk_info_inner_circle = risk_info[0:8,:]
+        risk_info_outer_circle = risk_info[8:,:]
+        smoothing_kernel = np.array([0, 1, 0])
+        #smooth the risk values spatially. ie. moderate risk in a bin will be
+        #smoothened to moderate risk to nearby bins. Moderate risk will not be 
+        #smoothened to low or high risk
+        risk_info_inner_circle_smooth = np.zeros(risk_info_inner_circle.shape)
+        risk_info_outer_circle_smooth = np.zeros(risk_info_outer_circle.shape)
+
+        #going through each of the columns (ie the risk levels)
+        #the smoothing does not smooth over the risk levels
+        #ie. high risk at a bin never smoothens to be a medium or low risk
+        #in someother bin.
+        for i in range(risk_info_inner_circle.shape[1]):
+            risk_info_part = risk_info_inner_circle[:,i]
+            risk_info_part_smooth = convolve(risk_info_part, smoothing_kernel, mode='wrap')
+            risk_info_inner_circle_smooth[:,i] = risk_info_part_smooth
+
+        for i in range(risk_info_outer_circle.shape[1]):
+            risk_info_part = risk_info_outer_circle[:,i]
+            risk_info_part_smooth = convolve(risk_info_part, smoothing_kernel, mode='wrap')
+            risk_info_outer_circle_smooth[:,i] = risk_info_part_smooth
+        #speed information
+        #no wrap in the smoothing function
+        speed_information = state[-6:]
+        smoothing_kernel = smoothing_kernel_general
+        speed_information_smooth = np.convolve(speed_information, smoothing_kernel, 'same')
+        #normalize the weights so that the sum remains 1
+        speed_information_smooth = speed_information_smooth/np.sum(speed_information_smooth)
+        
+        #********* for debugging purposes *********
+        '''
+        print('State information :')
+        print ("relative orientation")
+        print(rel_orient, " ", rel_orient_smooth)
+        
+        print("relative_orientation_goal")
+        print(relative_orientation_goal_full, "  " , relative_orientation_goal_smooth_9)
+
+        print("change in orienatation")
+        print(change_in_orientation, "  ", change_in_orientation_smooth)
+
+        print("risk information")
+        print("inner circle")
+        print(np.c_[risk_info_inner_circle, risk_info_inner_circle_smooth])
+
+        print("outer circle")
+        print(np.c_[risk_info_outer_circle, risk_info_outer_circle_smooth])
+
+        print("speed information")
+        print(speed_information, '  ', speed_information_smooth)
+        if sum(risk_info[:,0]) < 15:
+            pdb.set_trace()
+        #*******************************************
+        '''
+        return np.concatenate((rel_orient_smooth,
+                              relative_orientation_goal_smooth_9,
+                              change_in_orientation_smooth,
+                              risk_info_inner_circle_smooth.reshape((-1)),
+                              risk_info_outer_circle_smooth.reshape((-1)),
+                              speed_information_smooth))
+
+
+
+
+    def get_speed_info(self, agent_state):
+
+        speed_info = np.zeros(self.speed_divisions)
+        cur_speed = agent_state['speed']
+
+        if cur_speed is None:
+            cur_speed = 0
+
+        if cur_speed >= self.max_speed:
+            cur_speed = self.max_speed-0.001
+
+        quantization = self.max_speed/self.speed_divisions
+        speed_info[int(cur_speed/quantization)] = 1
+        return speed_info
+
+
+    def extract_features(self, state):
+        '''
+        the parameter ignore_cur_state, if set to true indicates that this is a part of a rollback play.
+
+        '''
+        agent_state, goal_state, obstacles = self.get_info_from_state(state)
+
+        if agent_state['speed'] == 0 and len(self.agent_state_history) > 0:
+            abs_approx_orientation, agent_orientation_index = get_abs_orientation(self.agent_state_history[-1], 
+                                                                                self.orientation_approximator)
+        else:
+            abs_approx_orientation, agent_orientation_index = get_abs_orientation(agent_state, self.orientation_approximator)
+
+
+        agent_orientation_angle = state['agent_head_dir']
+        #print('Current heading direction :', agent_orientation_angle)
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+
+        relative_orientation = get_rel_orientation(prev_frame_info, agent_state, goal_state)
+        relative_orientation_goal = get_rel_goal_orientation(self.orientation_approximator,
+                                                   self.rel_orient_conv,
+                                                   agent_state, 
+                                                   agent_orientation_index,
+                                                   goal_state)
+
+        change_in_orientation = self.get_change_in_orientation(state['agent_state']['orientation'])
+
+
+        for i in range(16):
+            self.bins[str(i)] = []
+
+        #print('absolute orientation :', abs_approx_orientation.reshape((3,3)))
+        #print('relative orientation :', relative_orientation_goal.reshape((3,3)))
+        self.populate_orientation_bin(agent_orientation_angle, agent_state, obstacles)
+
+        collision_info, _ = self.compute_bin_info(agent_orientation_angle, agent_state)
+
+        #adding speed information
+        speed_info = self.get_speed_info(agent_state)
+        
+        self.agent_state_history.append(copy.deepcopy(state['agent_state']))
+
+        extracted_feature = np.concatenate((relative_orientation,
+                                            relative_orientation_goal,
+                                            change_in_orientation,
+                                            collision_info.reshape((-1)),
+                                            speed_info
+                                            ))
+
+        '''
+        #***debugging block*****#
+        print('Relative orientation :', relative_orientation)
+        print('Relative orientation goal :', relative_orientation_goal.reshape(3,3))
+        print('Change in orientation :', change_in_orientation)
+        pdb.set_trace()
+        #****end block****#
+        '''
+        if self.return_tensor:
+            return reset_wrapper(extracted_feature)
+        else:
+            return extracted_feature
+
+
+class DroneFeatureRisk_speedv2(DroneFeatureRisk_speed):
+
+    def __init__(self, thresh1=1, thresh2=2,
+                 agent_width=10, step_size=10,
+                 obs_width=10, grid_size=10,
+                 show_bins=False, 
+                 max_speed=2,
+                 show_agent_persp=False,
+                 return_tensor=False,
+                 debug=False
+                 ):
+
+        super().__init__(thresh1=thresh1,
+                         thresh2=thresh2,
+                         agent_width=agent_width,
+                         obs_width=obs_width,
+                         step_size=step_size,
+                         grid_size=grid_size,
+                         show_bins=show_bins,
+                         show_agent_persp=show_agent_persp
+                         )
+
+        #change the state representation size accordingly
+        '''
+        relative_orientation 9
+        relative_orientation_goal 4 
+        change_in_orientation 5
+        collision_info 48
+        hit info 8
         speed_info 6
         '''
         self.state_rep_size = 4+9+5+16*3+8+6
@@ -1346,6 +1598,14 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         self.generate_hash_variable()
         self.return_tensor = return_tensor
 
+        #for debugging purposes
+        self.debug_mode = debug
+        self.inside_intimate_space = 0
+        self.inside_personal_space = 0
+        self.inside_social_space = 0
+        self.frames_with_risk_2 = 0
+        self.frames_with_risk_1 = 0
+        self.frames_with_risk_0 = 0
 
     def smooth_state(self, state):
 
@@ -1468,22 +1728,70 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                               speed_information_smooth))
 
 
+    def get_change_in_orientation(self, cur_agent_orientation):
+
+        #cur_agent_orientation is a 2d array [row, col]
+        prev_agent_orient = None
+        change_vector = np.zeros(5)
+        if len(self.agent_state_history) > 0:
+            prev_frame_info = self.agent_state_history[-1]
+        else:
+            prev_frame_info = None
+        if prev_frame_info is not None and cur_agent_orientation is not None:
+            prev_agent_orient = prev_frame_info['orientation']
+            angle_diffs = np.array([0, np.pi/9, 2*np.pi/9, np.pi*3/9, 4*np.pi/9])
+            diff_in_angle = angle_between(prev_agent_orient, cur_agent_orientation)
+            index = np.argmin(np.abs(angle_diffs - diff_in_angle))
+
+            #print('Prev orientation :', prev_agent_orient)
+            #print('cur_agent_orientation :', cur_agent_orientation)
+        else:
+            index = 0
+
+        #print('Index selected :', index)
+        #pdb.set_trace()
+        change_vector[index] = 1
+        return change_vector
 
 
-    def get_speed_info(self, agent_state):
+    def log_debugging_info(self, relative_orientation,
+                            relative_orientation_goal,
+                            change_in_orientation,
+                            collision_info,
+                            hit_info,
+                            speed_info):
+        
+        if np.sum(hit_info) > 0:
+            self.inside_intimate_space += 1
+        
+        if np.sum(collision_info[:,1]) > 0:
+            self.frames_with_risk_1 += 1
+        
+        if np.sum(collision_info[:,2]) > 0:
+            self.frames_with_risk_2 += 1
+        
+        if np.sum(collision_info[:,0]) == 16:
+            self.frames_with_risk_0 += 1
 
-        speed_info = np.zeros(self.speed_divisions)
-        cur_speed = agent_state['speed']
+    def print_info(self):
 
-        if cur_speed is None:
-            cur_speed = 0
+        print('States with pedestrian inside intimate space :', self.inside_intimate_space)
+        print('States with risk 0 - {}, 1 - {} and 2 - {}'.format(self.frames_with_risk_0,
+                                                                  self.frames_with_risk_1,
+                                                                  self.frames_with_risk_2))
+    
+    def reset_debug_info(self):
 
-        if cur_speed >= self.max_speed:
-            cur_speed = self.max_speed-0.001
+        self.inside_intimate_space = 0
+        self.inside_personal_space = 0
+        self.inside_social_space = 0
+        self.frames_with_risk_2 = 0
+        self.frames_with_risk_1 = 0
+        self.frames_with_risk_0 = 0
 
-        quantization = self.max_speed/self.speed_divisions
-        speed_info[int(cur_speed/quantization)] = 1
-        return speed_info
+
+
+
 
 
     def extract_features(self, state):
@@ -1539,6 +1847,16 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
                                             speed_info
                                             ))
 
+        if self.debug_mode:
+
+            self.log_debugging_info(relative_orientation,
+                                    relative_orientation_goal,
+                                    change_in_orientation,
+                                    collision_info,
+                                    hit_info,
+                                    speed_info
+                                    )
+
         '''
         #***debugging block*****#
         print('Relative orientation :', relative_orientation)
@@ -1547,9 +1865,8 @@ class DroneFeatureRisk_speed(DroneFeatureRisk):
         pdb.set_trace()
         #****end block****#
         '''
+
         if self.return_tensor:
             return reset_wrapper(extracted_feature)
         else:
             return extracted_feature
-
-
