@@ -376,7 +376,7 @@ def crash_analysis():
 
         #reset the world
         crash_analysis = False
-        state=env.reset()
+        state = env.reset()
         print('Current subject :', env.cur_ped)
         if args.feat_extractor is not None:
             feat_ext.reset()
@@ -384,14 +384,14 @@ def crash_analysis():
             #pass
         #reset the information collector
         info_collector.reset_info(state)
-        done=False
+        done = False
         t = 0
         while t < args.max_ep_length and not done:
 
             if args.feat_extractor is not None:
 
             
-                if args.agent_type=='Policy_network':
+                if args.agent_type == 'Policy_network':
                     action = agent.eval_action(state_feat)
                 else:
                 #action selection for alternate controller namely potential field
@@ -428,23 +428,23 @@ def crash_analysis():
                 if args.crash_analysis:
                     if  reward_true < -0.5:
                         if not crash_analysis:
-                            if t > 3:
-                                state = env.rollback(3)
-                                state_feat = feat_ext.rollback(4, state)
+                            if t > 10:
+                                state = env.rollback(10)
+                                state_feat = feat_ext.rollback(11, state)
                             else:
                                 state = env.rollback(t-1)
                                 state_feat = feat_ext.rollback(t, state)
                             print('Current frame after rollback :', env.current_frame)
                             for i in range(len(feat_ext.agent_state_history)):
-                                print(feat_ext.agent_state_history[i]['position'],env.heading_dir_history[i])                            
-                            done=False
-                            crash_analysis=True
+                                print(feat_ext.agent_state_history[i]['position'], env.heading_dir_history[i])                            
+                            done = False
+                            crash_analysis = True
                         else:
                             break
                 else:
                     break
 
-            t+=1
+            t += 1
 
 
 
@@ -569,20 +569,20 @@ def agent_drift_analysis_by_density(agent=agent,
                         ped_list=None,
                         viscinity=30,
                         pos_reset=20):
-    '''
+    
 
-    step interval after which to reset the position
-    input : agent, agent_type, 
-        ped_list (optional) - list of pedestrians
-        viscinity (optional) - radius around the agent to get pedestrian density
-        pos_reset - frames after which to reset the agent
+    # step interval after which to reset the position
+    # input : agent, agent_type, 
+    #     ped_list (optional) - list of pedestrians
+    #     viscinity (optional) - radius around the agent to get pedestrian density
+    #     pos_reset - frames after which to reset the agent
 
-        Plays the agent on the provided environment with the assigned reset value
-        for the assigned number of trajectories. Can be played with or without render
-    returns :
-        The an array that contains the drift analysis for each of the
-        pedestrians in the list for the given pos_reset.
-    '''
+    #     Plays the agent on the provided environment with the assigned reset value
+    #     for the assigned number of trajectories. Can be played with or without render
+    # returns :
+    #     The an array that contains the drift analysis for each of the
+    #     pedestrians in the list for the given pos_reset.
+    
 
     drift_value = 0
     segment_counter = 0
@@ -630,10 +630,10 @@ def agent_drift_analysis_by_density(agent=agent,
                 #action selection for alternate controller namely potential field
                     action = agent.eval_action(state)
 
-                '''
-                if args.render:
-                    feat_ext.overlay_bins(state)
-                '''
+                
+                # if args.render:
+                #     feat_ext.overlay_bins(state)
+                
             else:
                 action = agent.eval_action(state)
             state, reward_true, done, _ = env.step(action)
@@ -670,13 +670,13 @@ def agent_drift_analysis_by_density(agent=agent,
                 #print('Drift value : {} for segment {}'.format(drift_value, segment_counter))
                 env.agent_state = env.return_position(env.cur_ped, env.current_frame)
                 env.state['agent_state'] = copy.deepcopy(env.agent_state)
-                '''
-                pos = env.agent_state['position']
-                stop_points.append(pos)
-                for pos in stop_points:
-                    pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
-                pygame.display.update()
-                '''
+                
+                # pos = env.agent_state['position']
+                # stop_points.append(pos)
+                # for pos in stop_points:
+                #     pygame.draw.circle(pygame.display.get_surface(),  (0,0,0), (int(pos[1]), int(pos[0])), 20)
+                # pygame.display.update()
+                
                 env.goal_state = env.return_position(env.cur_ped, env.current_frame + pos_reset)['position']
                 env.state['goal_state'] = copy.deepcopy(env.goal_state)
                 state = copy.deepcopy(env.state)
@@ -731,7 +731,7 @@ if __name__ == '__main__':
     #**************** performing reward analysis
     '''
     reward_analysis()
-    '''
+    
     #************ performing drift analysis **************
 
     #initialize the agents
@@ -776,3 +776,6 @@ if __name__ == '__main__':
     ax.set_ylabel('Divergence from ground truth')
     ax.legend()
     plt.show()
+    #*******************************************
+    '''
+    crash_analysis()

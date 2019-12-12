@@ -87,7 +87,7 @@ def main():
     from envs.gridworld_drone import GridWorldDrone
     from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
     from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
-    from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+    from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 
     save_folder = None
 
@@ -192,6 +192,16 @@ def main():
                                        thresh1=10, thresh2=15)
 
 
+    if args.feat_extractor == 'DroneFeatureRisk_speedv2':
+
+        feat_ext = DroneFeatureRisk_speedv2(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            show_agent_persp=True,
+                            return_tensor=False,
+                            thresh1=15, thresh2=25)
+
 
     if feat_ext is None:
         print('Please enter proper feature extractor!')
@@ -205,15 +215,15 @@ def main():
 
     #initialize the environment
     if args.replace_subject:
-        replace_subject=True
+        replace_subject = True
     else:
-        replace_subject=False
+        replace_subject = False
 
     env = GridWorldDrone(display=args.render, is_onehot = False, 
                         seed=args.seed, obstacles=None, 
                         show_trail=False,
                         is_random=True,
-                        annotation_file=None,
+                        annotation_file=args.annotation_file,
                         subject=args.subject,
                         tick_speed=60, 
                         obs_width=10,
@@ -227,8 +237,8 @@ def main():
                         consider_heading=True,
                         show_orientation=True,
 
-                        rows=200, cols=200, width=grid_size)                       
-                        #rows=576, cols=720, width=grid_size)
+                        #rows=200, cols=200, width=grid_size)                       
+                        rows=576, cols=720, width=grid_size)
 
 
     #env = gym.make('Acrobot-v1')
@@ -361,7 +371,7 @@ def main():
     if args.play_user:
         env.tickSpeed = 200
 
-        model.generate_trajectory_user(args.num_trajs, args.render , path='./user_generated_trajectories/')
+        model.generate_trajectory_user(args.num_trajs, args.render, path='./user_generated_trajectories/')
 
 if __name__ == '__main__':
     main()
