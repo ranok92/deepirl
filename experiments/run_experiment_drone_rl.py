@@ -200,7 +200,7 @@ def main():
                             grid_size=grid_size,
                             show_agent_persp=True,
                             return_tensor=False,
-                            thresh1=15, thresh2=25)
+                            thresh1=18, thresh2=30)
 
 
     if feat_ext is None:

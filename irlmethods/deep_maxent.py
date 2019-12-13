@@ -152,17 +152,17 @@ class DeepMaxEnt():
         self.l1regularizer = l1regularizer
         #folders for saving purposes
 
-        self.save_folder_tf = save_folder+'-reg-'+str(self.regularizer)+\
+        self.save_folder_tf = save_folder+'-reg-'+str(self.l1regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/tf_logs/'
 
-        self.plot_save_folder = save_folder+'-reg-'+str(self.regularizer)+\
+        self.plot_save_folder = save_folder+'-reg-'+str(self.l1regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
 
         self.reward_network_save_folder = save_folder+'-reg-'+\
-                                          str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
+                                          str(self.l1regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
 
-        self.policy_network_save_folder = save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+        self.policy_network_save_folder = save_folder+'-reg-'+str(self.l1regularizer)+'-seed-'+\
                                           str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
