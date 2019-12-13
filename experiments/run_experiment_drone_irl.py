@@ -12,7 +12,7 @@ import utils
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 
 
 import datetime
@@ -327,13 +327,14 @@ def main():
                            env=env,
                            iterations=args.irl_iterations,
                            on_server=args.on_server,
-                           regularizer=args.regularizer,
+                           l1regularizer=args.regularizer,
                            learning_rate=args.lr_irl,
                            seed=args.seed,
                            graft=False,
                            scale_svf=scale,
                            hidden_dims=args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
+                           enumerate_all=True,
                            save_folder=parent_dir)
 
     print("IRL method intialized.")
