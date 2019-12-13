@@ -1,9 +1,47 @@
 """ Define GCL family IRL methods. """
 import warnings
+from collections import namedtuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from neural_nets.base_network import BaseNN, BasePolicy
+
+Transition = namedtuple(
+    "Transition",
+    ["state", "action", "next_state", "done", "traj_end", "action_prob"],
+)
+Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
+
+
+def play(policy, env, max_steps):
+    """Plays using policy on environment for a maximum number of episodes.
+
+    :param policy: Policy to use to play.
+    :param env: Environment to play in.
+    :param max_episodes: Maximum number of steps to take.
+    :return: Buffer of standard transition named tuples.
+    """
+    buffer = []
+    done = False
+    state = env.reset()
+    ep_length = 0
+
+    while not (done or ep_length > max_steps):
+        state = torch.from_numpy(state)
+        action = policy.sample_action(state)
+        action = action.detach().cpu().numpy()
+        next_state, reward, done, _ = env.step(action)
+        ep_length += 1
+
+        if ep_length > max_steps:
+            buffer.append(
+                Transition(state, action, next_state, reward, not done)
+            )
+        else:
+            buffer.append(Transition(state, action, next_state, reward, done))
+
+    return buffer
 
 
 class BaseExpert:
@@ -29,7 +67,7 @@ class PolicyExpert(BaseExpert):
             num_trajs, max_episode_length
         )
 
-    def generate_expert_trajectories(self, num_trajs, max_episode_length=10000):
+    def generate_expert_trajectories(self, num_trajs, max_episode_length=1000):
         """Generate a state buffer of expert trajectories.
 
         :param num_trajs: Number of trajectories to generate.
@@ -87,8 +125,8 @@ class NaiveGCL:
 
     def __init__(self, rl_method, env, expert, reward_net=None):
         """Initialize a Naive version of GCL.
-        
-        :param rl_method: a class that does RL. 
+
+        :param rl_method: a class that does RL.
         :type rl_method: Extension of BaseRL class.
         :param env: Gym-like environment.
         :type env: anyting that supports reset(), step() like gym.
@@ -109,6 +147,10 @@ class NaiveGCL:
         # NNs
         if not reward_net:
             self.reward = RewardNetwork(state_length, 256)
+
+    def train_reward(self, num_trajs):
+        expert_trajs = self.expert.generate_expert_trajectories(num_trajs)
+        generator_trajs = self.rl
 
     def train(self):
         pass
