@@ -105,3 +105,11 @@ class BasePolicy(BaseNN):
         """
 
         return self.sample_action(state)
+
+    def action_log_probs(self, state):
+        """Returns action and action log_probability.
+
+        :param state: State to evaluate actions in.
+        """
+
+        raise NotImplementedError
