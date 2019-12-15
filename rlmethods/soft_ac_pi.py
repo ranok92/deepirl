@@ -202,6 +202,27 @@ class PolicyNetwork(BasePolicy):
 
         return dist
 
+    def action_log_probs(self, state):
+        """Generate an action based on state vector using current policy.
+
+        :param state: Current state vector. must be Torch 32 bit float tensor.
+        """
+        dist = self.action_distribution(state)
+        raw_action = dist.rsample()  # reparametrization trick
+
+        # enforcing action bounds
+        tanh_action = torch.tanh(raw_action)  # prevent recomputation later.
+        action = tanh_action * self.action_scale + self.action_bias
+
+        # change of variables for log prob
+        raw_log_prob = dist.log_prob(raw_action)
+        log_prob = raw_log_prob - torch.log(
+            self.action_scale * (1 - tanh_action.pow(2)) + FEPS
+        )
+        log_prob = log_prob.sum(1, keepdim=True)
+
+        return action, log_prob
+
 
 class SoftActorCritic(BaseRL):
     """Implementation of soft actor critic."""
@@ -468,10 +489,7 @@ class SoftActorCritic(BaseRL):
         self.play_i += 1
 
     def train(
-        self,
-        num_episodes,
-        max_episode_length,
-        rewardNetwork=None,
+        self, num_episodes, max_episode_length, rewardNetwork=None,
     ):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
