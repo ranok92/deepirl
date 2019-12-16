@@ -1,45 +1,68 @@
 """ Define GCL family IRL methods. """
 import warnings
 from collections import namedtuple
+import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import Adam
 from neural_nets.base_network import BaseNN, BasePolicy
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 Transition = namedtuple(
     "Transition",
-    ["state", "action", "next_state", "done", "traj_end", "action_prob"],
+    ["state", "action", "next_state", "done", "traj_end", "action_log_prob"],
 )
 Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
 
 
 def play(policy, env, max_steps):
-    """Plays using policy on environment for a maximum number of episodes.
+    """
+    Plays using policy on environment for a maximum number of episodes.
 
     :param policy: Policy to use to play.
     :param env: Environment to play in.
     :param max_episodes: Maximum number of steps to take.
     :return: Buffer of standard transition named tuples.
+
     """
+
     buffer = []
     done = False
     state = env.reset()
-    ep_length = 0
+    ep_length = 1
 
-    while not (done or ep_length > max_steps):
+    while ep_length <= max_steps:
+
         state = torch.from_numpy(state)
-        action = policy.sample_action(state)
-        action = action.detach().cpu().numpy()
-        next_state, reward, done, _ = env.step(action)
-        ep_length += 1
 
-        if ep_length > max_steps:
-            buffer.append(
-                Transition(state, action, next_state, reward, not done)
+        action, log_prob = policy.action_log_probs(state)
+        action = action.detach().cpu().numpy()
+
+        log_prob = log_prob.detach().cpu().numpy()
+
+        next_state, reward, done, _ = env.step(action)
+
+        max_steps_elapsed = ep_length > max_steps
+
+        buffer.append(
+            Transition(
+                state,
+                action,
+                next_state,
+                reward,
+                not done if max_steps_elapsed else done,
+                max_steps_elapsed,
+                log_prob,
             )
-        else:
-            buffer.append(Transition(state, action, next_state, reward, done))
+        )
+
+        if done:
+            break
+
+        ep_length += 1
 
     return buffer
 
@@ -78,21 +101,9 @@ class PolicyExpert(BaseExpert):
         :rtype: list of tuples.
         """
         buffer = []
-        for _ in range(num_trajs):
-            done = False
-            state = self.env.reset()
-            ep_length = 0
-            while not (done or ep_length > max_episode_length):
-                state = torch.from_numpy(state)
-                action = self.policy.sample_action(state)
-                action = action.detach().cpu().numpy()
-                next_state, reward, done, _ = self.env.step(action)
-                ep_length += 1
-
-                if ep_length > max_episode_length:
-                    buffer.append(state, action, next_state, reward, not done)
-                else:
-                    buffer.append(state, action, next_state, reward, done)
+        for _ in num_trajs:
+            traj_buffer = play(self.policy, self.env, max_episode_length)
+            buffer.extend(traj_buffer)
 
         return buffer
 
@@ -123,7 +134,15 @@ class NaiveGCL:
     """Implements 'Guided Cost Learning' but without using policy optimizer
     used by Finn. et. al"""
 
-    def __init__(self, rl_method, env, expert, reward_net=None):
+    def __init__(
+        self,
+        rl_method,
+        env,
+        expert_states,
+        expert_actions,
+        reward_net=None,
+        learning_rate=1e-4,
+    ):
         """Initialize a Naive version of GCL.
 
         :param rl_method: a class that does RL.
@@ -142,15 +161,29 @@ class NaiveGCL:
         state_length = initial_state.shape[0]
 
         # IRL related
-        self.expert = expert
+        assert (
+            expert_states.shape[0] == expert_actions.shape[0] + 1
+        ), "Missing final state."
+        extended_rewards = np.concat((expert_actions, np.zeros(1)), axis=0)
+        extended_rewards = extended_rewards.astype(float)
+
+        self.expert_sa = np.concat((expert_states, extended_rewards), axis=1)
+        self.expert_sa = torch.from_numpy(self.expert_sa).device(DEVICE)
 
         # NNs
         if not reward_net:
-            self.reward = RewardNetwork(state_length, 256)
+            self.reward_net = RewardNetwork(state_length, 256)
+        else:
+            self.reward_net = reward_net
 
-    def train_reward(self, num_trajs):
-        expert_trajs = self.expert.generate_expert_trajectories(num_trajs)
-        generator_trajs = self.rl
+        self.reward_optim = Adam(self.reward_net.params(), lr=learning_rate)
+
+    def train_reward_episode(self):
+        # run expert trajectories
+        expert_reward_means = self.reward_net(self.expert_sa).mean()
+
+    def generate_trajs(self, num_trajs):
+        pass
 
     def train(self):
         pass
