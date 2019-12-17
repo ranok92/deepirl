@@ -34,7 +34,6 @@ def main():
     soft_ac = SoftActorCritic(
         env,
         replay_buffer,
-        args.max_episode_length,
         feature_extractor,
         buffer_sample_size=args.replay_buffer_sample_size,
         tbx_writer = tbx_writer,
@@ -43,9 +42,10 @@ def main():
         entropy_tuning=True,
         entropy_target=args.entropy_target,
         render=args.render,
+        play_interval=args.play_interval,
     )
 
-    soft_ac.train(args.training_steps, args.play_interval, halt_at_end=args.halt_at_end)
+    soft_ac.train(args.training_steps, args.max_episode_length)
 
     soft_ac.policy.save("./pendulum_policies")
 
