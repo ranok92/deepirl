@@ -1,6 +1,8 @@
 """ Define GCL family IRL methods. """
 import warnings
 from collections import namedtuple
+import functools
+import operator
 import numpy as np
 
 import torch
@@ -13,12 +15,20 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 Transition = namedtuple(
     "Transition",
-    ["state", "action", "next_state", "done", "traj_end", "action_log_prob"],
+    [
+        "state",
+        "action",
+        "next_state",
+        "done",
+        "traj_end",
+        "action_log_prob",
+        "reward",
+    ],
 )
 Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
 
 
-def play(policy, env, max_steps):
+def play(policy, env, max_steps, reward_net=None):
     """
     Plays using policy on environment for a maximum number of episodes.
 
@@ -45,6 +55,9 @@ def play(policy, env, max_steps):
 
         next_state, reward, done, _ = env.step(action)
 
+        if reward_net:
+            reward = reward_net(state, action)
+
         max_steps_elapsed = ep_length > max_steps
 
         buffer.append(
@@ -56,6 +69,7 @@ def play(policy, env, max_steps):
                 not done if max_steps_elapsed else done,
                 max_steps_elapsed,
                 log_prob,
+                reward,
             )
         )
 
@@ -114,15 +128,16 @@ class PolicyExpert(BaseExpert):
 class RewardNetwork(BaseNN):
     """Simple 2 layer reward network."""
 
-    def __init__(self, state_length, hidden_width):
+    def __init__(self, state_length, action_length, hidden_width):
         super().__init__()
 
         # define layers of NN
-        self.linear1 = nn.Linear(state_length, hidden_width)
+        self.linear1 = nn.Linear(state_length + action_length, hidden_width)
         self.linear2 = nn.Linear(hidden_width, hidden_width)
         self.head = nn.Linear(hidden_width, 1)
 
-    def forward(self, state):
+    def forward(self, state, action):
+        x = torch.cat((state, action), dim=1)
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         x = F.relu(self.head(x))
@@ -159,31 +174,109 @@ class NaiveGCL:
         self.env = env
         initial_state = env.reset()
         state_length = initial_state.shape[0]
+        action_length = functools.reduce(
+            operator.mul, self.env.action_space.shape
+        )
 
         # IRL related
         assert (
             expert_states.shape[0] == expert_actions.shape[0] + 1
         ), "Missing final state."
-        extended_rewards = np.concat((expert_actions, np.zeros(1)), axis=0)
-        extended_rewards = extended_rewards.astype(float)
+        extended_actions = np.concat((expert_actions, np.zeros(1)), axis=0)
+        extended_actions = extended_actions.astype(float)
 
-        self.expert_sa = np.concat((expert_states, extended_rewards), axis=1)
-        self.expert_sa = torch.from_numpy(self.expert_sa).device(DEVICE)
+        self.expert_states = torch.from_numpy(expert_states).to(DEVICE)
+        self.expert_actions = torch.from_numpy(expert_actions).to(DEVICE)
 
         # NNs
         if not reward_net:
-            self.reward_net = RewardNetwork(state_length, 256)
+            self.reward_net = RewardNetwork(state_length, action_length, 256)
         else:
             self.reward_net = reward_net
 
         self.reward_optim = Adam(self.reward_net.params(), lr=learning_rate)
 
-    def train_reward_episode(self):
-        # run expert trajectories
-        expert_reward_means = self.reward_net(self.expert_sa).mean()
+    def train_reward_episode(self, num_sample_trajs, max_steps):
+        """
+        Trains the reward function for one episode.
 
-    def generate_trajs(self, num_trajs):
-        pass
+        :param num_sample_trajs: Number of trajectories to sample from policy.
+        :type num_sample_trajs: int
 
-    def train(self):
-        pass
+        """
+
+        # calculate expert loss
+        L_expert = -self.reward_net(
+            self.expert_states, self.expert_actions
+        ).mean()
+
+        # compute policy generator loss
+        L_pi = 0
+
+        # samples trajectories from policy
+        for _ in range(num_sample_trajs):
+            samples = self.generate_traj(max_steps)
+            trans_idx = {
+                label: idx for idx, label in enumerate(samples[0]._fields)
+            }
+            assert samples, "no transitions sampled!"
+            samples = list(map(list, zip(*samples)))
+
+            pi_states = torch.tensor(samples[trans_idx["state"]]).to(DEVICE)
+            pi_actions = torch.tensor(samples[trans_idx["action"]]).to(DEVICE)
+            pi_rewards = torch.tensor(samples[trans_idx["reward"]]).to(DEVICE)
+            pi_log_probs = torch.tensor(samples[trans_idx["log_prob"]]).to(
+                DEVICE
+            )
+
+            # compute importance sampling weight
+            is_weight = torch.exp(pi_rewards.sum() - pi_log_probs.sum())
+            is_weight = is_weight.detach()
+
+            rewards = self.reward_net(pi_states, pi_actions)
+            L_pi += is_weight * rewards.sum()
+
+        L_pi = L_pi.mean()
+
+        # backprop total loss
+        L_tot = L_expert + L_pi
+        self.reward_optim.zero_grad()
+        L_tot.backward()
+        self.reward_optim.step()
+
+    def train_policy_episode(self, num_episodes, max_episode_length):
+        self.rl.train(num_episodes, max_episode_length, self.reward_net)
+
+    def generate_traj(self, max_steps):
+        """Generate a trajectory from policy.
+        
+        :param max_steps: Max allowed steps to take in environment.
+        :type max_steps: int
+        :return: list of transition tuples
+        :rtype: list of tuples
+        """
+        return play(self.rl.policy, self.env, max_steps, self.reward_net)
+
+    def train_episode(
+        self, num_traj_per_episode, max_env_steps, num_policy_episodes
+    ):
+        # train reward
+        self.train_reward_episode(num_traj_per_episode, max_env_steps)
+
+        # train policy
+        self.train_policy_episode(num_policy_episodes, max_env_steps)
+
+    def train(
+        self,
+        num_episodes,
+        num_traj_per_episode,
+        max_env_steps,
+        policy_episodes_per_episode,
+    ):
+        for _ in range(num_episodes):
+            self.train_episode(
+                num_traj_per_episode,
+                max_env_steps,
+                policy_episodes_per_episode,
+            )
+
