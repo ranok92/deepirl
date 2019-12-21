@@ -1,10 +1,9 @@
+import sys, time # NOQA
 import pdb
 import os
-
 import argparse
 import matplotlib
 import numpy as np
-import sys, time # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
@@ -212,7 +211,7 @@ def main():
                             obs_width=obs_width,
                             step_size=step_size,
                             grid_size=grid_size,
-                            thresh1=10, thresh2=15)
+                            thresh1=18, thresh2=30)
 
 
     experiment_logger.log_header('Parameters of the feature extractor :')
@@ -235,8 +234,6 @@ def main():
         print('Specify expert trajectory folder.')
         exit()
 
-    #**set is_onehot to false
-    goal_state = np.asarray([1,5])
     '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=False,
                     rows =10,
@@ -256,7 +253,7 @@ def main():
                     width=grid_size,
                     subject=args.subject,
                     annotation_file=args.annotation_file,
-                    goal_state=goal_state, 
+                    goal_state=None, 
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
                     replace_subject=args.replace_subject,
