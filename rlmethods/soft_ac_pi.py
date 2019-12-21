@@ -25,6 +25,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FLOAT = torch.finfo(torch.float32).max
 FEPS = torch.finfo(torch.float32).eps
 
+NN_HIDDEN_WIDTH = 256
 
 def copy_params(source, target):
     """Copies parameters from source network to target network.
@@ -232,7 +233,7 @@ class SoftActorCritic(BaseRL):
         env,
         replay_buffer,
         feature_extractor,
-        buffer_sample_size=10 ** 4,
+        buffer_sample_size,
         gamma=0.99,
         learning_rate=3e-4,
         tbx_writer=None,
@@ -258,12 +259,16 @@ class SoftActorCritic(BaseRL):
 
         # NNs
         if not policy_net:
-            self.policy = PolicyNetwork(feature_size, env.action_space, 256)
+            self.policy = PolicyNetwork(
+                feature_size, env.action_space, NN_HIDDEN_WIDTH
+            )
         else:
             self.policy = policy_net
 
         if not q_net:
-            self.q_net = QNetwork(feature_size, env.action_space, 256)
+            self.q_net = QNetwork(
+                feature_size, env.action_space, NN_HIDDEN_WIDTH
+            )
         else:
             self.q_net = q_net
 
