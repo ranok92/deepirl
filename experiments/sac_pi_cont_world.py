@@ -14,11 +14,10 @@ parser.add_argument("replay_buffer_size", type=int)
 parser.add_argument("replay_buffer_sample_size", type=int)
 parser.add_argument("--log-alpha", type=float, default=-2.995)
 parser.add_argument("--entropy-target", type=float, default=0.008)
-parser.add_argument("--max-episode-length", type=int, default=10 ** 6)
+parser.add_argument("--max-episode-length", type=int, default=10 ** 4)
 parser.add_argument("--play-interval", type=int, default=1)
-parser.add_argument("--training-steps", type=int, default=10 ** 4)
+parser.add_argument("--rl-episodes", type=int, default=10 ** 4)
 parser.add_argument("--render", action="store_true")
-parser.add_argument("--halt-at-end", action="store_true")
 
 args = parser.parse_args()
 
@@ -44,9 +43,10 @@ def main():
         entropy_tuning=True,
         entropy_target=args.entropy_target,
         render=args.render,
+        play_interval=args.play_interval,
     )
 
-    soft_ac.train(args.training_steps, args.play_interval)
+    soft_ac.train(args.rl_episodes, args.max_episode_length)
 
     soft_ac.policy.save("./cont_world_policies")
 
