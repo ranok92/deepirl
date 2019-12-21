@@ -40,7 +40,11 @@ def main():
 
     replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
-    feature_extractor = DroneFeatureRisk_speed()
+    feature_extractor = DroneFeatureRisk_speed(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            thresh1=18, thresh2=30)
 
     env = GridWorldDrone(display=args.render, is_random=True,
                     rows=576, cols=720,
