@@ -222,10 +222,9 @@ class ActorCritic:
         else:
             self.save_folder = None
         
-        if self.plot_loss or self.save_folder:
-            self.loss_interval = min(10, self.log_interval)
-            self.loss_mean = []
-            self.loss = []
+        self.loss_interval = min(10, self.log_interval)
+        self.loss_mean = []
+        self.loss = []
 
 
 
@@ -279,7 +278,6 @@ class ActorCritic:
         reward_across_trajs = []
         frac_unknown_states_enc = []
         subject_list = None
-
         if self.env.replace_subject:
             subject_list = []
         
@@ -296,8 +294,9 @@ class ActorCritic:
 
                 if self.env.replace_subject:
                     subject_list.append(self.env.cur_ped)
-            states = [state]
             state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
+            states = [state]
+
             done = False
             t= 0
             unknown_state_counter = 0
@@ -483,7 +482,7 @@ class ActorCritic:
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
+                        #print('The action frequency array :', action_array)
 
                         if (running_reward/self.log_interval) > 0.9:
                             self.policy.save(self.save_folder+'/policy-models/')
@@ -528,7 +527,7 @@ class ActorCritic:
                     if self.termination is None:
                         print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
                             i_episode, t, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
+                        #print('The action frequency array :', action_array)
                         action_array = np.zeros(self.env.action_space.n)
                         running_reward_list.append(running_reward/self.log_interval)
 
@@ -635,7 +634,7 @@ class ActorCritic:
 
             #getting the file_name, counting the number of files that are already existing
             folder = self.save_folder + '/' + name_tuple[i] +'/'
-            print('The folder :', folder)
+            #print('The folder :', folder)
             pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
             plot_i = 0
             while os.path.exists(os.path.join(folder, '%s.jpg' % plot_i)):

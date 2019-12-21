@@ -14,7 +14,7 @@ import pygame
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector)
+    return vector / (np.linalg.norm(vector)+np.finfo(float).eps)
 
 
 
