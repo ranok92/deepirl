@@ -10,6 +10,7 @@ from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from envs.gridworld_drone import GridWorldDrone
 
 parser = ArgumentParser()
+
 parser.add_argument("replay_buffer_size", type=int)
 parser.add_argument("replay_buffer_sample_size", type=int)
 parser.add_argument("--log-alpha", type=float, default=-2.995)
@@ -19,9 +20,19 @@ parser.add_argument("--play-interval", type=int, default=1)
 parser.add_argument("--training-steps", type=int, default=10 ** 4)
 parser.add_argument("--render", action="store_true")
 parser.add_argument("--halt-at-end", action="store_true")
-
+parser.add_argument('--annotation-file', type=str, default=None, 
+                    help='The location of the annotation file to \
+                    be used to run the environment.')
+                    
+                    
 args = parser.parse_args()
 
+
+
+agent_width = 10
+step_size = 2
+obs_width = 10
+grid_size = 10
 
 def main():
 
@@ -31,7 +42,18 @@ def main():
 
     feature_extractor = DroneFeatureRisk_speed()
 
-    env = GridWorldDrone(continuous_action=True, display=args.render)
+    env = GridWorldDrone(display=args.render, is_random=True,
+                    rows=576, cols=720,
+                    agent_width=agent_width,
+                    step_size=step_size,
+                    obs_width=obs_width,
+                    width=grid_size,
+                    annotation_file=args.annotation_file,
+                    external_control=True,
+                    continuous_action=True,
+                    consider_heading=True,
+                    is_onehot=False)
+    
 
     soft_ac = SoftActorCritic(
         env,
