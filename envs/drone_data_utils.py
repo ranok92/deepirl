@@ -10,7 +10,7 @@ from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,Fr
 
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
-from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 from scipy.interpolate import splev, splprep
 
 
@@ -144,7 +144,7 @@ def preprocess_data_from_stanford_drone_dataset(annotation_file):
         for line in f:
             line_list = line.strip().split(' ')
 
-            with open(file_n,'a') as fnew:
+            with open(file_n, 'a') as fnew:
                 if line_list[6]!=str(1):
                     fnew.write("%s "%line_list[5]) #the frame number
                     fnew.write("%s "%line_list[0]) #the ped id
@@ -215,8 +215,8 @@ def extract_trajectory(annotation_file, feature_extractor,
     total_path_len = 0
 
     if show_states:
-            tick_speed=5
-            disp=True
+            tick_speed = 5
+            disp = True
             
     #initialize world
     world = GridWorldDrone(display=disp, is_onehot=False, 
@@ -264,12 +264,13 @@ def extract_trajectory(annotation_file, feature_extractor,
                 feature_extractor.overlay_bins(state)
 
             state = feature_extractor.extract_features(state)
+
             state = torch.tensor(state)
             trajectory_info.append(state)
 
             if trajectory_length_limit is not None:
 
-                if step_counter_segment%traj_seg_length==0:
+                if step_counter_segment%traj_seg_length == 0:
                     print('Segment {} final frame : {}'.format(segment_counter, world.current_frame))
                     path_len = cur_subject_final_frame - world.current_frame
                     traj_seg_length = min(trajectory_length_limit, path_len)
@@ -280,7 +281,7 @@ def extract_trajectory(annotation_file, feature_extractor,
                     world.state['goal_state'] = copy.deepcopy(world.goal_state) 
                     print('Trajectory length : ', len(trajectory_info))
                     state_tensors = torch.stack(trajectory_info)
-                    torch.save(state_tensors, os.path.join(folder_to_save,'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+                    torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
                     segment_counter += 1 
                     #pdb.set_trace()
                     step_counter_segment = 0 
@@ -294,6 +295,10 @@ def extract_trajectory(annotation_file, feature_extractor,
         if trajectory_length_limit is None:
             state_tensors = torch.stack(trajectory_info)
             torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_%s.states' % str(sub)))
+        
+    if feature_extractor.debug_mode:
+        feature_extractor.print_info()
+
 
     print('The average path length :', total_path_len/len(subject_list))
 
@@ -505,13 +510,13 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
 
-    feature_extractor = 'DroneFeatureRisk_speed_smooth_state/'
+    feature_extractor = 'Dronefeature_risk_hit/'
     to_save = 'traj_info/frame_skip_1/students003/'
     file_name = folder_name + dataset_name + file_n
 
@@ -521,8 +526,9 @@ if __name__=='__main__':
     step_size = 2
 
 
-    feature_extractor = DroneFeatureRisk_speed(thresh1=10, thresh2=15,
+    feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
                                                agent_width=10, obs_width=10,
+                                               debug=True,
                                                grid_size=10, step_size=step_size)
 
    
@@ -538,7 +544,7 @@ if __name__=='__main__':
                        folder_to_save, show_states=False,
                        display=False, trajectory_length_limit=None)
     
-    
+    '''
     #****************************************************
     #******** section to record trajectories
     '''
@@ -604,8 +610,8 @@ if __name__=='__main__':
 
     
     #******** section for preprocessing data ************
-    '''
-    file_name = '../envs/Another_spline_file.txt'
+    
+    file_name = './t-junction-3.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
     
@@ -613,7 +619,7 @@ if __name__=='__main__':
     
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
-    '''
+    
 
     #*****************************************************
     #********** getting information of the trajectories
