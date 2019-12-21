@@ -84,9 +84,12 @@ def play(policy, env, max_steps, reward_net=None):
 class BaseExpert:
     """Base class for expert trajectory generation/retrieval."""
 
-    def get_expert_trajectory(self):
-        """Returns num_trajs number of trajectories as a list of tuples when
-        called."""
+    def get_expert_states(self):
+        """Returns an numpy array of expert states."""
+        raise NotImplementedError
+
+    def get_expert_actions(self):
+        """Returns an numpy array of expert actions."""
         raise NotImplementedError
 
 
@@ -121,8 +124,13 @@ class PolicyExpert(BaseExpert):
 
         return buffer
 
-    def get_expert_trajectory(self):
-        return self.expert_trajs
+    def get_expert_states(self):
+        states = [transition.state for transition in self.expert_trajs]
+        return np.array(states)
+
+    def get_expert_actions(self):
+        actions = [transition.action for transition in self.expert_trajs]
+        return np.array(actions)
 
 
 class RewardNetwork(BaseNN):
@@ -249,7 +257,7 @@ class NaiveGCL:
 
     def generate_traj(self, max_steps):
         """Generate a trajectory from policy.
-        
+
         :param max_steps: Max allowed steps to take in environment.
         :type max_steps: int
         :return: list of transition tuples
