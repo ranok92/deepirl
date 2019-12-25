@@ -6,6 +6,7 @@ import sys
 import copy
 import operator
 import functools
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -16,8 +17,7 @@ import numpy as np
 from tensorboardX import SummaryWriter
 
 sys.path.insert(0, "..")
-from neural_nets.base_network import BaseNN  # NOQA
-from neural_nets.base_network import BasePolicy
+from neural_nets.base_network import BaseNN, BasePolicy, Checkpointer  # NOQA
 from rlmethods.base_rl import BaseRL
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -220,9 +220,11 @@ class SoftActorCritic(BaseRL):
         tau=0.005,
         log_alpha=-2.995,
         play_interval=1,
-        policy_net=None,
-        q_net=None,
         render=False,
+        checkpoint_path="./SAC_checkpoints/",
+        checkpointer=None,
+        checkpoint_interval=1000,
+        checkpoint_name="SAC",
     ):
         # env related settings
         self.env = env
@@ -235,22 +237,6 @@ class SoftActorCritic(BaseRL):
         self.replay_buffer = replay_buffer
         self.buffer_sample_size = buffer_sample_size
 
-        # NNs
-        if not policy_net:
-            self.policy = PolicyNetwork(feature_size, env.action_space, 256)
-        else:
-            self.policy = policy_net
-
-        if not q_net:
-            self.q_net = QNetwork(feature_size, env.action_space, 256)
-        else:
-            self.q_net = q_net
-
-        self.avg_q_net = copy.deepcopy(self.q_net)
-
-        # initialize weights of moving avg Q net
-        copy_params(self.q_net, self.avg_q_net)
-
         # set hyperparameters
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
@@ -259,15 +245,57 @@ class SoftActorCritic(BaseRL):
         self.tau = tau
         self.play_interval = play_interval
 
+        # NNs
+        if checkpointer:
+            self.checkpointer = checkpointer
+
+            try:
+                self.policy = checkpointer.models["policy"].model
+                self.policy_optim = checkpointer.models["policy"].optimizer
+
+                self.q_net = checkpointer.models["q_net"].model
+                self.q_optim = checkpointer.models["q_net"].optimizer
+
+                self.log_alpha = checkpointer.models["alpha"].model
+                self.alpha_optim = checkpointer.models["alpha"].optimizer
+
+            except KeyError:
+                import pdb;pdb.set_trace()
+                raise KeyError("Models not found in checkpointer!")
+
+        else:
+            self.policy = PolicyNetwork(feature_size, env.action_space, 256)
+            self.q_net = QNetwork(feature_size, env.action_space, 256)
+
+            # optimizers
+            self.policy_optim = Adam(
+                self.policy.parameters(), lr=learning_rate
+            )
+            self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
+            self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
+
+            # initialize checkpointer
+            self.checkpointer = Checkpointer(
+                checkpoint_path, checkpoint_interval, checkpoint_name
+            )
+
+            self.checkpointer.add_model(
+                "policy", self.policy, self.policy_optim
+            )
+            self.checkpointer.add_model("q_net", self.q_net, self.q_optim)
+            self.checkpointer.add_model(
+                "alpha", self.log_alpha, self.alpha_optim
+            )
+
+        # initialize weights of moving avg Q net
+        self.avg_q_net = copy.deepcopy(self.q_net)
+        copy_params(self.q_net, self.avg_q_net)
+
         # training meta
-        self.training_i = 0
+        self.training_i = self.checkpointer.checkpoint_counter
         self.play_i = 0
         self.entropy_tuning = entropy_tuning
 
-        # optimizers
-        self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate)
-        self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
-        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
         # tensorboardX settings
         if not tbx_writer:
@@ -410,6 +438,7 @@ class SoftActorCritic(BaseRL):
         )
 
         self.training_i += 1
+        self.checkpointer.increment_counter()
 
     def play(self, max_steps, render=False, rewardNetwork=None):
         """
@@ -468,10 +497,7 @@ class SoftActorCritic(BaseRL):
         self.play_i += 1
 
     def train(
-        self,
-        num_episodes,
-        max_episode_length,
-        rewardNetwork=None,
+        self, num_episodes, max_episode_length, rewardNetwork=None,
     ):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
