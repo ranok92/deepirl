@@ -19,10 +19,10 @@ Transition = namedtuple(
         "state",
         "action",
         "next_state",
+        "reward",
         "done",
         "traj_end",
         "action_log_prob",
-        "reward",
     ],
 )
 Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
@@ -41,15 +41,18 @@ def play(policy, env, max_steps, reward_net=None):
 
     buffer = []
     done = False
-    state = env.reset()
     ep_length = 1
 
+    state = env.reset()
+
     while ep_length <= max_steps:
+        torch_state = torch.from_numpy(state).to(torch.float).to(DEVICE)
+        torch_state = torch_state.unsqueeze(dim=0)
+        import pdb; pdb.set_trace()
 
-        state = torch.from_numpy(state)
-
-        action, log_prob = policy.action_log_probs(state)
+        action, log_prob = policy.action_log_probs(torch_state)
         action = action.detach().cpu().numpy()
+        action = action.reshape(env.action_space.shape)
 
         log_prob = log_prob.detach().cpu().numpy()
 
@@ -69,9 +72,10 @@ def play(policy, env, max_steps, reward_net=None):
                 not done if max_steps_elapsed else done,
                 max_steps_elapsed,
                 log_prob,
-                reward,
             )
         )
+
+        state = next_state
 
         if done:
             break
@@ -100,6 +104,7 @@ class PolicyExpert(BaseExpert):
         if not isinstance(policy, BasePolicy):
             warnings.warn("Given policy is not a BasePolicy instance.")
 
+        assert policy is not None, 'Policy is none!'
         self.policy = policy
         self.env = env
 
@@ -118,7 +123,7 @@ class PolicyExpert(BaseExpert):
         :rtype: list of tuples.
         """
         buffer = []
-        for _ in num_trajs:
+        for _ in range(num_trajs):
             traj_buffer = play(self.policy, self.env, max_episode_length)
             buffer.extend(traj_buffer)
 

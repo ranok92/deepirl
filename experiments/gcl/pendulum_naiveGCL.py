@@ -41,7 +41,7 @@ arg_parser.add_argument(
 arg_parser.add_argument(
     "--disable-entropy-tuning",
     action="store_false",
-    help="Enable entropy tuning for SAC.",
+    help="disable entropy tuning for SAC.",
 )
 
 arg_parser.add_argument(
@@ -116,15 +116,15 @@ def main():
     state_size = feature_extractor.extract_features(env.reset()).shape[0]
 
     # rl related
-    replay_buffer = ReplayBuffer(args.buffer_max_length)
+    replay_buffer = ReplayBuffer(args.replay_buffer_length)
 
     rl = SoftActorCritic(
         env,
         replay_buffer,
         feature_extractor,
-        args.buffer_sample_size,
+        args.replay_buffer_sample_size,
         entropy_target=args.entropy_target,
-        entropy_tuning=args.entropy_tuning,
+        entropy_tuning=args.disable_entropy_tuning,
         tau=args.tau,
         log_alpha=args.log_alpha,
         play_interval=args.play_interval,
@@ -135,7 +135,7 @@ def main():
     expert_policy = PolicyNetwork(
         state_size, env.action_space, NN_HIDDEN_WIDTH
     )
-    expert_policy = expert_policy.load("./pendulum_experts/pendulum_expert.pt")
+    expert_policy.load("../pendulum_policies/3.pt")
     expert = PolicyExpert(
         expert_policy, env, args.num_expert_trajs, args.max_env_steps
     )
