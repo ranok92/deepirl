@@ -244,6 +244,7 @@ class SoftActorCritic(BaseRL):
         self.entropy_target = entropy_target
         self.tau = tau
         self.play_interval = play_interval
+        self.lr = learning_rate
 
         # NNs
         if checkpointer:
@@ -440,7 +441,7 @@ class SoftActorCritic(BaseRL):
         self.training_i += 1
         self.checkpointer.increment_counter()
 
-    def play(self, max_steps, render=False, rewardNetwork=None):
+    def play(self, max_steps, render=False, reward_network=None):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
@@ -463,8 +464,8 @@ class SoftActorCritic(BaseRL):
 
             next_state, reward, done, _ = self.env_step(action)
 
-            if rewardNetwork:
-                reward = rewardNetwork(torch_state)
+            if reward_network:
+                reward = reward_network(torch_state)
                 reward = float(reward.cpu().detach().item())
 
             episode_length += 1
@@ -497,7 +498,7 @@ class SoftActorCritic(BaseRL):
         self.play_i += 1
 
     def train(
-        self, num_episodes, max_episode_length, rewardNetwork=None,
+        self, num_episodes, max_episode_length, reward_network=None,
     ):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
@@ -513,5 +514,5 @@ class SoftActorCritic(BaseRL):
                 self.play(
                     max_episode_length,
                     self.render,
-                    rewardNetwork=rewardNetwork,
+                    reward_network=reward_network,
                 )
