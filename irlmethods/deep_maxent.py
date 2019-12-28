@@ -94,7 +94,9 @@ class DeepMaxEnt():
             regularizer=0.1,
             learning_rate=1e-3,
             scale_svf=False,
-            seed=10, 
+            seed=10,
+            rl_max_ep_len=None,
+            rl_episodes=None,
             clipping_value=None,
             enumerate_all=False
     ):
@@ -104,7 +106,16 @@ class DeepMaxEnt():
         self.env = env
         self.max_episodes = iterations
         self.traj_path = traj_path
-        self.rl_max_episode_len = self.rl.max_episode_length
+        if rl_max_ep_len is None:
+            self.rl_max_episode_len = self.rl.max_episode_length
+        else:
+            self.rl_max_episode_len = rl_max_ep_len
+        
+        if rl_episodes is None:
+            self.rl_episodes = self.rl.max_episodes
+        else:
+            self.rl_episodes = rl_episodes
+
         self.graft = graft
 
     # TODO: These functions are replaced in the rl method already, this
@@ -594,8 +605,9 @@ class DeepMaxEnt():
             #np.random.seed(7)
             print('Starting RL training. . .')
             current_agent_policy = self.rl.train(
+                self.rl_episodes,
+                self.rl_max_episode_len,
                 reward_network=self.reward,
-                irl=True
             )
             print('Completed RL training.')
             #np.random.seed(11)
