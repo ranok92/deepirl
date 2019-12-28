@@ -412,7 +412,7 @@ class ActorCritic:
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
 
-    def train(self, reward_network=None, irl=False):
+    def train(self, max_episodes=None, max_episode_length=None, reward_network=None):
         """Train actor critic method on given gym environment."""
         #along with the policy, the train now returns the loss and the 
         #rewards obtained in the form of a list
@@ -420,6 +420,14 @@ class ActorCritic:
         running_reward_list =[]
         action_array = np.zeros(self.env.action_space.n)
         plt.figure('Loss')
+        if max_episode_length is None:
+            max_episode_length = self.max_episode_length
+        
+
+        if max_episodes is None:
+            max_episodes = self.max_episodes
+
+            
         for i_episode in count(1):
 
             if self.feature_extractor is not None:
@@ -436,7 +444,7 @@ class ActorCritic:
             # ep_reward = self.max_episode_length
             ep_reward = 0
 
-            for t in range(self.max_episode_length):  # Don't infinite loop while learning
+            for t in range(max_episode_length):  # Don't infinite loop while learning
 
                 action = self.policy.sample_action(state)
                 action_array[action] += 1
@@ -476,85 +484,44 @@ class ActorCritic:
             self.finish_episode()
 
             # if not in an IRL setting, solve environment according to specs
-            if not irl:
 
-                if i_episode >= 10 and i_episode % self.log_interval == 0:
-                    
-                    if self.termination is None:
-                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
-
-                        if (running_reward/self.log_interval) > 0.9:
-                            self.policy.save(self.save_folder+'/policy-models/')
-                        
-                        running_reward_list.append(running_reward/self.log_interval)
-                        running_reward = 0
-                        action_array = np.zeros(self.env.action_space.n)
-                        if self.plot_loss:
-
-                            plt.plot(self.loss)
-                            plt.draw()
-                            plt.pause(.0001)
-
-                    else:
-                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f} \
-                            \tLoss diff :{:.4f}'.format(
-                            i_episode, t, running_reward, 
-                            self.termination.current_avg_loss))
+            if i_episode >= 10 and i_episode % self.log_interval == 0:
                 
+                if self.termination is None:
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
+                        i_episode, t, running_reward/self.log_interval))
+                    print('The action frequency array :', action_array)
+                    running_reward_list.append(running_reward/self.log_interval)
+                    running_reward = 0
+                    action_array = np.zeros(self.env.action_space.n)
+                else:
+                    print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f} \
+                        \tLoss diff :{:.4f}'.format(
+                        i_episode, t, running_reward, 
+                        self.termination.current_avg_loss))
 
-                '''
-                commenting the break by 'solving' for now
-                if running_reward > self.env.spec.reward_threshold:
-                    print("Solved! Running reward is now {} and "
-                          "the last episode runs to {} time \
-                          steps!".format(running_reward, t))
-                    break
-                '''
-                # terminate if max episodes exceeded
-                if i_episode > self.max_episodes and self.max_episodes > 0:
+                if self.plot_loss:
 
-                    break
+                    plt.plot(self.loss)
+                    plt.draw()
+                    plt.pause(.0001)
+            
 
-                if self.termination is not None and self.termination.check_termination():
-                    break
+            '''
+            commenting the break by 'solving' for now
+            if running_reward > self.env.spec.reward_threshold:
+                print("Solved! Running reward is now {} and "
+                        "the last episode runs to {} time \
+                        steps!".format(running_reward, t))
+                break
+            '''
+            # terminate if max episodes exceeded
+            if i_episode > max_episodes and max_episodes > 0:
 
-            else:
-                assert self.max_episodes > 0
+                break
 
-                if i_episode >= 10 and  i_episode % self.log_interval == 0:
-
-                    if self.termination is None:
-                        print('Ep {}\tLast length: {:5d}\tAvg. reward: {:.2f}'.format(
-                            i_episode, t, running_reward/self.log_interval))
-                        print('The action frequency array :', action_array)
-                        action_array = np.zeros(self.env.action_space.n)
-                        running_reward_list.append(running_reward/self.log_interval)
-
-                        running_reward = 0
-
-                    else:
-                        print(self.termination)
-                        print('Ep {}\tLast length: {:5d}\
-                            \tAvg. reward: {:.2f} \
-                            \tLoss diff :{:.4f}'.format(
-                            i_episode, t, running_reward, 
-                            self.termination.current_avg_loss))
-
-                    if self.plot_loss:
-                            plt.plot(self.loss)
-                            plt.draw()
-                            plt.pause(.0001)
-
-                # terminate if max episodes exceeded
-                if i_episode > self.max_episodes:
-                    break
-
-                #terminate based on loss
-                if self.termination is not None:
-                    if self.termination.check_termination():
-                        break
+            if self.termination is not None and self.termination.check_termination():
+                break
 
         loss_list = self.loss
         self.loss = []
