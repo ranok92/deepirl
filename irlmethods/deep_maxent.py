@@ -604,11 +604,13 @@ class DeepMaxEnt():
             #torch.manual_seed(7)
             #np.random.seed(7)
             print('Starting RL training. . .')
-            current_agent_policy = self.rl.train(
+            self.rl.train(
                 self.rl_episodes,
                 self.rl_max_episode_len,
                 reward_network=self.reward,
             )
+
+            current_agent_policy = self.rl.policy
             print('Completed RL training.')
             #np.random.seed(11)
             print('Starting sampling agent-svf. . .')
@@ -712,7 +714,7 @@ class DeepMaxEnt():
             print('done')
 
             if len(prev_state_list) > 0 and len(prev_nn_reward_list) >0:
-
+                
                 cur_reward_list = self.get_rewards_of_states(self.reward, prev_state_list)
                 irlUtils.save_bar_plot(prev_nn_reward_list,cur_reward_list, 
                                    prev_diff, i, self.plot_save_folder)

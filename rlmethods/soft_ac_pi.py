@@ -190,7 +190,7 @@ class PolicyNetwork(BasePolicy):
         means, _ = self.__call__(state)
         action = self.action_scale * means + self.action_bias
 
-        return action
+        return action.detach().cpu().numpy()
 
     def action_distribution(self, state):
         """Returns a pytorch distribution object based on policy output.

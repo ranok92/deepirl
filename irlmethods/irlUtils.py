@@ -927,7 +927,7 @@ def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
                 break
     return state_list , diff_list
 
-def save_bar_plot(self, list1, list2, diff_list, iteration, save_folder):
+def save_bar_plot(list1, list2, diff_list, iteration, save_folder):
 
     #torch to numpy
     list1 = list1.cpu().detach().numpy().squeeze()
