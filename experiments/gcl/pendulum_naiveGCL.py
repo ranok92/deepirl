@@ -77,7 +77,7 @@ arg_parser.add_argument(
 arg_parser.add_argument(
     "--num-expert-trajs",
     type=int,
-    default=1000,
+    default=50,
     help="Number of expert trajectories from policy expert.",
 )
 
@@ -91,14 +91,14 @@ arg_parser.add_argument(
 arg_parser.add_argument(
     "--irl-traj-per-ep",
     type=int,
-    default=1000,
+    default=10,
     help="Number of policy trajectory samples per irl episode.",
 )
 
 arg_parser.add_argument(
     "--irl-num-policy-updates",
     type=int,
-    default=1000,
+    default=10,
     help="Number of policy training iterations inside inner IRL loop.",
 )
 
@@ -151,6 +151,8 @@ def main():
         args.max_env_steps,
         args.irl_num_policy_updates,
     )
+
+    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
