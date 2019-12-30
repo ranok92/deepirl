@@ -454,14 +454,19 @@ class SoftActorCritic(BaseRL):
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE).unsqueeze(0)
 
-            action, _, _ = self.policy.sample(torch_state)
-            action = action.detach().cpu().numpy()
+            torch_action, _, _ = self.policy.sample(torch_state)
+            action = torch_action.detach().cpu().numpy()
             action = action.reshape(self.env.action_space.shape)
 
             next_state, reward, done, _ = self.env_step(action)
 
             if rewardNetwork:
-                reward = rewardNetwork(torch_state)
+                # reward networks can be either r(s) or r(s,a)
+                try:
+                    reward = rewardNetwork(torch_state, torch_action)
+                except TypeError:
+                    reward = rewardNetwork(torch_state)
+
                 reward = float(reward.cpu().detach().item())
 
             episode_length += 1
