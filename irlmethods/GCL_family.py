@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from neural_nets.base_network import BaseNN, BasePolicy
+from tensorboardX import SummaryWriter
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -48,18 +49,23 @@ def play(policy, env, max_steps, reward_net=None):
     while ep_length <= max_steps:
         torch_state = torch.from_numpy(state).to(torch.float).to(DEVICE)
         torch_state = torch_state.unsqueeze(dim=0)
-        import pdb; pdb.set_trace()
 
         action, log_prob = policy.action_log_probs(torch_state)
         action = action.detach().cpu().numpy()
         action = action.reshape(env.action_space.shape)
+
+        torch_action = torch.from_numpy(action).to(torch.float).to(DEVICE)
+        torch_action = torch_action.unsqueeze(dim=0)
 
         log_prob = log_prob.detach().cpu().numpy()
 
         next_state, reward, done, _ = env.step(action)
 
         if reward_net:
-            reward = reward_net(state, action)
+            try:
+                reward = reward_net(torch_state, torch_action)
+            except TypeError:
+                reward = reward_net(torch_state)
 
         max_steps_elapsed = ep_length > max_steps
 
@@ -85,6 +91,15 @@ def play(policy, env, max_steps, reward_net=None):
     return buffer
 
 
+def bulk_torch_convert(tensors, torch_type):
+    out = []
+
+    for tensor in tensors:
+        out.append(tensor.to(torch_type))
+
+    return tuple(out)
+
+
 class BaseExpert:
     """Base class for expert trajectory generation/retrieval."""
 
@@ -104,7 +119,7 @@ class PolicyExpert(BaseExpert):
         if not isinstance(policy, BasePolicy):
             warnings.warn("Given policy is not a BasePolicy instance.")
 
-        assert policy is not None, 'Policy is none!'
+        assert policy is not None, "Policy is none!"
         self.policy = policy
         self.env = env
 
@@ -149,9 +164,11 @@ class RewardNetwork(BaseNN):
         self.linear2 = nn.Linear(hidden_width, hidden_width)
         self.head = nn.Linear(hidden_width, 1)
 
+        self.to(DEVICE)
+
     def forward(self, state, action):
         x = torch.cat((state, action), dim=1)
-        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = F.relu(self.head(x))
 
@@ -192,14 +209,24 @@ class NaiveGCL:
         )
 
         # IRL related
-        assert (
-            expert_states.shape[0] == expert_actions.shape[0] + 1
-        ), "Missing final state."
-        extended_actions = np.concat((expert_actions, np.zeros(1)), axis=0)
-        extended_actions = extended_actions.astype(float)
+        assert expert_states.shape[0] == expert_actions.shape[0]
 
-        self.expert_states = torch.from_numpy(expert_states).to(DEVICE)
-        self.expert_actions = torch.from_numpy(expert_actions).to(DEVICE)
+        padded_states = np.concatenate(
+            (expert_states, expert_states[np.newaxis, -1]), axis=0
+        )
+
+        # pad actions with zero action
+        zero_action = expert_actions[np.newaxis, -1]
+        zero_action.fill(0.0)
+
+        padded_actions = np.concatenate((expert_actions, zero_action), axis=0)
+
+        self.expert_states = (
+            torch.from_numpy(padded_states).to(torch.float).to(DEVICE)
+        )
+        self.expert_actions = (
+            torch.from_numpy(padded_actions).to(torch.float).to(DEVICE)
+        )
 
         # NNs
         if not reward_net:
@@ -207,7 +234,14 @@ class NaiveGCL:
         else:
             self.reward_net = reward_net
 
-        self.reward_optim = Adam(self.reward_net.params(), lr=learning_rate)
+        self.reward_optim = Adam(
+            self.reward_net.parameters(), lr=learning_rate
+        )
+
+        # tensorboard related
+        tbx_path = './runs/irl'
+        tbx_comment = 'irl_naive_gcl'
+        self.tbx_writer=SummaryWriter(comment=tbx_comment, log_dir=tbx_path)
 
     def train_reward_episode(self, num_sample_trajs, max_steps):
         """
@@ -238,16 +272,25 @@ class NaiveGCL:
             pi_states = torch.tensor(samples[trans_idx["state"]]).to(DEVICE)
             pi_actions = torch.tensor(samples[trans_idx["action"]]).to(DEVICE)
             pi_rewards = torch.tensor(samples[trans_idx["reward"]]).to(DEVICE)
-            pi_log_probs = torch.tensor(samples[trans_idx["log_prob"]]).to(
-                DEVICE
+            pi_log_probs = torch.tensor(
+                samples[trans_idx["action_log_prob"]]
+            ).to(DEVICE)
+
+            (
+                pi_states,
+                pi_actions,
+                pi_rewards,
+                pi_log_probs,
+            ) = bulk_torch_convert(
+                (pi_states, pi_actions, pi_rewards, pi_log_probs), torch.float
             )
 
             # compute importance sampling weight
             is_weight = torch.exp(pi_rewards.sum() - pi_log_probs.sum())
             is_weight = is_weight.detach()
-
             rewards = self.reward_net(pi_states, pi_actions)
-            L_pi += is_weight * rewards.sum()
+            # L_pi += is_weight * rewards.sum()
+            L_pi += rewards.sum()
 
         L_pi = L_pi.mean()
 
@@ -256,6 +299,11 @@ class NaiveGCL:
         self.reward_optim.zero_grad()
         L_tot.backward()
         self.reward_optim.step()
+
+        # log errors
+        self.tbx_writer.add_scalar('Expert loss', L_expert)
+        self.tbx_writer.add_scalar('traj generator loss', L_pi)
+        self.tbx_writer.add_scalar('total_errro', L_tot)
 
     def train_policy_episode(self, num_episodes, max_episode_length):
         self.rl.train(num_episodes, max_episode_length, self.reward_net)
