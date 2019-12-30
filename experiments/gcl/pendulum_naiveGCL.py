@@ -14,6 +14,7 @@ from rlmethods.soft_ac_pi import (
 )
 from rlmethods.rlutils import ReplayBuffer
 from featureExtractor.gym_feature_extractor import IdentityFeatureExtractor
+from tensorboardX import SummaryWriter
 
 arg_parser = ArgumentParser()
 
@@ -108,6 +109,11 @@ args = arg_parser.parse_args()
 def main():
     """ Run the experiment. """
 
+    # TensorboardX
+    tbx_writer = SummaryWriter(comment="pendulum_naive_gcl_")
+
+    tbx_writer.add_hparams(vars(args), {})
+
     # env related
     env = gym.make("Pendulum-v0")
 
@@ -128,6 +134,7 @@ def main():
         tau=args.tau,
         log_alpha=args.log_alpha,
         play_interval=args.play_interval,
+        tbx_writer=tbx_writer,
     )
 
     # irl related
@@ -135,7 +142,7 @@ def main():
     expert_policy = PolicyNetwork(
         state_size, env.action_space, NN_HIDDEN_WIDTH
     )
-    expert_policy.load("../pendulum_policies/3.pt")
+    expert_policy.load("../pendulum_policies/5.pt")
     expert = PolicyExpert(
         expert_policy, env, args.num_expert_trajs, args.max_env_steps
     )
@@ -143,7 +150,9 @@ def main():
     expert_states = expert.get_expert_states()
     expert_actions = expert.get_expert_actions()
 
-    irl = NaiveGCL(rl, env, expert_states, expert_actions)
+    irl = NaiveGCL(
+        rl, env, expert_states, expert_actions, tbx_writer=tbx_writer
+    )
 
     irl.train(
         args.irl_episodes,
@@ -152,7 +161,9 @@ def main():
         args.irl_num_policy_updates,
     )
 
-    import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()
 
 
 if __name__ == "__main__":

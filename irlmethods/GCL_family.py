@@ -186,7 +186,8 @@ class NaiveGCL:
         expert_states,
         expert_actions,
         reward_net=None,
-        learning_rate=1e-4,
+        learning_rate=1e-3,
+        tbx_writer=None,
     ):
         """Initialize a Naive version of GCL.
 
@@ -239,9 +240,14 @@ class NaiveGCL:
         )
 
         # tensorboard related
-        tbx_path = './runs/irl'
-        tbx_comment = 'irl_naive_gcl'
-        self.tbx_writer=SummaryWriter(comment=tbx_comment, log_dir=tbx_path)
+        if tbx_writer:
+            self.tbx_writer = tbx_writer
+        else:
+            tbx_comment = "irl_naive_gcl_only"
+            self.tbx_writer = SummaryWriter(comment=tbx_comment)
+
+        # learning meta
+        self.irl_epoch = 0
 
     def train_reward_episode(self, num_sample_trajs, max_steps):
         """
@@ -253,9 +259,8 @@ class NaiveGCL:
         """
 
         # calculate expert loss
-        L_expert = -self.reward_net(
-            self.expert_states, self.expert_actions
-        ).mean()
+        L_expert = self.reward_net(self.expert_states, self.expert_actions)
+        L_expert = -L_expert.mean()
 
         # compute policy generator loss
         L_pi = 0
@@ -301,9 +306,13 @@ class NaiveGCL:
         self.reward_optim.step()
 
         # log errors
-        self.tbx_writer.add_scalar('Expert loss', L_expert)
-        self.tbx_writer.add_scalar('traj generator loss', L_pi)
-        self.tbx_writer.add_scalar('total_errro', L_tot)
+        self.tbx_writer.add_scalar("irl/Expert loss", L_expert, self.irl_epoch)
+        self.tbx_writer.add_scalar(
+            "irl/traj generator loss", L_pi, self.irl_epoch
+        )
+        self.tbx_writer.add_scalar("irl/total error", L_tot, self.irl_epoch)
+
+        self.irl_epoch += 1
 
     def train_policy_episode(self, num_episodes, max_episode_length):
         self.rl.train(num_episodes, max_episode_length, self.reward_net)
