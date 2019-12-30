@@ -135,6 +135,7 @@ def main():
         log_alpha=args.log_alpha,
         play_interval=args.play_interval,
         tbx_writer=tbx_writer,
+        learning_rate=1e-5,
     )
 
     # irl related
@@ -151,7 +152,12 @@ def main():
     expert_actions = expert.get_expert_actions()
 
     irl = NaiveGCL(
-        rl, env, expert_states, expert_actions, tbx_writer=tbx_writer
+        rl,
+        env,
+        expert_states,
+        expert_actions,
+        tbx_writer=tbx_writer,
+        learning_rate=1e-5,
     )
 
     irl.train(

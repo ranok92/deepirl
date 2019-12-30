@@ -260,7 +260,7 @@ class NaiveGCL:
 
         # calculate expert loss
         L_expert = self.reward_net(self.expert_states, self.expert_actions)
-        L_expert = -L_expert.mean()
+        L_expert = L_expert.mean()
 
         # compute policy generator loss
         L_pi = 0
@@ -293,14 +293,23 @@ class NaiveGCL:
             # compute importance sampling weight
             is_weight = torch.exp(pi_rewards.sum() - pi_log_probs.sum())
             is_weight = is_weight.detach()
+            max_weight = torch.tensor([1e6]).to(DEVICE)
+            is_weight = torch.min(max_weight, is_weight)
             rewards = self.reward_net(pi_states, pi_actions)
-            # L_pi += is_weight * rewards.sum()
-            L_pi += rewards.sum()
+            L_pi += is_weight * rewards.sum()
+
+            self.tbx_writer.add_scalar(
+                "irl/is_weight",
+                is_weight,
+                num_sample_trajs * (self.irl_epoch - 1) + num_sample_trajs,
+            )
 
         L_pi = L_pi.mean()
 
         # backprop total loss
-        L_tot = L_expert + L_pi
+        L_tot = L_expert - L_pi
+        L_tot = -L_tot # maximize objective
+
         self.reward_optim.zero_grad()
         L_tot.backward()
         self.reward_optim.step()
