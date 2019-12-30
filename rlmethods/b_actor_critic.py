@@ -358,6 +358,14 @@ class ActorCritic:
             
         return reward_across_trajs, frac_unknown_states_enc, subject_list
 
+    def reset_training(self):
+        """
+        Resets the optimizers for the RL 
+        """
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+
+
+
     def finish_episode(self):
         """Takes care of calculating gradients, updating weights, and resetting
         required variables and histories used in the training cycle one an

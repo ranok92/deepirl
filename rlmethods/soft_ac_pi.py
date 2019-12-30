@@ -341,6 +341,22 @@ class SoftActorCritic(BaseRL):
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
+
+    def reset_training(self):
+        """
+        Resets the optimizers used in the training
+        """
+        self.policy_optim = Adam(
+                self.policy.parameters(), lr=self.lr
+            )
+        self.q_optim = Adam(self.q_net.parameters(), lr=self.lr)
+
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
+
+
+
+
+
     def train_episode(self, max_episode_length):
         """Train Soft Actor Critic"""
 

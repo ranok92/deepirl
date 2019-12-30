@@ -414,9 +414,9 @@ class DeepMaxEnt():
             file_name = self.plot_save_folder+name_tuple[i]+str(iteration)+'.jpg'
             plt.savefig(file_name)
 
-
+    ''' #reset training is now functions within the RL method
     def resetTraining(self, inp_size, out_size, hidden_dims, graft=True):
-        '''
+        
         if graft:
             newNN = Policy(inp_size, out_size, 
                            hidden_dims=hidden_dims,
@@ -431,15 +431,15 @@ class DeepMaxEnt():
         self.rl.policy = newNN
         #print('the rewards of the new policy :')
         #print(self.rl.policy.rewards)
-        '''
+        
         self.rl.optimizer = optim.Adam(self.rl.policy.parameters(), lr=self.rl.lr)
-
+    '''
     #############################################################################
     #############################################################################
     #******************Following are a bunch of debugging methods****************
     '''does not contribute to the main workings of the algorithm '''
     
-    def extract_svf_difference(self,svf_dict, svf_array):
+    def extract_svf_difference(self, svf_dict, svf_array):
         #here the dict is converted to array and the difference is taken
         #diff = array - dict
         svf_diff = []
@@ -594,8 +594,7 @@ class DeepMaxEnt():
 
             # current_agent_policy = self.rl.policy
 
-            self.resetTraining(self.state_size, self.action_size, self.hidden_dims, graft=self.graft)
-
+            self.rl.reset_training()
             #save the reward network
 
             pathlib.Path(self.reward_network_save_folder).mkdir(parents=True, exist_ok=True)
