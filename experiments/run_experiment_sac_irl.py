@@ -328,6 +328,7 @@ def main():
                            rl_max_ep_len=args.max_episode_length,
                            hidden_dims=args.reward_net_hidden_dims,
                            clipping_value=args.clipping_value,
+                           enumerate_all=True,
                            save_folder=parent_dir)
 
     print("IRL method intialized.")
