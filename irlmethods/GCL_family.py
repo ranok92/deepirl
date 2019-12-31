@@ -5,12 +5,12 @@ import functools
 import operator
 import numpy as np
 
+from tensorboardX import SummaryWriter
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from neural_nets.base_network import BaseNN, BasePolicy
-from tensorboardX import SummaryWriter
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -92,6 +92,14 @@ def play(policy, env, max_steps, reward_net=None):
 
 
 def bulk_torch_convert(tensors, torch_type):
+    """
+    Bulk convert list of tensors to desired torch type.
+
+    :param tensors: Iterable of tensors.
+    :param torch_type: torch type to convert tensors to.
+    :return: tuple of converted tensors, in the order iterated over.
+    :rtype: tuple of torch tensors.
+    """
     out = []
 
     for tensor in tensors:
@@ -352,10 +360,21 @@ class NaiveGCL:
         max_env_steps,
         policy_episodes_per_episode,
     ):
+        """
+        Train agent and reward.
+
+        :param num_episodes: number of episodes to train for.
+        :type num_episodes: int
+        :param num_traj_per_episode: number of trajectories sampled from
+        policy for training each episode.
+        :param max_env_steps: Max number of environment steps the RL agent is
+        allowed to take.
+        :param policy_episodes_per_episode: Number of times policy is trained
+        per times reward is trained.
+        """
         for _ in range(num_episodes):
             self.train_episode(
                 num_traj_per_episode,
                 max_env_steps,
                 policy_episodes_per_episode,
             )
-
