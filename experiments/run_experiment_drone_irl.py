@@ -320,7 +320,6 @@ def main():
         scale = args.scale_svf
     irl_method = DeepMaxEnt(trajectory_path,
                            rlmethod=rl_method,
-                           max_episode_length=args.rl_ep_length,
                            env=env,
                            iterations=args.irl_iterations,
                            on_server=args.on_server,

@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 
 
 import datetime
@@ -218,6 +218,14 @@ def main():
                             thresh1=10, thresh2=15)
 
 
+    if args.feat_extractor == 'DroneFeatureRisk_speedv2':
+
+        feat_ext = DroneFeatureRisk_speedv2(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            thresh1=18, thresh2=30)
+
 
     experiment_logger.log_header('Parameters of the feature extractor :')
     experiment_logger.log_info(feat_ext.__dict__)
@@ -294,6 +302,7 @@ def main():
                                 log_alpha=args.log_alpha,
                                 entropy_target=args.entropy_target,
                                 render=args.render,
+                                checkpoint_interval=100000000,
                                 play_interval=args.play_interval,
                                 )
 
@@ -320,7 +329,7 @@ def main():
                            env=env,
                            iterations=args.irl_iterations,
                            on_server=args.on_server,
-                           regularizer=args.regularizer,
+                           l1regularizer=args.regularizer,
                            learning_rate=args.lr_irl,
                            seed=args.seed,
                            graft=False,
