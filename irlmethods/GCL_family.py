@@ -316,7 +316,7 @@ class NaiveGCL:
 
         # backprop total loss
         L_tot = L_expert - L_pi
-        L_tot = -L_tot # maximize objective
+        L_tot = -L_tot  # maximize objective
 
         self.reward_optim.zero_grad()
         L_tot.backward()
@@ -328,8 +328,6 @@ class NaiveGCL:
             "irl/traj generator loss", L_pi, self.irl_epoch
         )
         self.tbx_writer.add_scalar("irl/total error", L_tot, self.irl_epoch)
-
-        self.irl_epoch += 1
 
     def train_policy_episode(self, num_episodes, max_episode_length):
         self.rl.train(num_episodes, max_episode_length, self.reward_net)
@@ -352,6 +350,8 @@ class NaiveGCL:
 
         # train policy
         self.train_policy_episode(num_policy_episodes, max_env_steps)
+
+        self.irl_epoch += 1
 
     def train(
         self,
@@ -378,3 +378,101 @@ class NaiveGCL:
                 max_env_steps,
                 policy_episodes_per_episode,
             )
+
+
+class NaiveAIRL(NaiveGCL):
+    def __init__(
+        self,
+        rl_method,
+        env,
+        expert_states,
+        expert_actions,
+        reward_net=None,
+        learning_rate=1e-3,
+        tbx_writer=None,
+    ):
+
+        super().__init__(
+            rl_method,
+            env,
+            expert_states,
+            expert_actions,
+            reward_net=reward_net,
+            learning_rate=learning_rate,
+            tbx_writer=tbx_writer,
+        )
+
+    def train_reward_episode(self, num_sample_trajs, max_steps):
+        """
+        Trains the reward function for one episode.
+
+        :param num_sample_trajs: Number of trajectories to sample from policy.
+        :type num_sample_trajs: int
+
+        """
+
+        # calculate expert loss
+        L_expert = self.reward_net(self.expert_states, self.expert_actions)
+        L_expert = L_expert.mean()
+
+        # compute policy generator loss
+        L_pi = 0
+
+        # samples trajectories from policy
+        for traj_counter in range(num_sample_trajs):
+            samples = self.generate_traj(max_steps)
+            trans_idx = {
+                label: idx for idx, label in enumerate(samples[0]._fields)
+            }
+            assert samples, "no transitions sampled!"
+            samples = list(map(list, zip(*samples)))
+
+            pi_states = torch.tensor(samples[trans_idx["state"]]).to(DEVICE)
+            pi_actions = torch.tensor(samples[trans_idx["action"]]).to(DEVICE)
+            pi_rewards = torch.tensor(samples[trans_idx["reward"]]).to(DEVICE)
+            pi_log_probs = torch.tensor(
+                samples[trans_idx["action_log_prob"]]
+            ).to(DEVICE)
+
+            (
+                pi_states,
+                pi_actions,
+                pi_rewards,
+                pi_log_probs,
+            ) = bulk_torch_convert(
+                (pi_states, pi_actions, pi_rewards, pi_log_probs), torch.float
+            )
+
+            # compute importance sampling weight
+            is_weight = torch.exp(pi_rewards - pi_log_probs)
+            is_weight = is_weight.detach()
+
+            rewards = self.reward_net(pi_states, pi_actions)
+            L_pi += (is_weight * rewards).sum()
+
+            # log every is_weight seperately
+            self.tbx_writer.add_histogram(
+                "irl/is_weight",
+                is_weight,
+                self.irl_epoch * num_sample_trajs + traj_counter,
+                bins="auto",
+            )
+
+            print(self.irl_epoch * num_sample_trajs + traj_counter)
+
+        L_pi = (1.0 / num_sample_trajs) * L_pi.mean()
+
+        # backprop total loss
+        L_tot = L_expert - L_pi
+        L_tot = -L_tot  # maximize objective
+
+        self.reward_optim.zero_grad()
+        L_tot.backward()
+        self.reward_optim.step()
+
+        # log errors
+        self.tbx_writer.add_scalar("irl/Expert loss", L_expert, self.irl_epoch)
+        self.tbx_writer.add_scalar(
+            "irl/traj generator loss", L_pi, self.irl_epoch
+        )
+        self.tbx_writer.add_scalar("irl/total error", L_tot, self.irl_epoch)
