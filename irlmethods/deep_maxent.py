@@ -48,7 +48,7 @@ class RewardNet(BaseNN):
             nn.ELU(),
         )
         self.hidden_layers = []
-        for i in range(1,len(hidden_dims)):
+        for i in range(1, len(hidden_dims)):
             self.hidden_layers.append(nn.Sequential(
                                                     nn.Linear(hidden_dims[i-1], hidden_dims[i]),
                                                     nn.ELU(),
@@ -91,12 +91,13 @@ class DeepMaxEnt():
             save_folder=None,
             graft=True,
             hidden_dims=[128],
-            regularizer=0.1,
+            l1regularizer=0.1,
             learning_rate=1e-3,
             scale_svf=False,
             seed=10,
             rl_max_ep_len=None,
             rl_episodes=None,
+
             clipping_value=None,
             enumerate_all=False
     ):
@@ -144,9 +145,9 @@ class DeepMaxEnt():
         self.hidden_dims = hidden_dims
 
         self.learning_rate = learning_rate
-        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0.01, lr=self.learning_rate)
+        self.optimizer = optim.SGD(self.reward.parameters(), weight_decay=0, lr=self.learning_rate)
 
-        self.lr_scheduler = StepLR(self.optimizer, step_size=4, gamma=0.9)
+        self.lr_scheduler = StepLR(self.optimizer, step_size=2, gamma=0.9)
 
         self.EPS = np.finfo(np.float32).eps.item()
 
@@ -159,26 +160,26 @@ class DeepMaxEnt():
         #making it run on server
         self.on_server = on_server
 
-        self.regularizer = regularizer
+        self.l1regularizer = l1regularizer
         #folders for saving purposes
 
-        self.save_folder_tf = save_folder+'-reg-'+str(self.regularizer)+\
+        self.save_folder_tf = save_folder+'-reg-'+str(self.l1regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/tf_logs/'
 
-        self.plot_save_folder = save_folder+'-reg-'+str(self.regularizer)+\
+        self.plot_save_folder = save_folder+'-reg-'+str(self.l1regularizer)+\
                                 '-seed-'+str(self.seed)+'-lr-'+str(learning_rate)+'/plots/'
 
         self.reward_network_save_folder = save_folder+'-reg-'+\
-                                          str(self.regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
+                                          str(self.l1regularizer)+'-seed-'+str(self.seed)+'-lr-'+\
                                           str(learning_rate)+'/saved-models-rewards/'
 
-        self.policy_network_save_folder = save_folder+'-reg-'+str(self.regularizer)+'-seed-'+\
+        self.policy_network_save_folder = save_folder+'-reg-'+str(self.l1regularizer)+'-seed-'+\
                                           str(self.seed)+'-lr-'+str(learning_rate)+'/saved-models/'
     
         if os.path.exists(self.plot_save_folder):
             pass
         else:
-            print(self.plot_save_folder)
+            #print(self.plot_save_folder)
             os.makedirs(self.plot_save_folder)
 
 
@@ -225,12 +226,13 @@ class DeepMaxEnt():
     ##################################################################################
     def expert_svf_dict(self, max_time_steps,
                         feature_extractor, 
-                        smoothing_window=None,
+                        smoothing=False,
                         gamma=1):
         
         return irlUtils.calculate_expert_svf(self.traj_path, 
                                              max_time_steps=max_time_steps,
                                              feature_extractor=feature_extractor,
+                                             smoothing=smoothing,
                                              gamma=gamma)
         '''
         return irlUtils.calculate_expert_svf_with_smoothing(self.traj_path, 
@@ -239,7 +241,7 @@ class DeepMaxEnt():
         
         '''
     def agent_svf_sampling_dict(self, num_of_samples=10000 , env=None,
-                                policy_nn=None, reward_nn=None, smoothing_window=None, 
+                                policy_nn=None, reward_nn=None, smoothing=False, 
                                 scale_svf=True, episode_length=20, gamma=0.99,
                                 feature_extractor=None, enumerate_all=False):
 
@@ -249,6 +251,7 @@ class DeepMaxEnt():
                                             reward_nn=reward_nn, scale_svf=scale_svf,
                                             episode_length=episode_length,
                                             gamma=gamma,
+                                            smoothing=smoothing,
                                             feature_extractor=feature_extractor,
                                             enumerate_all=enumerate_all)
         '''
@@ -275,7 +278,7 @@ class DeepMaxEnt():
         dot_prod = torch.dot(stateRewards.squeeze(), freq_diff.squeeze())
 
         #adding L1 regularization
-        lambda1 = self.regularizer
+        lambda1 = self.l1regularizer
         l1_reg = torch.tensor(0, dtype=torch.float).to(self.device)
         grad_mag = torch.tensor(0, dtype=torch.float).to(self.device)
 
@@ -283,7 +286,7 @@ class DeepMaxEnt():
             l1_reg += torch.norm(param, 1)
 
         #adding back the regularizer term
-        loss = dot_prod
+        loss = dot_prod + lambda1*l1_reg
         
 
         loss.backward()
@@ -520,7 +523,7 @@ class DeepMaxEnt():
         return svf_diff_list
 
 
-    def array_to_state_dict(self,narray):
+    def array_to_state_dict(self, narray):
 
         narray = np.squeeze(narray)
         state_dict = {}
@@ -555,7 +558,7 @@ class DeepMaxEnt():
         expert_policy = Policy(self.state_size,self.action_size)
         expert_policy.to(self.device)
         expert_policy.load('./saved-models/g5_5_o1_2.pt')
-        expertdemo_svf = self.calc_svf_absolute( expert_policy, 
+        expertdemo_svf = self.calc_svf_absolute( expert_policy,
                                          rows=self.env.rows,
                                          cols=self.env.cols,
                                          goalState = self.env.goal_state,
@@ -564,14 +567,12 @@ class DeepMaxEnt():
         '''
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
-
-        #smoothing_window = np.asarray([[0,.1,0],[.1,.6,.1],[0,.1,0]])
         print('Reading expert-svf . . ')
         prev_nn_reward_list = []
         prev_state_list = []
-        expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
+        expertdemo_svf = self.expert_svf_dict(self.max_episode_len,
                                               self.rl.feature_extractor,
-                                              smoothing_window=None, 
+                                              smoothing=True,
                                               gamma=1)
         print('Done reading expert-svf.')
 
@@ -620,8 +621,8 @@ class DeepMaxEnt():
                                                              gamma=1,
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
-                                                             episode_length=self.rl_max_episode_len,
-                                                             smoothing_window=None,
+                                                             episode_length=self.max_episode_len,
+                                                             smoothing=True,
                                                              enumerate_all=self.enumerate_all)
 
             model_performance_list.append(true_reward)
@@ -644,7 +645,6 @@ class DeepMaxEnt():
             
             #policy_network_folder = './saved-models/'+'loc_glob_win_3_smooth_test_rectified_svf_dict_sub_30-reg'+str(self.regularizer)+'-seed'+str(self.env.seed)+'/'
             pathlib.Path(self.policy_network_save_folder).mkdir(parents=True, exist_ok=True)
-            print(self.policy_network_save_folder)
             current_agent_policy.save(self.policy_network_save_folder)
             
             #diff_freq = expert - current_agent
@@ -707,8 +707,8 @@ class DeepMaxEnt():
             self.optimizer.step()
 
             self.lr_scheduler.step()
-            print("The current learning rate after itertaion : {} is {}".format(i, 
-                                                            self.lr_scheduler.get_lr()))
+            #print("The current learning rate after itertaion : {} is {}".format(i, 
+            #                                                self.lr_scheduler.get_lr()))
 
             print('done')
 

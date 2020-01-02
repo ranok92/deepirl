@@ -469,7 +469,7 @@ class GridWorldDrone(GridWorld):
                             (self.agent_width/2), self.agent_width, self.agent_width])
 
             if self.show_orientation:
-                mag = 10 * self.agent_state['speed']
+                mag = 10 + 10 * self.agent_state['speed']
 
                 if self.agent_state['orientation'] is not None: 
                         pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
@@ -515,6 +515,7 @@ class GridWorldDrone(GridWorld):
                     if not self.continuous_action:
                         action_orient = int(action%len(self.orientation_array))
                         action_speed = int(action/len(self.orientation_array))
+                        #print(action_speed, "   ", action)
                         orient_change = self.orientation_array[action_orient]
                         speed_change = self.speed_array[action_speed]
                     else:
@@ -887,7 +888,7 @@ class GridWorldDrone(GridWorld):
             #pdb.set_trace()
             return int(speed_action)*len(self.orientation_array) + int(orient_action)
 
-        return (len(self.orientation_array)-1)/2 + (0*len(self.orientation_array))
+        return None
 
     '''
     def return_position(self, ped_id, frame_id):

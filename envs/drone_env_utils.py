@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 import matplotlib.pyplot as plt
 import pdb
 
@@ -33,7 +33,7 @@ class InformationCollector():
     run_info = A string that contains the name/type of agent whose information
     is being collected by the collector
     
-    plot_info - plot the information 
+    plot_info - plot the information
     disp_info - display the information in the terminal
     store_info - store the information in a csv file.
 
@@ -43,7 +43,6 @@ class InformationCollector():
                  plot_info=False,
                  store_info=False,
                  disp_info=True,
-                 save_folder=None,
                  thresh=30):
 
 
@@ -57,7 +56,7 @@ class InformationCollector():
         self.display_info = disp_info
         
         #information that changes per frame
-        self.closest_obs_cur_frame = None 
+        self.closest_obs_cur_frame = None
         self.prev_agent_pos = None
 
         #information that changes per trajectory
@@ -83,6 +82,36 @@ class InformationCollector():
         self.avg_pedestrians_along_pf = []
 
         self.feature_extractor = None
+
+        self.min_dist_list = []
+        self.obs_nearby_list = []
+        self.obs_against_list = []
+        self.obs_along_list = []
+
+
+        self.information_tuple_plot = [('Displacement to steps ratio', self.disp_to_steps_ratio),
+                                  ('Min avg distance from obstacle', self.min_avg_dist_from_obs_across_runs),
+                                  ('Total pedestrians going against agent per run', self.total_pedestrians_against),
+                                  ('Total pedestrians going along agent per run', self.total_pedestrians_along),
+                                  ('Total pedestrians nearby', self.total_pedestrians_nearby),
+                                  ('Avg pedestrians going against agent per frame', self.avg_pedestrians_against_pf),
+                                  ('Avg pedestrians going along agent per frame', self.avg_pedestrians_along_pf),
+                                  ('Avg pedestrians nearby', self.avg_pedestrians_nearby_pf)
+                                  ]
+
+        self.information_tuple_display = [('Displacement to steps ratio', self.disp_to_steps_ratio),
+                                          ('Min avg distance from obstacle', self.min_avg_dist_from_obs_across_runs),
+                                          ('Total pedestrians going against agent per run', self.total_pedestrians_against),
+                                          ('Total pedestrians going along agent per run', self.total_pedestrians_along),
+                                          ('Total pedestrians nearby', self.total_pedestrians_nearby),
+                                          ('Avg pedestrians going against agent per frame', self.avg_pedestrians_against_pf),
+                                          ('Avg pedestrians going along agent per frame', self.avg_pedestrians_along_pf),
+                                          ('Avg pedestrians nearby', self.avg_pedestrians_nearby_pf)
+                                          ]
+
+        self.avg_obs_nearby = 0
+
+
         print('Information collector initalized')
 
 
@@ -127,7 +156,7 @@ class InformationCollector():
         self.avg_steps_against_other_obs = 0
         self.avg_steps_with_other_obs = 0
         self.traj_len = 0
-        self.prev_agent_pos = self.agent_start_position 
+        self.prev_agent_pos = self.agent_start_position
 
 
     def collect_information_per_frame(self, state):
@@ -186,6 +215,7 @@ class InformationCollector():
         self.obs_along_list.append(with_counter)
         self.obs_against_list.append(against_counter)
         self.prev_agent_pos = state['agent_state']['position']
+
 
     def collab_end_traj_results(self):
         '''

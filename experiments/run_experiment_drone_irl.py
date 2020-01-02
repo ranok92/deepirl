@@ -1,10 +1,9 @@
+import sys, time # NOQA
 import pdb
 import os
-
 import argparse
 import matplotlib
 import numpy as np
-import sys, time # NOQA
 sys.path.insert(0, '..')  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
@@ -12,7 +11,7 @@ import utils
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.gridworld_featureExtractor import FrontBackSide,LocalGlobal,OneHot,SocialNav,FrontBackSideSimple
-from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
+from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 
 
 import datetime
@@ -206,6 +205,13 @@ def main():
                             grid_size=grid_size,
                             thresh1=10, thresh2=15)
 
+    if args.feat_extractor == 'DroneFeatureRisk_speedv2':
+
+        feat_ext = DroneFeatureRisk_speedv2(agent_width=agent_width,
+                            obs_width=obs_width,
+                            step_size=step_size,
+                            grid_size=grid_size,
+                            thresh1=18, thresh2=30)
 
 
     experiment_logger.log_header('Parameters of the feature extractor :')
@@ -228,8 +234,6 @@ def main():
         print('Specify expert trajectory folder.')
         exit()
 
-    #**set is_onehot to false
-    goal_state = np.asarray([1,5])
     '''
     env = GridWorld(display=args.render, is_onehot= False,is_random=False,
                     rows =10,
@@ -249,7 +253,7 @@ def main():
                     width=grid_size,
                     subject=args.subject,
                     annotation_file=args.annotation_file,
-                    goal_state=goal_state, 
+                    goal_state=None, 
                     step_wrapper=utils.step_wrapper,
                     seed=args.seed,
                     replace_subject=args.replace_subject,
@@ -282,16 +286,16 @@ def main():
                                 max_episodes = args.rl_episodes)
 
     if args.rl_method == 'SAC':
-
+        if not env.continuous_action:
+            print('The action space needs to be continuous for SAC to work.')
+            exit()
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
         rl_method = SoftActorCritic(env, replay_buffer,
-                                    args.rl_ep_length,
                                     feat_ext,
-                                    max_episodes=100,
                                     play_interval=500,
                                     learning_rate=args.lr_rl,
-                                   buffer_sample_size=args.replay_buffer_sample_size)
+                                    buffer_sample_size=args.replay_buffer_sample_size)
 
 
 
@@ -314,12 +318,13 @@ def main():
     
     if args.scale_svf:
         scale = args.scale_svf
-    irl_method = DeepMaxEnt(trajectory_path, 
-                           rlmethod=rl_method, 
+    irl_method = DeepMaxEnt(trajectory_path,
+                           rlmethod=rl_method,
+                           max_episode_length=args.rl_ep_length,
                            env=env,
                            iterations=args.irl_iterations,
                            on_server=args.on_server,
-                           regularizer=args.regularizer,
+                           l1regularizer=args.regularizer,
                            learning_rate=args.lr_irl,
                            seed=args.seed,
                            graft=False,
