@@ -287,7 +287,7 @@ class NaiveGCL:
             pi_rewards = torch.tensor(samples[trans_idx["reward"]]).to(DEVICE)
             pi_log_probs = torch.tensor(
                 samples[trans_idx["action_log_prob"]]
-            ).to(DEVICE)
+            ).to(DEVICE).flatten()
 
             (
                 pi_states,
@@ -432,7 +432,7 @@ class NaiveAIRL(NaiveGCL):
             pi_rewards = torch.tensor(samples[trans_idx["reward"]]).to(DEVICE)
             pi_log_probs = torch.tensor(
                 samples[trans_idx["action_log_prob"]]
-            ).to(DEVICE)
+            ).to(DEVICE).flatten()
 
             (
                 pi_states,
@@ -455,10 +455,7 @@ class NaiveAIRL(NaiveGCL):
                 "irl/is_weight",
                 is_weight,
                 self.irl_epoch * num_sample_trajs + traj_counter,
-                bins="auto",
             )
-
-            print(self.irl_epoch * num_sample_trajs + traj_counter)
 
         L_pi = (1.0 / num_sample_trajs) * L_pi.mean()
 
