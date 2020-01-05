@@ -178,7 +178,7 @@ class RewardNetwork(BaseNN):
         x = torch.cat((state, action), dim=1)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
-        x = F.relu(self.head(x))
+        x = self.head(x)
 
         return x
 
@@ -220,22 +220,11 @@ class NaiveGCL:
         # IRL related
         assert expert_states.shape[0] == expert_actions.shape[0]
 
-        padded_states = np.concatenate(
-            (expert_states, expert_states[np.newaxis, -1]), axis=0
-        )
+        self.expert_states = torch.from_numpy(expert_states)
+        self.expert_states = self.expert_states.to(torch.float).to(DEVICE)
 
-        # pad actions with zero action
-        zero_action = expert_actions[np.newaxis, -1]
-        zero_action.fill(0.0)
-
-        padded_actions = np.concatenate((expert_actions, zero_action), axis=0)
-
-        self.expert_states = (
-            torch.from_numpy(padded_states).to(torch.float).to(DEVICE)
-        )
-        self.expert_actions = (
-            torch.from_numpy(padded_actions).to(torch.float).to(DEVICE)
-        )
+        self.expert_actions = torch.from_numpy(expert_actions)
+        self.expert_actions = self.expert_actions.to(torch.float).to(DEVICE)
 
         # NNs
         if not reward_net:
@@ -244,7 +233,7 @@ class NaiveGCL:
             self.reward_net = reward_net
 
         self.reward_optim = Adam(
-            self.reward_net.parameters(), lr=learning_rate
+            self.reward_net.parameters(), lr=learning_rate, weight_decay=1e-3
         )
 
         # tensorboard related
@@ -448,7 +437,7 @@ class NaiveAIRL(NaiveGCL):
             is_weight = is_weight.detach()
 
             rewards = self.reward_net(pi_states, pi_actions)
-            L_pi += (is_weight * rewards).sum()
+            L_pi += (is_weight * rewards.flatten()).sum()
 
             # log every is_weight seperately
             self.tbx_writer.add_histogram(
@@ -457,7 +446,7 @@ class NaiveAIRL(NaiveGCL):
                 self.irl_epoch * num_sample_trajs + traj_counter,
             )
 
-        L_pi = (1.0 / num_sample_trajs) * L_pi.mean()
+        L_pi /= num_sample_trajs
 
         # backprop total loss
         L_tot = L_expert - L_pi
