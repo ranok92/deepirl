@@ -513,19 +513,30 @@ if __name__=='__main__':
     '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
+    
+    #the annotation file to be used to run and extract expert demonstrations
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
+    #name of the folder to save the extracted results
+    feature_extractor_name = 'Dronefeature_risk_hit/'
 
-    feature_extractor = 'Dronefeature_risk_hit/'
+    #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
+    
+    #complete path to the annotation file for the environment
     file_name = folder_name + dataset_name + file_n
 
-    folder_to_save = folder_name + dataset_name + to_save + feature_extractor
+    #complete path to the folder to save the extracted expert
+    #demonstrations
+    folder_to_save = folder_name + dataset_name + to_save + feature_extractor_name
     
+
+    #parameters for the feature extractors 
     grid_size=agent_width=obs_width = 10
     step_size = 2
 
-
+    
+    #initialize the feature extractor
     feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
                                                agent_width=10, obs_width=10,
                                                debug=True,
