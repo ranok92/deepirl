@@ -8,27 +8,17 @@ from scipy.ndimage.filters import convolve1d as convolve
 import os
 import copy
 import pygame
+from numba import njit, jit
 
 ##################################################
 # *********** feature extracting functions********#
 
 
-def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
-    return vector / (np.linalg.norm(vector) + np.finfo(float).eps)
-
-
+@njit
 def angle_between(v1, v2):
-    """ Returns the angle in radians between vectors 'v1' and 'v2'"""
-    normalized_dot = np.dot(v1, v2) / np.linalg.norm(v1) / np.linalg.norm(v2)
-    clipped_dot = (
-        -1
-        if normalized_dot < -1
-        else 1
-        if normalized_dot > 1
-        else normalized_dot
-    )
-    return np.arccos(clipped_dot)
+    v1_conv = v1.astype(np.dtype('float'))
+    v2_conv = v2.astype(np.dtype('float'))
+    return np.abs(np.arctan2(np.linalg.det(np.stack((v1_conv,v2_conv))), np.dot(v1_conv,v2_conv)))
 
 
 def deg_to_rad(deg):
@@ -463,6 +453,7 @@ class DroneFeatureSAM1:
 
         return 0
 
+    @jit(nopython=False)
     def populate_orientation_bin(
         self, agent_orientation_val, agent_state, obs_state_list
     ):
