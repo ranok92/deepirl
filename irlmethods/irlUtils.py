@@ -344,7 +344,6 @@ def calculate_expert_svf(traj_path, max_time_steps=30,
         return collections.OrderedDict(sorted(svf.items()))
 
 
-
 def smooth_svf(svf_dictionary, feature_extractor):
     '''
     takes in a svf dictionary of the format {'state_hash':freqency} and
@@ -368,6 +367,7 @@ def smooth_svf(svf_dictionary, feature_extractor):
         #array to store the weights of all the visited states
         #wrt to the current state
         weighing = np.zeros(len(svf_dictionary.keys()))
+        import pdb; pdb.set_trace()
         for j in range(weighing.shape[0]):
             weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
         
