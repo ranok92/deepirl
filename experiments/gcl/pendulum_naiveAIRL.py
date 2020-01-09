@@ -143,7 +143,7 @@ def main():
     expert_policy = PolicyNetwork(
         state_size, env.action_space, NN_HIDDEN_WIDTH
     )
-    expert_policy.load("../pendulum_policies/5.pt")
+    expert_policy.load("../pendulum_policies/pendulum_expert.pt")
     expert = PolicyExpert(
         expert_policy, env, args.num_expert_trajs, args.max_env_steps
     )
