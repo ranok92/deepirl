@@ -638,7 +638,26 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
     #print(rewards)
     #print(rewards_true)
     if smoothing:
-        return smooth_svf(collections.OrderedDict(sorted(master_dict.items())), feature_extractor), np.mean(rewards_true), np.mean(rewards)
+
+        sorted_svf_dict = collections.OrderedDict(sorted(master_dict.items()))
+        state_numpy = np.array([feature_extractor.recover_state_from_hash_value(hash_value)
+                            for hash_value in sorted_svf_dict.keys()])
+        
+        smooth_state_array = np.zeros(state_numpy.shape)
+        for i in range(state_numpy.shape[0]):
+            smooth_state_array[i] = feature_extractor.smooth_state(state_numpy[i])
+
+        visitation_array = np.array([sorted_svf_dict[key] for key in sorted_svf_dict.keys()])
+        state_numpy_bool = state_numpy.astype(bool)
+        key_array = np.asarray([key for key in sorted_svf_dict.keys()])
+        smoothed_state_counts = smooth_svf(state_numpy, visitation_array, smooth_state_array)
+        
+        counter = 0
+        for key in sorted_svf_dict.keys():
+            sorted_svf_dict[key] = smoothed_state_counts[counter]
+            counter += 1
+        return sorted_svf_dict, np.mean(rewards_true), np.mean(rewards)
+
 
     else:
         return collections.OrderedDict(sorted(master_dict.items())), np.mean(rewards_true), np.mean(rewards)
