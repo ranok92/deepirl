@@ -11,7 +11,7 @@ from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
 from featureExtractor.gridworld_featureExtractor import OneHot,LocalGlobal,SocialNav,FrontBackSideSimple
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk_speed
-
+from numba import njit, jit
 from utils import reset_wrapper, step_wrapper
 from rlmethods.b_actor_critic import Policy
 from rlmethods.b_actor_critic import ActorCritic
@@ -339,40 +339,66 @@ def calculate_expert_svf(traj_path, max_time_steps=30,
         svf[state] /= total_trajectories
 
     if smoothing:
-        return smooth_svf(collections.OrderedDict(sorted(svf.items())), feature_extractor)
+        
+        sorted_svf_dict = collections.OrderedDict(sorted(svf.items()))
+        state_numpy = np.array([feature_extractor.recover_state_from_hash_value(hash_value)
+                            for hash_value in sorted_svf_dict.keys()])
+        
+        smooth_state_array = np.zeros(state_numpy.shape)
+        for i in range(state_numpy.shape[0]):
+            smooth_state_array[i] = feature_extractor.smooth_state(state_numpy[i])
+
+        visitation_array = np.array([sorted_svf_dict[key] for key in sorted_svf_dict.keys()])
+        state_numpy_bool = state_numpy.astype(bool)
+        key_array = np.asarray([key for key in sorted_svf_dict.keys()])
+        smoothed_state_counts = smooth_svf(state_numpy, visitation_array, smooth_state_array)
+        
+        counter = 0
+        for key in sorted_svf_dict.keys():
+            sorted_svf_dict[key] = smoothed_state_counts[counter]
+            counter += 1
+        return sorted_svf_dict
+        
     else:
-        return collections.OrderedDict(sorted(svf.items()))
+        return collections.OrderedDict(svisitation_arrayorted(svf.items()))
 
 
-
-def smooth_svf(svf_dictionary, feature_extractor):
+@njit
+def smooth_svf(state_numpy, visitation_array, smooth_state_array):
     '''
     takes in a svf dictionary of the format {'state_hash':freqency} and
     the feature extractor corresponding to the state and returns a 
     smoothened version of the state visitation frequency in the form of 
     another dictionary of the same format {'state_hash': frequency}
     '''
-    state_numpy = np.asarray([feature_extractor.recover_state_from_hash_value(hash_value)
-                            for hash_value in svf_dictionary.keys()])
+    #state_numpy = np.array([feature_extractor.recover_state_from_hash_value(hash_value)
+    #                        for hash_value in svf_dictionary.keys()])
 
-    visitation_array = np.asarray([svf_dictionary[key] for key in svf_dictionary.keys()])
-    state_numpy_bool = state_numpy.astype(bool)
-    smoothed_state_counts = np.zeros(visitation_array.shape)
+    #visitation_array = np.asarray([svf_dictionary[key] for key in svf_dictionary.keys()])
+    #state_numpy_bool = state_numpy.astype(bool)
+    smoothed_state_counts = np.zeros((visitation_array.shape[0]))
     #iterate through each of the states in the svf dictionary
-
+    smooth_state = np.zeros(state_numpy.shape[1])
 
     for i in range(state_numpy.shape[0]):
         cur_state = state_numpy[i]
         #get the smoothened value
-        smooth_state = feature_extractor.smooth_state(cur_state)
+        smooth_state = smooth_state_array[i]
         #array to store the weights of all the visited states
         #wrt to the current state
-        weighing = np.zeros(len(svf_dictionary.keys()))
+        #weighing = np.zeros(len(svf_dictionary.keys()))
+        weighing = np.zeros(visitation_array.shape[0])
         for j in range(weighing.shape[0]):
-            weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
+
+            element_mult = np.multiply(smooth_state, state_numpy[j, :])
+            non_zero_indices = np.nonzero(element_mult)[0]
+            non_zero_elements = element_mult.take(non_zero_indices)
+            weighing[j] = np.prod(non_zero_elements)
+            #weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
         
         #normalize the weights to be 1
-        weighing = weighing/sum(weighing)
+        total_weight = np.sum(weighing)
+        weighing = weighing/total_weight
         weighted_svf = weighing * visitation_array[i]
         smoothed_state_counts += weighted_svf
 
@@ -387,18 +413,7 @@ def smooth_svf(svf_dictionary, feature_extractor):
         #pdb.set_trace()
         #******************************
         '''
-
-    counter = 0
-    for key in svf_dictionary.keys():
-
-        svf_dictionary[key] = smoothed_state_counts[counter]
-        counter += 1
-    svf_sum = 0
-    for key in svf_dictionary.keys():
-        svf_sum += svf_dictionary[key]
-    
-
-    return svf_dictionary
+    return smoothed_state_counts
 
 
 
