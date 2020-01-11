@@ -360,7 +360,7 @@ def calculate_expert_svf(traj_path, max_time_steps=30,
         return sorted_svf_dict
         
     else:
-        return collections.OrderedDict(svisitation_arrayorted(svf.items()))
+        return collections.OrderedDict(sorted(svf.items()))
 
 
 @njit
