@@ -572,7 +572,7 @@ class DeepMaxEnt():
         prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
                                               self.rl.feature_extractor,
-                                              smoothing=True,
+                                              smoothing=False,
                                               gamma=1)
         print('Done reading expert-svf.')
 
@@ -622,7 +622,7 @@ class DeepMaxEnt():
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episode_len,
-                                                             smoothing=True,
+                                                             smoothing=False,
                                                              enumerate_all=self.enumerate_all)
 
             model_performance_list.append(true_reward)
