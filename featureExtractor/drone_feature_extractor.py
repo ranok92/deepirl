@@ -16,9 +16,14 @@ from numba import njit, jit
 
 @njit
 def angle_between(v1, v2):
-    v1_conv = v1.astype(np.dtype('float'))
-    v2_conv = v2.astype(np.dtype('float'))
-    return np.abs(np.arctan2(np.linalg.det(np.stack((v1_conv,v2_conv))), np.dot(v1_conv,v2_conv)))
+    v1_conv = v1.astype(np.dtype("float"))
+    v2_conv = v2.astype(np.dtype("float"))
+    return np.abs(
+        np.arctan2(
+            np.linalg.det(np.stack((v1_conv, v2_conv))),
+            np.dot(v1_conv, v2_conv),
+        )
+    )
 
 
 def deg_to_rad(deg):
@@ -459,8 +464,9 @@ class DroneFeatureSAM1:
 
         for obs_state in obs_state_list:
 
-            distance = np.linalg.norm(
-                obs_state["position"] - agent_state["position"]
+            distance = math.sqrt(
+                (obs_state["position"][0] - agent_state["position"][0]) ** 2
+                + (obs_state["position"][1] - agent_state["position"][1]) ** 2
             )
             # pdb.set_trace()
             if obs_state["orientation"] is not None:
