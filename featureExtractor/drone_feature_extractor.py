@@ -420,24 +420,11 @@ class DroneFeatureSAM1:
 
     def recover_state_from_hash_value(self, hash_value):
 
-        size = self.state_rep_size
-        state_val = np.zeros(size)
-        i = 0
-        while hash_value > 0:
-            state_val[i] = int(hash_value) % 2
-            hash_value = math.floor((hash_value) // 2)
-            i += 1
-
-        return state_val
+        return np.frombuffer(hash_value)
 
     def hash_function(self, state):
 
-        hash_value = 0
-        size = len(self.hash_variable_list)
-        for i in range(size):
-            hash_value += int(self.hash_variable_list[i] * state[i])
-
-        return hash_value
+        return state.tobytes()
 
     def get_info_from_state(self, state):
         # read information from the state
@@ -453,7 +440,6 @@ class DroneFeatureSAM1:
 
         return 0
 
-    @jit(nopython=False)
     def populate_orientation_bin(
         self, agent_orientation_val, agent_state, obs_state_list
     ):
