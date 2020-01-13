@@ -1110,8 +1110,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         thresh_value = (
             1.4 * (self.agent_width / 2 + self.obs_width / 2) + self.step_size
         )
-        # thresh_value += self.agent_width #padding
-        # pdb.set_trace()
 
         intimate_space_dist = int(
             self.step_size + (self.agent_width + self.obs_width) * 1.4 // 2
@@ -1125,14 +1123,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             rot_matrix, agent_state["orientation"]
         )
 
-        # ***for debugging purposes****
-        """
-        print('Agent orientation val :', agent_orientation_val)
-        print('Agent orientation :', agent_state['orientation'])
-        print('Rotated agent orientation :', rotated_agent_orientation)
-        print('Current agent speed :', agent_state['speed'], np.linalg.norm(agent_state['orientation']))
-        #*****************************
-        """
         rotated_agent_orientation = (
             rotated_agent_orientation * agent_state["speed"]
         )
