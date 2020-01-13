@@ -477,19 +477,9 @@ class DroneFeatureSAM1:
             else:
                 obs_orientation_ref_point = obs_state["position"]
 
-            ring_1 = False
-            ring_2 = False
-
             if distance < self.thresh2:
                 # classify obs as considerable
-                # check the distance
                 temp_obs = {}
-                if distance < self.thresh1:
-                    # classify obstacle in the inner ring
-                    ring_1 = True
-                else:
-                    # classify obstacle in the outer ring
-                    ring_2 = True
 
                 # check for the orientation
                 # obtain relative orientation
@@ -507,16 +497,18 @@ class DroneFeatureSAM1:
                 rel_coord_obs = np.matmul(rot_matrix, vec_to_obs)
                 rel_coord_orient_ref = np.matmul(rot_matrix, vec_to_orient_ref)
 
-                angle_diff = np.zeros(8)
+                bin_val = 0
+                angle_diff = angle_between(
+                    self.orientation_approximator[0], rel_coord_obs
+                )
 
-                for i in range(len(self.orientation_approximator)):
-                    angle_diff[i] = angle_between(
-                        self.orientation_approximator[i], rel_coord_obs
-                    )
+                for i, orientation_approx in enumerate(self.orientation_approximator[1:]):
+                    new_angle_diff = angle_between(orientation_approx, rel_coord_obs)
+                    if new_angle_diff < angle_diff:
+                        angle_diff = new_angle_diff
+                        bin_val = i
 
-                bin_val = np.argmin(angle_diff)
-
-                if ring_2:
+                if distance > self.thresh1:
                     bin_val += 8
 
                 # orientation of the obstacle needs to be changed as it will change with the
