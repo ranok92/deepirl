@@ -43,14 +43,14 @@ class Pedestrian():
                 ):
         self.id = idval
         self.position = pos
-        self.speed = speed 
+        self.speed = speed
         self.orientation = orientation
 
 
 class GridWorldDrone(GridWorld):
 
     #the numbering starts from 0,0 from topleft corner and goes down and right
-    #the obstacles should be a list of 2 dim numpy array stating the position of the 
+    #the obstacles should be a list of 2 dim numpy array stating the position of the
     #obstacle
     def __init__(
             self,
@@ -107,7 +107,7 @@ class GridWorldDrone(GridWorld):
             pygame.font.init()
             self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
             self.tickSpeed = tick_speed
-            
+
         self.show_comparison = show_comparison
 
         self.ghost = None
@@ -124,7 +124,7 @@ class GridWorldDrone(GridWorld):
         self.initial_frame = 999999999999 #a large number
 
         self.subject = subject
-        self.cur_ped = None 
+        self.cur_ped = None
 
         self.max_obstacles = None
         self.agent_action_flag = False
@@ -135,12 +135,6 @@ class GridWorldDrone(GridWorld):
         self.skip_list = [] #dont consider these pedestrians as obstacles
 
         ############# this comes with the change in the action space##########
-        '''
-        self.actionArray = [np.asarray([-1, 0]), np.asarray([-1, 1]),
-                            np.asarray([0, 1]), np.asarray([1, 1]),
-                            np.asarray([1, 0]), np.asarray([1, -1]),
-                            np.asarray([0, -1]), np.asarray([-1, -1]), np.asarray([0, 0])]
-        '''
 
         self.continuous_action = continuous_action
         if not self.continuous_action:
@@ -159,13 +153,13 @@ class GridWorldDrone(GridWorld):
             self.max_orient_change = 30
             self.action_space = Box(np.array([-.5, -self.max_orient_change]),
                                     np.array([.5, self.max_orient_change]))
-            #The action array is a 2 dimensional array 
+            #The action array is a 2 dimensional array
             #        [change in speed, change in orientation]
         '''
         Some things to note:
-            1. The orientation of the agent will be a 2d vector pointing in the direction in which the 
+            1. The orientation of the agent will be a 2d vector pointing in the direction in which the
                agent is currently heading.
-            2. "cur_heading_dir" will contain the degree (integer) in which the agent is heading. 
+            2. "cur_heading_dir" will contain the degree (integer) in which the agent is heading.
             3. Speed can only be positive and bound within a range
         '''
         #################################
@@ -224,7 +218,7 @@ class GridWorldDrone(GridWorld):
 
     def generate_annotation_dict(self):
 
-        #converting the list to a dictionary, where the keys are the frame number 
+        #converting the list to a dictionary, where the keys are the frame number
         #and for each key there is a list of entries providing the annotation information
         #for that particular frame
         #for stanford dataset format
@@ -253,8 +247,8 @@ class GridWorldDrone(GridWorld):
             #populating the dictionary
             if entry[5] not in self.annotation_dict: #if frame is not present in the dict
                 self.annotation_dict[entry[5]] = []
-            
-            self.annotation_dict[entry[5]].append(entry)                
+
+            self.annotation_dict[entry[5]].append(entry)
 
             if self.subject is None:
                 if self.initial_frame > int(entry[5]):
@@ -272,19 +266,18 @@ class GridWorldDrone(GridWorld):
                         self.final_frame = int(entry[5])
 
 
-      
 
         print('Done loading information.')
         print('initial_frame', self.initial_frame)
         print('final_frame', self.final_frame)
         print('cellWidth', self.cellWidth)
-    
+
 
     def generate_pedestrian_dict(self):
         '''
         Unlike the annotation dict, where the frames are the keys and the information is stored
         based on each frame. Here the information is stored based on the pedestrians i.e. each pedestrian
-        corresponds to a key in the dictionary and the corresponding to that key is a list consisting of the 
+        corresponds to a key in the dictionary and the corresponding to that key is a list consisting of the
         trajectory information of that particular pedestrian
 
         ***THERE SHOULD NOT BE ANY SKIPPING OF FRAMES***
@@ -292,7 +285,7 @@ class GridWorldDrone(GridWorld):
         The format of the dictionary:
 
             pedestrian_dict['ped_id']['frame_no']{'pos': numpy, 'orientation': numpy, 'speed': float}
-        
+
         '''
         #the entries are of the format : frame_no, id, y_coord, x_coord
 
@@ -309,7 +302,7 @@ class GridWorldDrone(GridWorld):
                 pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
             else:
                 pos = np.asarray([float(entry[2]), float(entry[3])]) #[row, col]
-                orientation = pos - self.pedestrian_dict[str(entry[1])][str(int(entry[0])-1)]['position'] 
+                orientation = pos - self.pedestrian_dict[str(entry[1])][str(int(entry[0])-1)]['position']
                 speed = np.linalg.norm(orientation)
 
             self.pedestrian_dict[str(entry[1])][str(entry[0])] = {} #initialize the dictionary for the frame regardless of the first or any other frames
@@ -318,7 +311,7 @@ class GridWorldDrone(GridWorld):
             if int(self.pedestrian_dict[str(entry[1])]['final_frame']) < int(entry[0]):
                 self.pedestrian_dict[str(entry[1])]['final_frame'] = str(entry[0])
 
-            #populate the dictionary 
+            #populate the dictionary
             '''
             the format of the dictionary : ped_dict['ped_id']['frame_id']['pos', 'orientation', 'speed']
             '''
@@ -334,10 +327,10 @@ class GridWorldDrone(GridWorld):
         Reads information from files with the following (general) format
          frame , id, y_coord, x_coord
         '''
-        #converting the list to a dictionary, where the keys are the frame number 
+        #converting the list to a dictionary, where the keys are the frame number
         #and for each key there is a list of entries providing the annotation information
         #for that particular frame
-        
+
 
         print("Loading information. . .")
         subject_final_frame = -1
@@ -355,8 +348,8 @@ class GridWorldDrone(GridWorld):
             #populating the dictionary
             if entry[0] not in self.annotation_dict: #if frame is not present in the dict
                 self.annotation_dict[entry[0]] = []
-            
-            self.annotation_dict[entry[0]].append(entry)                
+
+            self.annotation_dict[entry[0]].append(entry)
 
             if self.cur_ped is None:
                 if self.initial_frame > int(entry[0]):
@@ -372,7 +365,7 @@ class GridWorldDrone(GridWorld):
 
                     if self.final_frame < int(entry[0]):
                         self.final_frame = int(entry[0])
-      
+
 
         print('Done loading information.')
         print('initial_frame', self.initial_frame)
@@ -394,13 +387,9 @@ class GridWorldDrone(GridWorld):
                 obs = self.pedestrian_dict[element[1]][str(self.current_frame)]
                 obs['id'] = element[1]
                 self.obstacles.append(obs)
-                #print(obs)
-                #pdb.set_trace()
             #populating the agent
             #dont update the agent if training is going on
             if not self.external_control:
-                #pdb.set_trace()
-                
                 if float(element[1]) == self.cur_ped:
                     agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
                     self.agent_state = agent
@@ -413,7 +402,7 @@ class GridWorldDrone(GridWorld):
                 self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]
                 self.ghost_state_history.append(self.ghost_state)
 
-        self.state['obstacles'] = self.obstacles 
+        self.state['obstacles'] = self.obstacles
 
 
     def get_state_from_frame(self,frame_info):
@@ -439,7 +428,7 @@ class GridWorldDrone(GridWorld):
                     width = int(element[3]) - left
                     height = int(element[4]) - top
                     self.agent_state = np.array([int(top+(height/2)),int(left+(width/2))])
-            
+
 
     def render(self):
 
@@ -522,15 +511,12 @@ class GridWorldDrone(GridWorld):
                         speed_change = action[0]
                         orient_change = action[1]
 
-                    #pdb.set_trace()
-                    #print('Change in speed :',self.speed_array[action_speed])
-
                     #if self.consider_heading:
                         #after 360, it comes back to 0
+
                     self.cur_heading_dir = (self.cur_heading_dir+orient_change)%360
                     agent_cur_speed = max(0,min(self.agent_state['speed'] + speed_change, self.max_speed))
-                    #self.heading_dir_history.append(self.cur_heading_dir)
-                    #self.cur_heading_dir = action
+
                     prev_position = self.agent_state['position']
                     rot_mat = get_rot_matrix(deg_to_rad(-self.cur_heading_dir))
                     cur_displacement = np.matmul(rot_mat, np.array([-agent_cur_speed, 0]))
@@ -542,16 +528,11 @@ class GridWorldDrone(GridWorld):
                                        cur_displacement,self.upper_limit_agent),self.lower_limit_agent)
 
                     self.agent_state['speed'] = agent_cur_speed
-                    #print('Current speed :', agent_cur_speed)
-                    #self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-self.agent_state['speed'], 0]))
                     self.agent_state['orientation'] = np.matmul(rot_mat, np.array([-1,0]))
-                   
-            #print("Agent :",self.agent_state)
-            #if not np.array_equal(self.pos_history[-1],self.agent_state):
-            self.heading_dir_history .append(self.cur_heading_dir)
+
+            self.heading_dir_history.append(self.cur_heading_dir)
 
             self.pos_history.append(copy.deepcopy(self.agent_state))
-
 
             if self.ghost:
                 self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
@@ -559,7 +540,7 @@ class GridWorldDrone(GridWorld):
         #calculate the reward and completion condition
         reward, done = self.calculate_reward(action)
         self.prev_action = action
-        
+
         #if you are done ie hit an obstacle or the goal
         #you leave control of the agent and you are forced to
         #suffer/enjoy the consequences of your actions for the
@@ -590,7 +571,7 @@ class GridWorldDrone(GridWorld):
 
         hit = False
         done = False
-        
+
         if self.obstacles is not None:
             for obs in self.obstacles:
                 if self.check_overlap(self.agent_state['position'], obs['position'], self.obs_width, self.buffer_from_obs):
@@ -613,12 +594,9 @@ class GridWorldDrone(GridWorld):
             self.distanceFromgoal = newdist
 
         if cur_action is not None:
-
-            #energy_spent = -np.sum(np.square(self.actionArray[cur_action]-self.actionArray[self.prev_action]))
             energy_spent = 0
             reward += energy_spent*self.step_reward*1
 
-        #pdb.set_trace()
         return reward, done
 
 
@@ -628,33 +606,27 @@ class GridWorldDrone(GridWorld):
         If subject is specified, then the initial frame and final frame is set
         to the time frame when the subject is in the scene.
 
-        If no subject is specified then the initial frame is set to the overall 
+        If no subject is specified then the initial frame is set to the overall
         initial frame and goes till the last frame available in the annotation file.
 
         Also, the agent and goal positions are initialized at random.
 
-        Pro tip: Use this function while training the agent. 
+        Pro tip: Use this function while training the agent.
         '''
-        #pygame.image.save(self.gameDisplay,'traced_trajectories.png')
-        #########for debugging purposes###########
         if self.replace_subject:
-
             return self.reset_and_replace()
 
         else:
-            
-            #self.skip_list = [i for i in range(len(self.pedestrian_dict.keys()))]
-
             self.current_frame = self.initial_frame
             self.pos_history = []
             self.ghost_state_history = []
-            #if this flag is true, the position of the obstacles and the goal 
+            #if this flag is true, the position of the obstacles and the goal
             #change with each reset
             dist_g = self.goal_spawn_clearance
 
             if self.annotation_file:
                 self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
-            
+
 
             num_obs = len(self.obstacles)
 
@@ -663,9 +635,9 @@ class GridWorldDrone(GridWorld):
 
 
             #only for the goal and the agent when the subject is not specified speicfically.
-            
+
             if self.cur_ped is None:
-                
+
                 #placing the goal
                 while True:
                     flag = False
@@ -699,8 +671,7 @@ class GridWorldDrone(GridWorld):
                 self.cur_heading_dir = 0 #pointing upwards
                 self.agent_state['orientation'] = np.matmul(get_rot_matrix(deg_to_rad(self.cur_heading_dir)),
                                                                             np.array([self.agent_state['speed'], 0]))
-            
-            
+
             self.release_control = False
 
 
@@ -737,7 +708,7 @@ class GridWorldDrone(GridWorld):
     def reset_and_replace(self, ped=None):
         '''
         Resets the environment and replaces one of the existing pedestrians
-        from the video feed in the environment with the agent. 
+        from the video feed in the environment with the agent.
         Pro tip: Use this for testing the result.
         '''
         #pdb.set_trace()
@@ -854,7 +825,8 @@ class GridWorldDrone(GridWorld):
                 self.agent_action_flag = True
             if event.type == pygame.MOUSEBUTTONUP:
                 self.agent_action_flag = False
-        if self.agent_action_flag:  
+
+        if self.agent_action_flag:
             (x,y) = pygame.mouse.get_pos()
             #print('x :',x, 'y :',y)
             x = x - self.agent_state['position'][1]
@@ -871,8 +843,8 @@ class GridWorldDrone(GridWorld):
             mag_angle = rad_to_deg(angle_between(rotated_agent_heading_vector, rotated_vector))
             #print("The mag_angle :", mag_angle)
             orient_action = min( (len(self.orientation_array)-1)/2, mag_angle/self.orient_quantization)
-          
-            if (rotated_vector[1] < rotated_agent_heading_vector[1]): 
+
+            if (rotated_vector[1] < rotated_agent_heading_vector[1]):
                 #the new action wants the agent to move to its relative left
                 #print("moving to left")
                 orient_action = (len(self.orientation_array)-1)/2 - orient_action
@@ -904,17 +876,16 @@ class GridWorldDrone(GridWorld):
     def close_game(self):
 
         pygame.quit()
-#created this to trace the trajectory of the agents whose trajectory informations are provided in the 
+#created this to trace the trajectory of the agents whose trajectory informations are provided in the
 #master list
-    
 
     def rollback(self, frames):
-        ''' 
+        '''
         Added this function primarily for reward analysis purpose.
-        Provided the frames, this function rolls the environment back in time by the number of 
+        Provided the frames, this function rolls the environment back in time by the number of
         frames provided
         '''
-        self.current_frame = self.current_frame - frames 
+        self.current_frame = self.current_frame - frames
 
         if str(self.current_frame) in self.annotation_dict.keys():
             self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
@@ -967,41 +938,9 @@ class GridWorldDrone(GridWorld):
             arrow_base = base_pos_pixel
             arrow_end = base_pos_pixel + (next_pos_pixel - base_pos_pixel)* arrow_length
 
-
-            '''
-            if base_position[0]==next_position[0]:
-                #same row (movement left/right)
-                gap = (next_pos_pixel[1]-base_pos_pixel[1])*.45
-                pygame.draw.line(self.gameDisplay, (0,0,0),
-                                (base_pos_pixel[1],base_pos_pixel[0]),
-                                (next_pos_pixel[1]-gap,next_pos_pixel[0]))
-     
-                pygame.draw.polygon(self.gameDisplay,(0,0,0),
-                                (
-                                (ref_pos[1],ref_pos[0]+(arrow_width/2)),
-                                (next_pos_pixel[1]-gap,next_pos_pixel[0]),
-                                (ref_pos[1],ref_pos[0]-(arrow_width/2))  ),
-                                0
-                                )
-            
-            if base_position[1]==next_position[1]:
-                gap = (next_pos_pixel[0]-base_pos_pixel[0])*.45
-                pygame.draw.line(self.gameDisplay, (0,0,0),
-                                (base_pos_pixel[1],base_pos_pixel[0]),
-                                (next_pos_pixel[1],next_pos_pixel[0]-gap))
-                pygame.draw.polygon(self.gameDisplay,(0,0,0),
-                    (
-                    (ref_pos[1]+(arrow_width/2),ref_pos[0]),
-                    (ref_pos[1]-(arrow_width/2),ref_pos[0]),
-                    (next_pos_pixel[1],next_pos_pixel[0]-gap)   ),
-                    0
-                    )
-            '''
-
             pygame.draw.line(self.gameDisplay, color, (arrow_base[1], arrow_base[0]),
                              (arrow_end[1], arrow_end[0]), 2)
 
- 
 
     def draw_trajectory(self, trajectory=[], color=None):
 
@@ -1010,10 +949,10 @@ class GridWorldDrone(GridWorld):
         arrow_head_width = 1
         arrow_width = .1
         #denotes the start and end positions of the trajectory
-        
+
         rad = int(self.cellWidth*.4)
         start_pos=(trajectory[0]['position']+.5)*self.cellWidth
-        end_pos=(trajectory[-1]['position']+0.5)*self.cellWidth 
+        end_pos=(trajectory[-1]['position']+0.5)*self.cellWidth
 
         pygame.draw.circle(self.gameDisplay,(0,255,0),
                             (int(start_pos[1]),int(start_pos[0])),
@@ -1026,7 +965,7 @@ class GridWorldDrone(GridWorld):
         for count in range(len(trajectory)-1):
             #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
             self.draw_arrow(trajectory[count]['position'],trajectory[count+1]['position'], color)
-    
+
 
 
 
