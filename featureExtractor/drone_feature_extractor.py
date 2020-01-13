@@ -26,6 +26,11 @@ def angle_between(v1, v2):
     )
 
 
+@njit
+def dist_2d(v1, v2):
+    return math.sqrt((v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2)
+
+
 def deg_to_rad(deg):
 
     return deg * np.pi / 180
@@ -459,25 +464,22 @@ class DroneFeatureSAM1:
             Bin value in each of the ring is based on the orientation_approximator
 
         """
-        # for debugging purposes
-        # print('***INSIDE populate_orientation_bin ***')
 
         for obs_state in obs_state_list:
 
-            distance = math.sqrt(
-                (obs_state["position"][0] - agent_state["position"][0]) ** 2
-                + (obs_state["position"][1] - agent_state["position"][1]) ** 2
-            )
-            # pdb.set_trace()
+            distance = dist_2d(obs_state["position"], agent_state["position"])
+
             if obs_state["orientation"] is not None:
                 obs_orientation_ref_point = (
                     obs_state["position"] + obs_state["orientation"]
                 )
+
             else:
                 obs_orientation_ref_point = obs_state["position"]
 
             ring_1 = False
             ring_2 = False
+
             if distance < self.thresh2:
                 # classify obs as considerable
                 # check the distance
@@ -506,25 +508,12 @@ class DroneFeatureSAM1:
                 rel_coord_orient_ref = np.matmul(rot_matrix, vec_to_orient_ref)
 
                 angle_diff = np.zeros(8)
+
                 for i in range(len(self.orientation_approximator)):
-                    # print('The orientation val')
-                    # print(orientation)
-                    """
-                    print("***")
-                    print(self.orientation_approximator[i])
-                    print("---")
-                    print(rel_coord_obs)
-                    print("+++")
-                    print(vec_to_obs)
-                    print("####")
-                    print(rot_matrix)
-                    print("+++")
-                    print(agent_orientation_val)
-                    print("***")
-                    """
                     angle_diff[i] = angle_between(
                         self.orientation_approximator[i], rel_coord_obs
                     )
+
                 bin_val = np.argmin(angle_diff)
 
                 if ring_2:
@@ -537,22 +526,9 @@ class DroneFeatureSAM1:
                 temp_obs["position"] = rel_coord_obs
                 temp_obs["speed"] = obs_state["speed"]
 
-                """
-                #******for debugging purposes
-                print('The current agent heading direction :', agent_orientation_val)
-                print('Change in position : before :{}, after :{}'.format(obs_state['position'],
-                                                                          temp_obs['position']))
-                print('Change in orientation : before :{}, after : {}'.format(obs_state['orientation'],
-                                                                              temp_obs['orientation']))
-                print('Change in speed : before :{}, after :{}'.format(obs_state['speed'], temp_obs['speed']))
-                #pdb.set_trace()
-                """
-
                 self.bins[str(bin_val)].append(temp_obs)
-        # if the obstacle does not classify to be considered
 
     def overlay_bins(self, state):
-
         # a visualizing tool to debug if the binning is being done properly
         # draws the bins on the game surface for a visual inspection of the
         # classification of the obstacles in their respective bins
@@ -704,18 +680,14 @@ class DroneFeatureSAM1:
             goal_state,
         )
 
-        # print('The absolute approx orientation :', abs_approx_orientation)
-        ##print('The relative orientation', relative_orientation)
-
         # empty bins before populating
         for i in range(16):
             self.bins[str(i)] = []
 
-        # print('Here')
         self.populate_orientation_bin(
             agent_orientation_angle, agent_state, obstacles
         )
-        # pdb.set_trace()
+
         (
             sam_vector,
             inner_ring_density,
@@ -723,7 +695,7 @@ class DroneFeatureSAM1:
         ) = self.compute_bin_info()
 
         extracted_feature = np.concatenate(
-            (  # abs_approx_orientation,
+            (
                 relative_orientation_goal,
                 relative_orientation,
                 np.reshape(sam_vector, (-1)),
@@ -731,15 +703,7 @@ class DroneFeatureSAM1:
                 outer_ring_density,
             )
         )
-        """
-        flag = False
-        for i in range(16):
-            if len(self.bins[str(i)]) > 0:
-                flag = True
-        if flag:    
-            pdb.set_trace()
-            pass
-        """
+
         self.agent_state_history.append(copy.deepcopy(state["agent_state"]))
 
         return reset_wrapper(extracted_feature)
