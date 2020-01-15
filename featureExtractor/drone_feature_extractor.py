@@ -263,6 +263,36 @@ def calculate_social_forces(
     )
 
 
+@njit
+def radial_density_density(agent_position, pedestrian_positions, radius):
+    """
+    implements the 'density features' from:
+    IRL Algorithms and Features for Robot navigation in Crowds: Vasquez et. al
+
+    :param agent_position: position of agent.
+    :type agent_position: numpy array or tuple.
+    :param pedestrian_positions: list or array of pedestrian positions.
+    :type pedestrian_positions: list or np array of tuples or np arrays.
+    """
+    pedestrian_count = 0
+
+    for pedestrian_pos in pedestrian_positions:
+        if dist_2d(pedestrian_pos, agent_position) <= radius:
+            pedestrian_count += 1
+
+            if pedestrian_count >= 5:
+                return np.array[0.0, 0.0, 1.0]
+
+    if pedestrian_count < 2:
+        return np.array([1.0, 0.0, 0.0])
+
+    elif 2 <= pedestrian_count < 5:
+        return np.array([0.0, 1.0, 0.0])
+
+    else:
+        raise ValueError
+
+
 #################################################################################
 #################################################################################
 class DroneFeatureSAM1:
@@ -502,8 +532,12 @@ class DroneFeatureSAM1:
                     self.orientation_approximator[0], rel_coord_obs
                 )
 
-                for i, orientation_approx in enumerate(self.orientation_approximator[1:]):
-                    new_angle_diff = angle_between(orientation_approx, rel_coord_obs)
+                for i, orientation_approx in enumerate(
+                    self.orientation_approximator[1:]
+                ):
+                    new_angle_diff = angle_between(
+                        orientation_approx, rel_coord_obs
+                    )
                     if new_angle_diff < angle_diff:
                         angle_diff = new_angle_diff
                         bin_val = i
