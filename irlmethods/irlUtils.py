@@ -6,6 +6,7 @@ import os
 import glob
 import numpy as np
 import sys
+from pathlib import Path
 sys.path.insert(0, '..')
 from neural_nets.base_network import BaseNN
 from torch.distributions import Categorical
@@ -887,6 +888,23 @@ def save_bar_plot(list1, list2, diff_list, iteration, save_folder):
         list2 = list2[10:]
         diff_list = diff_list[10:]    
 
+def read_expert_states(folder_path):
+    """
+    reads expert features found in folder_path.
+
+    :return: torch tensor of all features of all expert trajectories.
+    :rtype: torch float tensor, shape of (num of total features x feature length)
+    """
+
+    features_path = Path(folder_path) / '*.states'
+    feature_files = glob.glob(features_path)
+
+    list_of_features = []
+
+    for feature_file in feature_files:
+        list_of_features.append(torhc.load(feature_file))
+
+    return torch.cat(list_of_features)
 
 if __name__ == '__main__':
 
