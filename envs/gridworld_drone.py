@@ -101,12 +101,8 @@ class GridWorldDrone(GridWorld):
                          step_size=step_size
                         )
         if display:
+            self.enable_rendering(tick_speed)
 
-            self.gameDisplay = pygame.display.set_mode((self.cols, self.rows))
-            self.clock = pygame.time.Clock()
-            pygame.font.init()
-            self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
-            self.tickSpeed = tick_speed
 
         self.show_comparison = show_comparison
 
@@ -195,6 +191,16 @@ class GridWorldDrone(GridWorld):
         self.show_orientation = show_orientation
 
 
+
+    def enable_rendering(self, tick_speed):
+        pygame.quit()
+        pygame.init()
+        self.display=True
+        self.gameDisplay = pygame.display.set_mode((self.cols, self.rows))
+        self.clock = pygame.time.Clock()
+        pygame.font.init()
+        self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
+        self.tickSpeed = tick_speed
 
     def generate_annotation_list(self):
         '''

@@ -172,6 +172,8 @@ parser.add_argument("--play-interval", type=int, default=100)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
 
+parser.add_argument("--num-trajectory-samples", type=int, default=100)
+
 
 def main():
     args = parser.parse_args()
@@ -228,7 +230,7 @@ def main():
     from rlmethods.soft_ac_pi import SoftActorCritic
     from rlmethods.rlutils import ReplayBuffer
 
-    from irlmethods.general_deep_maxent import GeneralDeepMaxent
+    from irlmethods.general_deep_maxent import GeneralDeepMaxent, play
 
     agent_width = 10
     step_size = 2
@@ -406,7 +408,7 @@ def main():
         args.irl_iterations,
         args.rl_episodes,
         args.rl_ep_length,
-        100,
+        args.num_trajectory_samples,
         args.rl_ep_length,
     )
 
