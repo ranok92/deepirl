@@ -897,12 +897,12 @@ def read_expert_states(folder_path):
     """
 
     features_path = Path(folder_path) / '*.states'
-    feature_files = glob.glob(features_path)
+    feature_files = glob.glob(str(features_path))
 
     list_of_features = []
 
     for feature_file in feature_files:
-        list_of_features.append(torhc.load(feature_file))
+        list_of_features.append(torch.load(feature_file))
 
     return torch.cat(list_of_features)
 

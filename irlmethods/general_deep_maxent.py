@@ -6,12 +6,12 @@ agnostic way.
 import numpy as np
 import torch
 from torch.optim import Adam
-from deep_maxent import RewardNet
+from irlmethods.deep_maxent import RewardNet
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def play(env, policy, feature_extractor, max_env_steps):
+def play(env, policy, feature_extractor, max_env_steps, render=False):
     """
     Plays the environment using actions from supplied policy. Returns list of
     features encountered.
@@ -30,25 +30,39 @@ def play(env, policy, feature_extractor, max_env_steps):
     playthough (max length of rollout)
     :type max_env_steps: int
 
+    :param render: Render the environment. Defaults to False.
+    :type render: Boolean.
+
     :return: list of features encountered in playthrough.
     :rtype: list of 0D numpy arrays.
     """
 
     done = False
     steps_counter = 0
-    states = []
+    features = []
+
+    feature = feature_extractor.extract_features(env.reset())
+    torch_feature = torch.from_numpy(feature).to(torch.float).to(DEVICE)
+    features.append(torch_feature)
 
     while not done and steps_counter < max_env_steps:
-        action = policy.eval_action()
-        action = action.cpu().numpy()
+        action = policy.eval_action(torch_feature)
+
+        # TODO: Fix misalignmnet in implementations of eval_action.
+        # action = action.cpu().numpy()
 
         state, _, done, _ = env.step(action)
 
-        states.append(feature_extractor.extract_features(state))
+        if render:
+            env.render()
+
+        feature = feature_extractor.extract_features(state)
+        torch_feature = torch.from_numpy(feature).to(torch.float).to(DEVICE)
+        features.append(torch_feature)
 
         steps_counter += 1
 
-    return states
+    return features
 
 
 class GeneralDeepMaxent:
@@ -57,21 +71,24 @@ class GeneralDeepMaxent:
     """
 
     def __init__(self, rl, env, expert_states, learning_rate=1e-4):
-        # environment attributes
-        self.env = env
-        state_size = env.reset().shape[0]
-
         # RL related
         self.rl = rl
         self.feature_extractor = self.rl.feature_extractor
 
+        # environment attributes
+        self.env = env
+        state_size = self.feature_extractor.extract_features(
+            env.reset()
+        ).shape[0]
+
         # reward net
         self.reward_net = RewardNet(state_size, hidden_dims=[256] * 2)
+        self.reward_net = self.reward_net.to(DEVICE)
         self.reward_optim = Adam(
             self.reward_net.parameters(), lr=learning_rate
         )
 
-        self.expert_states = expert_states
+        self.expert_states = expert_states.to(torch.float).to(DEVICE)
 
     def generate_trajectories(self, num_trajectories, max_env_steps):
         """
@@ -83,8 +100,8 @@ class GeneralDeepMaxent:
         :param max_env_steps: max steps to take in environment (rollout length.)
         :type max_env_steps: int
 
-        :return: numpy array of features encountered in playthrough.
-        :rtype: numpy array of shape (num_states x feature_length)
+        :return: list of features encountered in playthrough.
+        :rtype: list of tensors of shape (num_states x feature_length)
         """
         states = []
 
@@ -95,7 +112,7 @@ class GeneralDeepMaxent:
 
             states.extend(generated_states)
 
-        return np.array(states)
+        return states
 
     def train_episode(
         self,
@@ -124,7 +141,7 @@ class GeneralDeepMaxent:
         """
 
         # train RL agent
-        self.rl.reset()
+        self.rl.reset_training()
         self.rl.train(
             num_rl_episodes,
             max_rl_episode_length,
@@ -132,16 +149,14 @@ class GeneralDeepMaxent:
         )
 
         # expert loss
-        torch_expert_states = torch.from_numpy(self.expert_states)
-        torch_expert_states = torch_expert_states.to("float").to(DEVICE)
-        expert_loss = self.reward_net(self.expert_states)
+        expert_loss = self.reward_net(self.expert_states).sum()
 
         # policy loss
         trajectories = self.generate_trajectories(
             num_trajectory_samples, max_env_steps
         )
 
-        torch_trajs = torch.from_numpy(trajectories).to(torch.float).to(DEVICE)
+        torch_trajs = torch.stack(trajectories).to(torch.float).to(DEVICE)
 
         policy_loss = self.reward_net(torch_trajs).mean()
 
@@ -149,3 +164,20 @@ class GeneralDeepMaxent:
         loss = policy_loss - expert_loss
         self.reward_optim.zero_grad()
         loss.backward()
+
+    def train(
+        self,
+        num_irl_episodes,
+        num_rl_episodes,
+        max_rl_episode_length,
+        num_trajectory_samples,
+        max_env_steps,
+    ):
+        for _ in range(num_irl_episodes):
+            self.train_episode(
+                num_rl_episodes,
+                max_rl_episode_length,
+                num_trajectory_samples,
+                max_env_steps,
+            )
+
