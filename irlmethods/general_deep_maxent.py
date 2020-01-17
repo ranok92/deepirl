@@ -2,11 +2,12 @@
 Implements deep maxent IRL (Wulfmeier et. all) in a general, feature-type
 agnostic way.
 """
-
+from pathlib import Path
 import numpy as np
 import torch
 from torch.optim import Adam
 from irlmethods.deep_maxent import RewardNet
+from tensorboardX import SummaryWriter
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -70,7 +71,9 @@ class GeneralDeepMaxent:
     Implements deep maxent IRL (Wulfmeier et. al) in a state-type agnostic way.
     """
 
-    def __init__(self, rl, env, expert_states, learning_rate=1e-4):
+    def __init__(
+        self, rl, env, expert_states, learning_rate=1e-4, save_folder="./",
+    ):
         # RL related
         self.rl = rl
         self.feature_extractor = self.rl.feature_extractor
@@ -89,6 +92,10 @@ class GeneralDeepMaxent:
         )
 
         self.expert_states = expert_states.to(torch.float).to(DEVICE)
+
+        # logging and saving
+        self.save_path = Path(save_folder)
+        self.tbx_writer = SummaryWriter(str(self.save_path / "tensorboard_logs"))
 
     def generate_trajectories(self, num_trajectories, max_env_steps):
         """
@@ -120,6 +127,7 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
+        episode_i,
     ):
         """
         perform IRL training.
@@ -138,6 +146,9 @@ class GeneralDeepMaxent:
         :param max_env_steps: maximum number of environment steps to take,
         both when training RL agent and when generating rollouts.
         :type max_env_steps: int
+
+        :param episode_i: Current IRL iteration count.
+        :type episode_i: int
         """
 
         # train RL agent
@@ -160,10 +171,20 @@ class GeneralDeepMaxent:
 
         policy_loss = self.reward_net(torch_trajs).mean()
 
-        # IRL step
+        # Backpropagate IRL loss
         loss = policy_loss - expert_loss
         self.reward_optim.zero_grad()
         loss.backward()
+
+        # logging
+        self.tbx_writer.add_scalar("IRL/policy_loss", policy_loss, episode_i)
+        self.tbx_writer.add_scalar("IRL/expert_loss", expert_loss, episode_i)
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, episode_i)
+
+        # save policy and reward network
+        # TODO: make a uniform dumping function for all agents.
+        self.rl.policy.save(str(self.save_path / 'policy'))
+        self.reward_net.save(str(self.save_path / 'reward_net'))
 
     def train(
         self,
@@ -173,11 +194,11 @@ class GeneralDeepMaxent:
         num_trajectory_samples,
         max_env_steps,
     ):
-        for _ in range(num_irl_episodes):
+        for episode_i in range(num_irl_episodes):
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,
                 num_trajectory_samples,
                 max_env_steps,
+                episode_i,
             )
-

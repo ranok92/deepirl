@@ -396,6 +396,7 @@ def main():
         env=env,
         expert_states=expert_states,
         learning_rate=args.lr_irl,
+        save_folder=to_save,
     )
 
     print("IRL method intialized.")
