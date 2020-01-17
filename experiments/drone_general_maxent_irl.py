@@ -413,7 +413,6 @@ def main():
         args.rl_ep_length,
     )
 
-    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
