@@ -4,7 +4,6 @@ et. al 2019.
 """
 import sys
 import copy
-import pdb
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -12,6 +11,7 @@ from torch.optim import Adam
 from torch.distributions import Categorical
 from torch.distributions.kl import kl_divergence
 import numpy as np
+from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
 
@@ -131,6 +131,7 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer,
+            feature_extractor,
             buffer_sample_size=10**4,
             gamma=0.99,
             learning_rate=3e-4,
@@ -140,10 +141,9 @@ class SoftActorCritic:
             tau=0.005,
             log_alpha=-2.995,
             q_net=None,
-            feat_extractor=None
     ):
         self.env = env
-        self.feat_extractor = feat_extractor
+        self.feat_extractor = feature_extractor
 
         starting_state = self.env.reset()
 
@@ -194,7 +194,6 @@ class SoftActorCritic:
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
-        #pdb.set_trace()
         softmax_over_actions = F.softmax(
             (1.0/alpha) * self.q_net(state),
             dim=-1
@@ -204,13 +203,13 @@ class SoftActorCritic:
 
         return action, dist.log_prob(action), dist
 
-    def populate_buffer(self):
+    def populate_buffer(self, max_env_steps):
         """
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
         while len(self.replay_buffer) < self.buffer_sample_size:
-            self.play()
+            self.play(max_env_steps)
 
     def tbx_logger(self, log_dict, training_i):
         """Logs the tag-value pairs in log_dict using TensorboardX.
@@ -221,11 +220,11 @@ class SoftActorCritic:
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
-    def train_episode(self):
+    def train_episode(self, max_env_steps):
         """Train Soft Actor Critic"""
 
         # Populate the buffer
-        self.populate_buffer()
+        self.populate_buffer(max_env_steps)
 
         # weight updates
         replay_samples = self.replay_buffer.sample(self.buffer_sample_size)
@@ -300,7 +299,7 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self):
+    def play(self, max_env_steps, render=False):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
@@ -313,7 +312,7 @@ class SoftActorCritic:
             state = self.feat_extractor.extract_features(state)
         episode_length = 0
 
-        while not done:
+        for _ in range(max_env_steps):
             # Env returns numpy state so convert to torch
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE)
@@ -321,8 +320,10 @@ class SoftActorCritic:
             alpha = self.log_alpha.exp().detach()
             action, _, _ = self.select_action(torch_state, alpha)
             next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
-            if self.feat_extractor is not None:
-                next_state = self.feat_extractor.extract_features(next_state)
+            next_state = self.feat_extractor.extract_features(next_state)
+
+            if render:
+                self.env.render()
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
@@ -345,6 +346,9 @@ class SoftActorCritic:
             total_reward += reward
             episode_length += 1
 
+            if done:
+                break
+
         self.tbx_writer.add_scalar(
             'rewards/episode_reward',
             total_reward.item(),
@@ -359,7 +363,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train_and_play(self, num_episodes, play_interval):
+    def train(self, num_episodes, play_interval, max_env_steps):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -367,8 +371,8 @@ class SoftActorCritic:
         :param play_interval: trainig episodes between each play session.
         """
 
-        for i in range(num_episodes):
-            self.train_episode()
+        for i in tqdm(range(num_episodes)):
+            self.train_episode(max_env_steps)
 
             if self.training_i % play_interval == 0:
-                self.play()
+                self.play(max_env_steps)
