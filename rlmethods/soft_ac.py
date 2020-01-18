@@ -78,6 +78,8 @@ class QNetwork(BaseNN):
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, action_length)
 
+        self.alpha=1.0
+
     def forward(self, states):
         # actions need to be byte or long to be used as indices
         x = F.relu(self.in_layer(states))
@@ -86,6 +88,25 @@ class QNetwork(BaseNN):
         x = self.head(x)
 
         return x
+
+    def sample_action(self, state):
+        softmax_over_actions = F.softmax(
+            (1.0/self.alpha) * self.__call__(state),
+            dim=-1
+        )
+        dist = Categorical(softmax_over_actions)
+        action = dist.sample()
+
+        return action, dist.log_prob(action), dist
+
+    def eval_action(self, state):
+        softmax_over_actions = F.softmax(
+            (1.0/self.alpha) * self.__call__(state),
+            dim=-1
+        )
+        action = torch.argmax(softmax_over_actions)
+
+        return action
 
 
 class PolicyNetwork(BaseNN):
@@ -141,14 +162,15 @@ class SoftActorCritic:
             tau=0.005,
             log_alpha=-2.995,
             q_net=None,
+            play_interval=1,
     ):
         self.env = env
-        self.feat_extractor = feature_extractor
+        self.feature_extractor = feature_extractor
 
         starting_state = self.env.reset()
 
-        if self.feat_extractor is not None:
-            starting_state = self.feat_extractor.extract_features(starting_state)
+        if self.feature_extractor is not None:
+            starting_state = self.feature_extractor.extract_features(starting_state)
         state_size = starting_state.shape[0]
 
         # buffer
@@ -163,10 +185,14 @@ class SoftActorCritic:
 
         self.avg_q_net = copy.deepcopy(self.q_net)
 
+        # Dummy policy, it's just q_net in disguise!
+        self.policy = self.q_net
+
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
         self.q_net.to(DEVICE)
         self.avg_q_net.to(DEVICE)
+
         # set hyperparameters
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
@@ -178,8 +204,10 @@ class SoftActorCritic:
         self.training_i = 0
         self.play_i = 0
         self.entropy_tuning = entropy_tuning
+        self.play_interval = play_interval
 
         # optimizers
+        self.learning_rate = learning_rate
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
         self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
@@ -211,6 +239,10 @@ class SoftActorCritic:
         while len(self.replay_buffer) < self.buffer_sample_size:
             self.play(max_env_steps)
 
+    def reset_training(self):
+        self.q_optim = Adam(self.q_net.parameters(), lr=self.learning_rate)
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
+
     def tbx_logger(self, log_dict, training_i):
         """Logs the tag-value pairs in log_dict using TensorboardX.
 
@@ -236,6 +268,7 @@ class SoftActorCritic:
 
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
+        self.policy.alpha = alpha
 
         with torch.no_grad():
             # Figure out value function
@@ -299,7 +332,7 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self, max_env_steps, render=False):
+    def play(self, max_env_steps, reward_network=None, render=False):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
@@ -308,8 +341,8 @@ class SoftActorCritic:
         done = False
         total_reward = np.zeros(1)
         state = self.env.reset()
-        if self.feat_extractor is not None:
-            state = self.feat_extractor.extract_features(state)
+        if self.feature_extractor is not None:
+            state = self.feature_extractor.extract_features(state)
         episode_length = 0
 
         for _ in range(max_env_steps):
@@ -320,10 +353,13 @@ class SoftActorCritic:
             alpha = self.log_alpha.exp().detach()
             action, _, _ = self.select_action(torch_state, alpha)
             next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
-            next_state = self.feat_extractor.extract_features(next_state)
+            next_state = self.feature_extractor.extract_features(next_state)
 
             if render:
                 self.env.render()
+
+            if reward_network:
+                reward = reward_network(torch_state).cpu().item()
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
@@ -363,7 +399,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train(self, num_episodes, play_interval, max_env_steps):
+    def train(self, num_episodes, max_env_steps, reward_network=None):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -371,8 +407,8 @@ class SoftActorCritic:
         :param play_interval: trainig episodes between each play session.
         """
 
-        for i in tqdm(range(num_episodes)):
+        for _ in tqdm(range(num_episodes)):
             self.train_episode(max_env_steps)
 
-            if self.training_i % play_interval == 0:
-                self.play(max_env_steps)
+            if self.training_i % self.play_interval == 0:
+                self.play(max_env_steps, reward_network=reward_network)
