@@ -904,7 +904,7 @@ def read_expert_states(folder_path):
     for feature_file in feature_files:
         list_of_features.append(torch.load(feature_file))
 
-    return torch.cat(list_of_features)
+    return torch.cat(list_of_features), len(feature_files)
 
 if __name__ == '__main__':
 

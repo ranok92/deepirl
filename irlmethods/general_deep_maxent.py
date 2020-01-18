@@ -72,7 +72,13 @@ class GeneralDeepMaxent:
     """
 
     def __init__(
-        self, rl, env, expert_states, learning_rate=1e-4, save_folder="./",
+        self,
+        rl,
+        env,
+        expert_states,
+        num_expert_trajs,
+        learning_rate=1e-3,
+        save_folder="./",
     ):
         # RL related
         self.rl = rl
@@ -91,11 +97,15 @@ class GeneralDeepMaxent:
             self.reward_net.parameters(), lr=learning_rate
         )
 
+        # expert info
         self.expert_states = expert_states.to(torch.float).to(DEVICE)
+        self.num_expert_trajs = num_expert_trajs
 
         # logging and saving
         self.save_path = Path(save_folder)
-        self.tbx_writer = SummaryWriter(str(self.save_path / "tensorboard_logs"))
+        self.tbx_writer = SummaryWriter(
+            str(self.save_path / "tensorboard_logs")
+        )
 
     def generate_trajectories(self, num_trajectories, max_env_steps):
         """
@@ -169,12 +179,17 @@ class GeneralDeepMaxent:
 
         torch_trajs = torch.stack(trajectories).to(torch.float).to(DEVICE)
 
-        policy_loss = self.reward_net(torch_trajs).mean()
+        policy_loss = self.reward_net(torch_trajs).sum()
+        policy_loss = (
+            self.num_expert_trajs / num_trajectory_samples
+        ) * policy_loss
 
         # Backpropagate IRL loss
         loss = policy_loss - expert_loss
+
         self.reward_optim.zero_grad()
         loss.backward()
+        self.reward_optim.step()
 
         # logging
         self.tbx_writer.add_scalar("IRL/policy_loss", policy_loss, episode_i)
@@ -183,8 +198,8 @@ class GeneralDeepMaxent:
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        self.rl.policy.save(str(self.save_path / 'policy'))
-        self.reward_net.save(str(self.save_path / 'reward_net'))
+        self.rl.policy.save(str(self.save_path / "policy"))
+        self.reward_net.save(str(self.save_path / "reward_net"))
 
     def train(
         self,
@@ -195,6 +210,7 @@ class GeneralDeepMaxent:
         max_env_steps,
     ):
         for episode_i in range(num_irl_episodes):
+            print("IRL episode {}".format(episode_i))
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,

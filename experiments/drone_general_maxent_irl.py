@@ -10,6 +10,7 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from irlmethods.irlUtils import read_expert_states
 from logger.logger import Logger
 import utils
+import gym
 
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureSAM1,
@@ -168,7 +169,7 @@ parser.add_argument(
     default="ActorCritic",
     help="The RL trainer to be used.",
 )
-parser.add_argument("--play-interval", type=int, default=100)
+parser.add_argument("--play-interval", type=int, default=10)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
 
@@ -228,6 +229,7 @@ def main():
 
     from rlmethods.b_actor_critic import ActorCritic
     from rlmethods.soft_ac_pi import SoftActorCritic
+    from rlmethods.soft_ac import SoftActorCritic as QSAC
     from rlmethods.rlutils import ReplayBuffer
 
     from irlmethods.general_deep_maxent import GeneralDeepMaxent, play
@@ -381,6 +383,26 @@ def main():
             buffer_sample_size=args.replay_buffer_sample_size,
         )
 
+    if args.rl_method == "discrete_SAC":
+        if not isinstance(env.action_space, gym.spaces.Discrete):
+            print(
+                "discrete SAC requires a discrete action space environmnet to work."
+            )
+            exit()
+
+        replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
+        rl_method = QSAC(
+            env,
+            replay_buffer,
+            feat_ext,
+            args.replay_buffer_sample_size,
+            learning_rate=args.lr_rl,
+            entropy_tuning=True,
+            entropy_target=0.3,
+            play_interval=args.play_interval,
+        )
+
     print("RL method initialized.")
     print(rl_method.policy)
     if args.policy_path is not None:
@@ -389,12 +411,13 @@ def main():
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
-    expert_states = read_expert_states(args.exp_trajectory_path)
+    expert_states, num_expert_trajs = read_expert_states(args.exp_trajectory_path)
 
     irl_method = GeneralDeepMaxent(
         rl=rl_method,
         env=env,
         expert_states=expert_states,
+        num_expert_trajs=num_expert_trajs,
         learning_rate=args.lr_irl,
         save_folder=to_save,
     )

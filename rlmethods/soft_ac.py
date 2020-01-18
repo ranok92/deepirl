@@ -179,7 +179,7 @@ class SoftActorCritic:
 
         # NNs
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 2048)
+            self.q_net = QNetwork(state_size, env.action_space.n, 256)
         else:
             self.q_net = q_net
 
@@ -213,7 +213,7 @@ class SoftActorCritic:
 
         # tensorboardX settings
         if not tbx_writer:
-            self.tbx_writer = SummaryWriter('runs/generic_soft_ac')
+            self.tbx_writer = SummaryWriter()
         else:
             self.tbx_writer = tbx_writer
 
@@ -406,6 +406,8 @@ class SoftActorCritic:
         :param num_episodes: number of episodes to train for.
         :param play_interval: trainig episodes between each play session.
         """
+
+        print("Training RL . . .")
 
         for _ in tqdm(range(num_episodes)):
             self.train_episode(max_env_steps)
