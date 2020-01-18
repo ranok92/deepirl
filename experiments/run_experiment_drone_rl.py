@@ -60,6 +60,7 @@ parser.add_argument('--rl-method', type=str, default='ActorCritic', help='The RL
 parser.add_argument('--play-interval', type=int, default=100)
 parser.add_argument('--replay-buffer-sample-size', type=int, default=1000)
 parser.add_argument('--replay-buffer-size', type=int, default=5000)
+parser.add_argument('--target-entropy', type=float, default=0.3)
 
 def main():
     
@@ -80,7 +81,7 @@ def main():
     mp.set_start_method('spawn')
 
     from rlmethods.b_actor_critic import ActorCritic
-    from rlmethods.soft_ac_pi import SoftActorCritic
+    from rlmethods.soft_ac import SoftActorCritic
     from rlmethods.rlutils import ReplayBuffer
 
 
@@ -168,7 +169,7 @@ def main():
                                     obs_width=obs_width,
                                     step_size=step_size,
                                     grid_size=grid_size,
-                                    show_agent_persp=True,
+                                    show_agent_persp=False,
                                     thresh1=15, thresh2=30)
 
 
@@ -178,7 +179,7 @@ def main():
                                        obs_width=obs_width,
                                        step_size=step_size,
                                        grid_size=grid_size,
-                                       show_agent_persp=True,
+                                       show_agent_persp=False,
                                        thresh1=15, thresh2=30)
 
     if args.feat_extractor == 'DroneFeatureRisk_speed':
@@ -198,7 +199,7 @@ def main():
                             obs_width=obs_width,
                             step_size=step_size,
                             grid_size=grid_size,
-                            show_agent_persp=True,
+                            show_agent_persp=False,
                             return_tensor=False,
                             thresh1=18, thresh2=30)
 
@@ -265,9 +266,8 @@ def main():
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
         model = SoftActorCritic(env, replay_buffer,
-                                args.max_ep_length,
                                 feat_ext,
-                                buffer_sample_size=args.replay_buffer_sample_size)
+                                buffer_sample_size=args.replay_buffer_sample_size, entropy_tuning=True)
 
 
 
@@ -300,7 +300,12 @@ def main():
 
             if args.policy_path:
                 model.policy.load(args.policy_path)
-            model.train()
+
+            if args.rl_method == 'SAC':
+                model.train(args.total_episodes, args.play_interval, args.max_ep_length)
+            
+            else:
+                model.train()
 
         else:
             from irlmethods.deep_maxent import RewardNet
@@ -372,6 +377,7 @@ def main():
         env.tickSpeed = 200
 
         model.generate_trajectory_user(args.num_trajs, args.render, path='./user_generated_trajectories/')
+
 
 if __name__ == '__main__':
     main()
