@@ -2,12 +2,15 @@
 Implements deep maxent IRL (Wulfmeier et. all) in a general, feature-type
 agnostic way.
 """
+import sys
 from pathlib import Path
-import numpy as np
 import torch
+import torch.nn as nn
 from torch.optim import Adam
-from irlmethods.deep_maxent import RewardNet
 from tensorboardX import SummaryWriter
+
+sys.path.insert(0, "..")
+from neural_nets.base_network import BaseNN
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -66,6 +69,35 @@ def play(env, policy, feature_extractor, max_env_steps, render=False):
     return features
 
 
+class RewardNet(BaseNN):
+    """Reward network"""
+
+    def __init__(self, state_dims, hidden_dims=[128]):
+        super(RewardNet, self).__init__()
+
+        self.input = nn.Sequential(
+            nn.Linear(state_dims, hidden_dims[0]), nn.ELU(),
+        )
+        self.hidden_layers = []
+        for i in range(1, len(hidden_dims)):
+            self.hidden_layers.append(
+                nn.Sequential(
+                    nn.Linear(hidden_dims[i - 1], hidden_dims[i]), nn.ELU(),
+                )
+            )
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
+        self.head = nn.Linear(hidden_dims[-1], 1)
+
+    def forward(self, x):
+        x = self.input(x)
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers[i](x)
+
+        x = self.head(x)
+
+        return x
+
+
 class GeneralDeepMaxent:
     """
     Implements deep maxent IRL (Wulfmeier et. al) in a state-type agnostic way.
@@ -107,6 +139,9 @@ class GeneralDeepMaxent:
             str(self.save_path / "tensorboard_logs")
         )
 
+        # training meta
+        self.training_i = 0
+
     def generate_trajectories(self, num_trajectories, max_env_steps):
         """
         Generate trajectories in environemnt using leanred RL policy.
@@ -137,7 +172,6 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
-        episode_i,
     ):
         """
         perform IRL training.
@@ -192,14 +226,21 @@ class GeneralDeepMaxent:
         self.reward_optim.step()
 
         # logging
-        self.tbx_writer.add_scalar("IRL/policy_loss", policy_loss, episode_i)
-        self.tbx_writer.add_scalar("IRL/expert_loss", expert_loss, episode_i)
-        self.tbx_writer.add_scalar("IRL/total_loss", loss, episode_i)
+        self.tbx_writer.add_scalar(
+            "IRL/policy_loss", policy_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            "IRL/expert_loss", expert_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
         self.rl.policy.save(str(self.save_path / "policy"))
         self.reward_net.save(str(self.save_path / "reward_net"))
+
+        # increment training counter
+        self.training_i += 1
 
     def train(
         self,
@@ -209,12 +250,11 @@ class GeneralDeepMaxent:
         num_trajectory_samples,
         max_env_steps,
     ):
-        for episode_i in range(num_irl_episodes):
-            print("IRL episode {}".format(episode_i))
+        for _ in range(num_irl_episodes):
+            print("IRL episode {}".format(self.training_i))
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,
                 num_trajectory_samples,
                 max_env_steps,
-                episode_i,
             )
