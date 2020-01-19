@@ -293,6 +293,89 @@ def radial_density_density(agent_position, pedestrian_positions, radius):
         raise ValueError
 
 
+@njit
+def speed_features(agent_velocity, pedestrian_velocities):
+    """
+    Computes speed features as described in Vasquez et. al's paper: "Learning
+    to navigate through crowded environments".
+
+    :param agent_velocity: velocity of agent (robot)
+    :type agent_velocity: 2D np.array or tuple
+    :param pedestrian_velocities: velocities of pedestrians
+    :type pedestrian_velocities: list or np.array of 2d arrays or tuples.
+    :return: magnitude feature np.array of shape (3,)
+    :rtype: float np.array
+    """
+
+    feature = np.zeros(3)
+
+    for pedestrian_vel in pedestrian_velocities:
+        speed = dist_2d(pedestrian_vel, agent_velocity)
+
+        # put value into proper bin
+        if 0 <= speed < 0.015:
+            feature[0] += 1
+        elif 0.015 <= speed < 0.025:
+            feature[1] += 1
+        elif speed >= 0.025:
+            feature[2] += 1
+        else:
+            raise ValueError(
+                "Error in binning speed. speed does not fit into any bin."
+            )
+
+    return feature
+
+
+@njit
+def orientation_features(
+    agent_position, agent_velocity, pedestrian_positions, pedestrian_velocities
+):
+    """
+    Computes the orientation features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: np.array or list, containing 2d arrays or tuples.
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: np.array or list, containing 2d arrays or tuples.
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    feature = np.zeros(3)
+
+    # Check that same number of pedestrian positions and velocities are passed in.
+    assert len(pedestrian_positions) == len(pedestrian_velocities)
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = agent_position - pedestrian_positions[ped_id]
+        relative_vel = agent_velocity - pedestrian_velocities[ped_id]
+
+        angle = angle_between(relative_pos, relative_vel)
+        print(angle)
+
+        # put into bins
+        if (-3 / 4) * np.pi < angle <= (3 / 4) * np.pi:
+            feature[0] += 1
+        elif 0.25 * np.pi <= angle < (3 / 4) * np.pi:
+            feature[1] += 1
+        elif (-3 / 4) * np.pi <= angle < -0.25 * np.pi:
+            feature[1] += 1
+        elif -0.25 * np.pi <= angle < 0.25 * np.pi:
+            feature[2] += 1
+        else:
+            raise ValueError(
+                "Error in binning orientation. Orientation does not fit into any bin."
+            )
+
+    return feature
+
+
 #################################################################################
 #################################################################################
 class DroneFeatureSAM1:
