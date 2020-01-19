@@ -175,6 +175,8 @@ parser.add_argument("--replay-buffer-size", type=int, default=5000)
 
 parser.add_argument("--num-trajectory-samples", type=int, default=100)
 
+parser.add_argument("--entropy-target", type=float, default=0.3)
+
 
 def main():
     args = parser.parse_args()
@@ -399,7 +401,7 @@ def main():
             args.replay_buffer_sample_size,
             learning_rate=args.lr_rl,
             entropy_tuning=True,
-            entropy_target=0.3,
+            entropy_target=args.entropy_target,
             play_interval=args.play_interval,
         )
 
@@ -435,6 +437,8 @@ def main():
         args.num_trajectory_samples,
         args.rl_ep_length,
     )
+
+    import pdb; pdb.set_trace()
 
 
 

@@ -252,7 +252,7 @@ class SoftActorCritic:
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
-    def train_episode(self, max_env_steps):
+    def train_episode(self, max_env_steps, reward_net=None):
         """Train Soft Actor Critic"""
 
         # Populate the buffer
@@ -265,6 +265,12 @@ class SoftActorCritic:
         reward_batch = torch.from_numpy(replay_samples[2]).to(DEVICE)
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
         dones = torch.from_numpy(replay_samples[4]).type(torch.long).to(DEVICE)
+
+        # if reward net exists, replace reward batch with fresh one
+        if reward_net:
+            fresh_rewards = reward_net(next_state_batch).flatten()
+            assert fresh_rewards.shape == reward_batch.shape
+            reward_batch = fresh_rewards
 
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
@@ -410,7 +416,7 @@ class SoftActorCritic:
         print("Training RL . . .")
 
         for _ in tqdm(range(num_episodes)):
-            self.train_episode(max_env_steps)
+            self.train_episode(max_env_steps, reward_network)
 
             if self.training_i % self.play_interval == 0:
                 self.play(max_env_steps, reward_network=reward_network)
