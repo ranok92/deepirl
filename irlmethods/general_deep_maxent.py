@@ -126,7 +126,7 @@ class GeneralDeepMaxent:
         self.reward_net = RewardNet(state_size, hidden_dims=[256] * 2)
         self.reward_net = self.reward_net.to(DEVICE)
         self.reward_optim = Adam(
-            self.reward_net.parameters(), lr=learning_rate
+            self.reward_net.parameters(), lr=learning_rate, weight_decay=1e-5,
         )
 
         # expert info
