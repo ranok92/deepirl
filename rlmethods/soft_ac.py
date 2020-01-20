@@ -338,10 +338,15 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self, max_env_steps, reward_network=None, render=False):
+    def play(self, max_env_steps, reward_network=None, render=False, best_action=False):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
+
+        :param max_env_steps: Maximum number of steps to take in playthrough.
+        :param reward_network: Replaces environment's builtin rewards.
+        :param render: If True, renders the playthrough.
+        :param best_action: If True, uses best actions instead of stochastic actions.
         """
 
         done = False
@@ -357,7 +362,13 @@ class SoftActorCritic:
             torch_state = torch_state.to(DEVICE)
 
             alpha = self.log_alpha.exp().detach()
-            action, _, _ = self.select_action(torch_state, alpha)
+
+            # select an action to do
+            if best_action:
+                action = self.policy.eval_action(torch_state)
+            else:
+                action, _, _ = self.select_action(torch_state, alpha)
+
             next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
             next_state = self.feature_extractor.extract_features(next_state)
 
