@@ -361,9 +361,9 @@ def orientation_features(
 
         # put into bins
         # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
-        if (3 / 4) * np.pi < angle < np.pi:
+        if 0.75 * np.pi < angle <= np.pi:
             feature[0] += 1
-        elif 0.25 * np.pi <= angle < (3 / 4) * np.pi:
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
             feature[1] += 1
         elif 0.0 <= angle < 0.25 * np.pi:
             feature[2] += 1
