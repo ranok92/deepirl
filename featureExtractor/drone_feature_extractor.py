@@ -356,17 +356,16 @@ def orientation_features(
         relative_pos = agent_position - pedestrian_positions[ped_id]
         relative_vel = agent_velocity - pedestrian_velocities[ped_id]
 
+        # angle_between produces only positive angles
         angle = angle_between(relative_pos, relative_vel)
-        print(angle)
 
         # put into bins
-        if (-3 / 4) * np.pi < angle <= (3 / 4) * np.pi:
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if (3 / 4) * np.pi < angle < np.pi:
             feature[0] += 1
         elif 0.25 * np.pi <= angle < (3 / 4) * np.pi:
             feature[1] += 1
-        elif (-3 / 4) * np.pi <= angle < -0.25 * np.pi:
-            feature[1] += 1
-        elif -0.25 * np.pi <= angle < 0.25 * np.pi:
+        elif 0.0 <= angle < 0.25 * np.pi:
             feature[2] += 1
         else:
             raise ValueError(
