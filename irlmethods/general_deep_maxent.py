@@ -93,7 +93,7 @@ class RewardNet(BaseNN):
         for i in range(len(self.hidden_layers)):
             x = self.hidden_layers[i](x)
 
-        x = self.head(x)
+        x = torch.tanh(self.head(x))
 
         return x
 
