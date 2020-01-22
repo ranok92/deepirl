@@ -375,8 +375,74 @@ def orientation_features(
     return feature
 
 
-#################################################################################
-#################################################################################
+@njit
+def velocity_features(
+    agent_position, agent_velocity, pedestrian_positions, pedestrian_velocities
+):
+    """
+    Computes the velocity features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: 2d float np.array.
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: 2d float np.array.
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    feature = np.zeros((3, 3))
+
+    assert len(pedestrian_positions) == len(pedestrian_velocities)
+
+    # used to group pedestrians with the same orientation bin together using
+    # their ID.
+    ped_sorted_by_orientation = [np.empty(0, dtype=np.int64)] * 3
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = agent_position - pedestrian_positions[ped_id]
+        relative_vel = agent_velocity - pedestrian_velocities[ped_id]
+
+        # angle_between produces only positive angles
+        angle = angle_between(relative_pos, relative_vel)
+
+        # put into bins
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if 0.75 * np.pi < angle <= np.pi:
+            ped_sorted_by_orientation[0] = np.append(
+                ped_sorted_by_orientation[0], ped_id
+            )
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            ped_sorted_by_orientation[1] = np.append(
+                ped_sorted_by_orientation[1], ped_id
+            )
+        elif 0.0 <= angle < 0.25 * np.pi:
+            ped_sorted_by_orientation[2] = np.append(
+                ped_sorted_by_orientation[2], ped_id
+            )
+        else:
+            raise ValueError("Orientation does not fit into any bin.")
+
+    for idx, ped_ids in enumerate(ped_sorted_by_orientation):
+        mean_speeds = np.mean(np.abs(pedestrian_velocities[ped_ids]))
+
+        # bin speeds
+        if 0 <= mean_speeds < 0.015:
+            feature[idx, 0] = 1
+        elif 0.015 <= mean_speeds < 0.025:
+            feature[idx, 1] = 1
+        elif mean_speeds >= 0.025:
+            feature[idx, 2] = 1
+        else:
+            raise ValueError("Average speed does not fit in any bins.")
+
+    return feature.flatten()
+
+
 class DroneFeatureSAM1:
     """
     Features to put in:
