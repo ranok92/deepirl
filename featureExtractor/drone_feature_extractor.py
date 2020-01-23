@@ -443,6 +443,92 @@ def velocity_features(
     return feature.flatten()
 
 
+def social_force_features(
+    agent_radius, agent_position, pedestrian_positions, pedestrian_velocities
+):
+    """
+    Computes the social forces features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_radius: radius of agent(s) in the environment. Note: this is
+    the radius of the agent's graphical circle, not a radius around the
+    agent.
+    :type agent_radius: float.
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: 2d float np.array.
+
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: 2d float np.array.
+
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    assert len(pedestrian_positions) == len(pedestrian_velocities)
+
+    # calculate social forces between pedestrians and agent
+    # in the paper formula, 'j' is our agent, while 'i's are the pedestrians.
+
+    rel_positions = agent_position - pedestrian_positions
+    rel_distances = np.linalg.norm(rel_positions, axis=1)
+    normalized_rel_positions = rel_positions / np.max(rel_distances)
+
+    assert rel_positions.shape == normalized_rel_positions.shape
+
+    rel_angles = np.zeros(rel_distances.shape)
+
+    # used to group pedestrians with the same orientation bin together using
+    # their ID.
+    feature = np.zeros(3)
+    ped_orientation_bins = [np.empty(0, dtype=np.int64)] * 3
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = rel_positions[ped_id]
+        ped_velocity = pedestrian_velocities[ped_id]
+
+        # angle_between produces only positive angles
+        angle = angle_between(relative_pos, ped_velocity)
+        rel_angles[ped_id] = angle
+
+        # put into bins
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if 0.75 * np.pi < angle <= np.pi:
+            ped_orientation_bins[0] = np.append(
+                ped_orientation_bins[0], ped_id
+            )
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            ped_orientation_bins[1] = np.append(
+                ped_orientation_bins[1], ped_id
+            )
+        elif 0.0 <= angle < 0.25 * np.pi:
+            ped_orientation_bins[2] = np.append(
+                ped_orientation_bins[2], ped_id
+            )
+        else:
+            raise ValueError("Orientation does not fit into any bin.")
+
+    exp_multiplier = np.exp(2 * agent_radius - rel_distances).reshape(-1, 1)
+    anisotropic_term = (2.0 - 0.5 * (1.0 + np.cos(rel_angles))).reshape(-1, 1)
+    social_forces = (
+        exp_multiplier * normalized_rel_positions * anisotropic_term
+    )
+
+    forces_above_threshold = np.linalg.norm(social_forces, axis=1) > 0.5
+
+    feature[0] = np.sum(forces_above_threshold[ped_orientation_bins[0]])
+    feature[1] = np.sum(forces_above_threshold[ped_orientation_bins[1]])
+    feature[2] = np.sum(forces_above_threshold[ped_orientation_bins[2]])
+
+    return feature
+
+
 class DroneFeatureSAM1:
     """
     Features to put in:
