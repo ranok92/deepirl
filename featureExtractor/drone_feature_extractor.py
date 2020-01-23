@@ -444,7 +444,7 @@ def velocity_features(
 
 
 def social_force_features(
-    agent_radius, agent_position, pedestrian_positions, pedestrian_velocities
+    agent_radius, agent_position, agent_velocity, pedestrian_positions
 ):
     """
     Computes the social forces features described in Vasquez et. al's paper:
@@ -471,12 +471,9 @@ def social_force_features(
     :rtype: float np.array of shape (3,)
     """
 
-    assert len(pedestrian_positions) == len(pedestrian_velocities)
+    # in the paper formula, 'i' is our agent, while 'j's are the pedestrians.
 
-    # calculate social forces between pedestrians and agent
-    # in the paper formula, 'j' is our agent, while 'i's are the pedestrians.
-
-    rel_positions = agent_position - pedestrian_positions
+    rel_positions = pedestrian_positions - agent_position
     rel_distances = np.linalg.norm(rel_positions, axis=1)
     normalized_rel_positions = rel_positions / np.max(rel_distances)
 
@@ -491,10 +488,9 @@ def social_force_features(
 
     for ped_id in range(len(pedestrian_positions)):
         relative_pos = rel_positions[ped_id]
-        ped_velocity = pedestrian_velocities[ped_id]
 
         # angle_between produces only positive angles
-        angle = angle_between(relative_pos, ped_velocity)
+        angle = angle_between(relative_pos, agent_velocity)
         rel_angles[ped_id] = angle
 
         # put into bins
