@@ -1,4 +1,5 @@
 import sys
+import warnings
 import math
 import pdb
 import itertools
@@ -29,6 +30,11 @@ def angle_between(v1, v2):
 @njit
 def dist_2d(v1, v2):
     return math.sqrt((v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2)
+
+
+@njit
+def norm_2d(vector):
+    return math.sqrt(vector[0] ** 2 + vector[1] ** 2)
 
 
 def deg_to_rad(deg):
@@ -295,7 +301,7 @@ def speed_features(
     agent_velocity,
     pedestrian_velocities,
     lower_threshold=0.015,
-    higher_threshold=0.025,
+    upper_threshold=0.025,
 ):
     """
     Computes speed features as described in Vasquez et. al's paper: "Learning
@@ -311,15 +317,15 @@ def speed_features(
     for binning. This is 0.015 in the paper.
     :type lower_threshold: float
 
-    :param higher_threshold: Higher magnitude of speed threshold threshold
+    :param upper_threshold: Higher magnitude of speed threshold
     used for binning. This is 0.025 in the paper.
-    :type higher_threshold: float
+    :type upper_threshold: float
 
     :return: magnitude feature np.array of shape (3,)
     :rtype: float np.array
     """
 
-    assert lower_threshold < higher_threshold
+    assert lower_threshold < upper_threshold
 
     feature = np.zeros(3)
 
@@ -329,9 +335,9 @@ def speed_features(
         # put value into proper bin
         if 0 <= speed < lower_threshold:
             feature[0] += 1
-        elif lower_threshold <= speed < higher_threshold:
+        elif lower_threshold <= speed < upper_threshold:
             feature[1] += 1
-        elif speed >= higher_threshold:
+        elif speed >= upper_threshold:
             feature[2] += 1
         else:
             raise ValueError(
@@ -396,7 +402,7 @@ def velocity_features(
     pedestrian_positions,
     pedestrian_velocities,
     lower_speed_threshold=0.015,
-    higher_speed_threshold=0.025,
+    upper_speed_threshold=0.025,
 ):
     """
     Computes the velocity features described in Vasquez et. al's paper:
@@ -415,9 +421,9 @@ def velocity_features(
     threshold used for binning. This is 0.015 in the paper.
     :type lower_threshold: float
 
-    :param higher_speed_threshold: Higher magnitude of speed threshold
+    :param upper_speed_threshold: Higher magnitude of speed threshold
     threshold used for binning. This is 0.025 in the paper.
-    :type higher_threshold: float
+    :type upper_threshold: float
 
     :param pedestrian_velocities: velocities of pedestrians.
     :type pedestrian_velocities: 2d float np.array.
@@ -426,13 +432,14 @@ def velocity_features(
     for binning. This is 0.015 in the paper.
     :type lower_threshold: float
 
-    :param higher_threshold: Higher magnitude of speed threshold threshold
+    :param upper_threshold: Higher magnitude of speed threshold threshold
     used for binning. This is 0.025 in the paper.
-    :type higher_threshold: float
+    :type upper_threshold: float
     :return: orientation feature vector.
     :rtype: float np.array of shape (3,)
     """
 
+    assert lower_speed_threshold < upper_speed_threshold
     feature = np.zeros((3, 3))
 
     assert len(pedestrian_positions) == len(pedestrian_velocities)
@@ -471,9 +478,9 @@ def velocity_features(
         # bin speeds
         if 0 <= mean_speeds < lower_speed_threshold:
             feature[idx, 0] = 1
-        elif lower_speed_threshold <= mean_speeds < higher_speed_threshold:
+        elif lower_speed_threshold <= mean_speeds < upper_speed_threshold:
             feature[idx, 1] = 1
-        elif mean_speeds >= higher_speed_threshold:
+        elif mean_speeds >= upper_speed_threshold:
             feature[idx, 2] = 1
         else:
             raise ValueError("Average speed does not fit in any bins.")
@@ -561,6 +568,59 @@ def social_force_features(
     feature[2] = np.sum(forces_above_threshold[ped_orientation_bins[2]])
 
     return feature
+
+
+class BaseVasquez:
+    def compute_state_information(self, state_dict):
+        """
+        Vasquez et. al's features are based on agent positions and
+        velocities. This function computes those values and returns them in
+        the proper format.
+
+        :param state_dict: State dictionary of the environment.
+        :type state_dict: dictionary.
+
+        :return: agent position, agent velocity, pedestrian positions,
+        pedestrian velocities
+        :rtype: 2d float np.array, 2d float np.array, (num_peds x 2) float
+        np.array, (num_peds x2) float np.array
+        """
+
+        # get necessary info about pedestrians
+        ped_info_list = state_dict["obstacles"]
+
+        ped_velocities = np.zeros(len(ped_info_list), 2)
+        ped_positions = np.zeros(len(ped_info_list), 2)
+
+        for ped_index, ped_info in enumerate(ped_info_list):
+            ped_orientation = ped_info["orientation"]
+            ped_orientation = ped_orientation / norm_2d(ped_orientation)
+
+            ped_velocities[ped_index] = ped_orientation * ped_info["speed"]
+            ped_positions[ped_index] = ped_info["position"]
+
+        # get necessary info about agent
+        agent_orientation = state_dict["agent_state"]["orientation"]
+        normalizing_factor = norm_2d(agent_orientation)
+
+        if normalizing_factor != 0.0:
+            agent_orientation = agent_orientation / norm_2d(agent_orientation)
+        else:
+            warnings.warn(
+                "division by zero side-stepped - agent has (0,0) orinetation."
+            )
+
+        agent_speed = state_dict["agent_state"]["speed"]
+        agent_velocity = agent_orientation * agent_speed
+
+        agent_position = state_dict["agent_state"]["position"]
+
+        return (
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            ped_velocities,
+        )
 
 
 class DroneFeatureSAM1:
