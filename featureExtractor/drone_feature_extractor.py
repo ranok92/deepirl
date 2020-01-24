@@ -291,18 +291,35 @@ def radial_density_density(agent_position, pedestrian_positions, radius):
 
 
 @njit
-def speed_features(agent_velocity, pedestrian_velocities):
+def speed_features(
+    agent_velocity,
+    pedestrian_velocities,
+    lower_threshold=0.015,
+    higher_threshold=0.025,
+):
     """
     Computes speed features as described in Vasquez et. al's paper: "Learning
     to navigate through crowded environments".
 
     :param agent_velocity: velocity of agent (robot)
     :type agent_velocity: 2D np.array or tuple
+
     :param pedestrian_velocities: velocities of pedestrians
     :type pedestrian_velocities: list or np.array of 2d arrays or tuples.
+
+    :param lower_threshold: Lower magnitude of speed threshold threshold used
+    for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param higher_threshold: Higher magnitude of speed threshold threshold
+    used for binning. This is 0.025 in the paper.
+    :type higher_threshold: float
+
     :return: magnitude feature np.array of shape (3,)
     :rtype: float np.array
     """
+
+    assert lower_threshold < higher_threshold
 
     feature = np.zeros(3)
 
@@ -310,11 +327,11 @@ def speed_features(agent_velocity, pedestrian_velocities):
         speed = dist_2d(pedestrian_vel, agent_velocity)
 
         # put value into proper bin
-        if 0 <= speed < 0.015:
+        if 0 <= speed < lower_threshold:
             feature[0] += 1
-        elif 0.015 <= speed < 0.025:
+        elif lower_threshold <= speed < higher_threshold:
             feature[1] += 1
-        elif speed >= 0.025:
+        elif speed >= higher_threshold:
             feature[2] += 1
         else:
             raise ValueError(
@@ -374,7 +391,12 @@ def orientation_features(
 
 @njit
 def velocity_features(
-    agent_position, agent_velocity, pedestrian_positions, pedestrian_velocities
+    agent_position,
+    agent_velocity,
+    pedestrian_positions,
+    pedestrian_velocities,
+    lower_speed_threshold=0.015,
+    higher_speed_threshold=0.025,
 ):
     """
     Computes the velocity features described in Vasquez et. al's paper:
@@ -382,12 +404,31 @@ def velocity_features(
 
     :param agent_position: position of the agent (robot)
     :type agent_position: 2d np.array or tuple
+
     :param agent_velocity: velocity of the agent (robot)
     :type agent_velocity: 2d np.array or tuple
+
     :param pedestrian_positions: positions of pedestrians.
     :type pedestrian_positions: 2d float np.array.
+
+    :param lower_speed_threshold: Lower magnitude of speed threshold
+    threshold used for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param higher_speed_threshold: Higher magnitude of speed threshold
+    threshold used for binning. This is 0.025 in the paper.
+    :type higher_threshold: float
+
     :param pedestrian_velocities: velocities of pedestrians.
     :type pedestrian_velocities: 2d float np.array.
+
+    :param lower_threshold: Lower magnitude of speed threshold threshold used
+    for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param higher_threshold: Higher magnitude of speed threshold threshold
+    used for binning. This is 0.025 in the paper.
+    :type higher_threshold: float
     :return: orientation feature vector.
     :rtype: float np.array of shape (3,)
     """
@@ -428,11 +469,11 @@ def velocity_features(
         mean_speeds = np.mean(np.abs(pedestrian_velocities[ped_ids]))
 
         # bin speeds
-        if 0 <= mean_speeds < 0.015:
+        if 0 <= mean_speeds < lower_speed_threshold:
             feature[idx, 0] = 1
-        elif 0.015 <= mean_speeds < 0.025:
+        elif lower_speed_threshold <= mean_speeds < higher_speed_threshold:
             feature[idx, 1] = 1
-        elif mean_speeds >= 0.025:
+        elif mean_speeds >= higher_speed_threshold:
             feature[idx, 2] = 1
         else:
             raise ValueError("Average speed does not fit in any bins.")
