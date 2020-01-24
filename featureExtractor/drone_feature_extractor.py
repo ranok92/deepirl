@@ -161,6 +161,10 @@ def get_abs_orientation(agent_state, orientation_approximator):
 
 
 def get_rel_orientation(prev_frame_info, agent_state, goal_state):
+    """
+    Calculates and bins the angle between (agent_pos - goal_pos) and agent velocity.
+    in effect, this is the "error" in the agent's heading.
+    """
     # returns the relative orientation of the agent with the direction
     # of the goal.
     # Primarily for use in IRL
@@ -197,6 +201,11 @@ def get_rel_goal_orientation(
     agent_abs_orientation,
     goal_state,
 ):
+    """
+    Calculates a vector from the agent to the goal.
+    This vector is in the agent's coordinate system, e.g. zero degrees is forward.
+    This vector is binned into a one hot vector based on orientation_approximator.
+    """
     # returns the relative orientation of the goal wrt to the agent
     # Dim:8
 
@@ -220,18 +229,6 @@ def get_rel_goal_orientation(
         relative_goal, orientation_approximator
     )
 
-    """
-    if diff_in_angle < np.pi/4:
-        rel_orientation = 0
-
-    elif diff_in_angle < np.pi*3/4 and diff_in_angle >= np.pi/4:
-        rel_orientation = 1
-
-    else:
-        rel_orientation = 2
-
-    relative_orientation_vector[rel_orientation] = 1 
-    """
     return relative_orientation_vector
 
 
