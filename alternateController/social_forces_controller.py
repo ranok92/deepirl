@@ -89,7 +89,9 @@ class SocialForcesController():
     def calculate_repulsive_force_btw_points(self, agent_state, obstacle):
         '''
         calculates the repulsive forces acting on the agent due to a single 
-        nearby pedestrian(obstacle)
+        nearby pedestrian(obstacle) [following the formulation as shown in 
+        the paper IRL algorithms and feature representations for robot navigation
+        vasquez et al]
             input: agent_state, obstacle
             output: repulsive force (2 dim vector)
         '''
@@ -97,7 +99,10 @@ class SocialForcesController():
         obs_pos = obstacle['position']
         diff_pos = agent_pos - obs_pos
         obs_step = obstacle['speed']*obstacle['orientation']
-
+        
+        r_ij = 10 #sum of agent and obstacle radius
+        d_ij = np.linalg.norm(diff_pos)
+        
         return 
 
 

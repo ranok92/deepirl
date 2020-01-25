@@ -18,7 +18,7 @@ from numba import njit, jit
 def angle_between(v1, v2):
     v1_conv = v1.astype(np.dtype('float'))
     v2_conv = v2.astype(np.dtype('float'))
-    return np.abs(np.arctan2(np.linalg.det(np.stack((v1_conv,v2_conv))), np.dot(v1_conv,v2_conv)))
+    return np.arctan2(np.linalg.det(np.stack((v1_conv,v2_conv))), np.dot(v1_conv,v2_conv))
 
 
 def deg_to_rad(deg):

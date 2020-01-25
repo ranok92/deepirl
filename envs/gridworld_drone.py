@@ -10,6 +10,7 @@ from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeat
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from envs.drone_env_utils import InformationCollector
 from alternateController.potential_field_controller import PotentialFieldController as PFController
+from alternateController.social_forces_controller import SocialForcesController
 from itertools import count
 import utils  # NOQA: E402
 from envs.gridworld import GridWorld
@@ -1063,14 +1064,16 @@ if __name__=="__main__":
                                         thresh1=20,
                                         thresh2=30,
                                         show_agent_persp=True)
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt'
+    #annotation_file = None
     world = GridWorldDrone(display=True, 
-                        seed=0, obstacles=None, 
+                        seed=20, obstacles=None, 
                         show_trail=True,
                         is_random=False,
                         annotation_file=annotation_file,
                         subject=None,
-                        tick_speed=5, 
+                        tick_speed=30, 
                         obs_width=7,
                         step_size=2,
                         agent_width=7,
@@ -1078,13 +1081,21 @@ if __name__=="__main__":
                         show_comparison=True,
                         show_orientation=True,
                         external_control=True,
-                        replace_subject=True, 
+                        replace_subject=False, 
                         segment_size=500,
                         consider_heading=True,                      
                         continuous_action=False,
                         rows=576, cols=720, width=20)
 
-    pf_agent = PFController()
+    #pf_agent = PFController()
+    orient_quant = world.orient_quantization
+    orient_div = len(world.orientation_array)
+    speed_quant = world.speed_quantization
+    speed_div = len(world.speed_array)
+    pdb.set_trace()
+    agent = SocialForcesController(speed_div, orient_div, orient_quant)
+
+
     '''
     feat_ext = LocalGlobal(window_size=9, 
                            grid_size = 10,
@@ -1116,7 +1127,7 @@ if __name__=="__main__":
             action = world.action_space.sample()
 
 
-            #action = pf_agent.select_action(state)
+            #action = agent.eval_action(state)
             #print("agent state :", world.agent_state)
             #print("current orientation :", world.cur_heading_dir)
             #action_speed = int(input())
@@ -1135,7 +1146,7 @@ if __name__=="__main__":
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
-            pdb.set_trace()
+            #pdb.set_trace()
             #print(feat)
             '''
             if t%100==0:
