@@ -414,6 +414,7 @@ def orientation_features(
 
     return feature
 
+
 @njit
 def velocity_features(
     agent_position,
@@ -751,6 +752,22 @@ class VasquezF1(BaseVasquez):
     def __init__(
         self, density_radius, lower_speed_threshold, upper_speed_threshold
     ):
+        """
+        Calculates Vasquez et. al's f1 features as described in their paper:
+        "Inverse reinforcement learning Algorithms and features for robot
+        navigation in crowds."
+
+        :param density_radius: Radius around agent used to density features of surrounding pedestrians.
+        :type density_radius: float.
+
+        :param lower_speed_threshold: Lower speed magnitude threshold, used for
+        binning features based on speed.
+        :type lower_speed_threshold: float.
+        :param upper_speed_threshold: Upper speed magnitude threshold, used for
+        binning features based on speed.
+        :type upper_speed_threshold: float.
+        """
+
         self.density_radius = density_radius
         self.lower_speed_threshold = lower_speed_threshold
         self.upper_speed_threshold = upper_speed_threshold
@@ -792,6 +809,127 @@ class VasquezF1(BaseVasquez):
             (
                 density_feature_vector,
                 velocity_feature_vector,
+                angle_to_goal_feature_vector,
+                vector_to_goal_feature_vector,
+                default_feature_vector,
+            )
+        )
+
+        return out_features
+
+
+class VasquezF2(BaseVasquez):
+    def __init__(
+        self, density_radius, lower_speed_threshold, upper_speed_threshold
+    ):
+        """
+        Calculates Vasquez et. al's f2 features as described in their paper:
+        "Inverse reinforcement learning Algorithms and features for robot
+        navigation in crowds."
+
+        :param density_radius: Radius around agent used to density features of surrounding pedestrians.
+        :type density_radius: float.
+
+        :param lower_speed_threshold: Lower speed magnitude threshold, used for
+        binning features based on speed.
+        :type lower_speed_threshold: float.
+        :param upper_speed_threshold: Upper speed magnitude threshold, used for
+        binning features based on speed.
+        :type upper_speed_threshold: float.
+        """
+
+        self.density_radius = density_radius
+        self.lower_speed_threshold = lower_speed_threshold
+        self.upper_speed_threshold = upper_speed_threshold
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            ped_velocities,
+        ) = self.compute_state_information(state_dict)
+
+        density_feature_vector = radial_density_features(
+            agent_position, ped_positions, self.density_radius
+        )
+
+        speed_feature_vector = speed_features(
+            agent_velocity,
+            ped_velocities,
+            lower_threshold=self.lower_speed_threshold,
+            upper_threshold=self.upper_speed_threshold,
+        )
+
+        orientation_feature_vector = orientation_features(
+            agent_position, agent_velocity, ped_positions, ped_velocities,
+        )
+
+        default_feature_vector = np.ones(1)
+
+        # goal orienting features
+        goal_position = state_dict["goal_state"]
+        angle_to_goal_feature_vector = angle_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        vector_to_goal_feature_vector = vector_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        out_features = np.concatenate(
+            (
+                density_feature_vector,
+                speed_feature_vector,
+                orientation_feature_vector,
+                angle_to_goal_feature_vector,
+                vector_to_goal_feature_vector,
+                default_feature_vector,
+            )
+        )
+
+        return out_features
+
+
+class VasquezF3(BaseVasquez):
+    def __init__(self, agent_radius):
+        """
+        Calculates Vasquez et. al's f3 features as described in their paper:
+        "Inverse reinforcement learning Algorithms and features for robot
+        navigation in crowds."
+
+        :param agent_radius: radius of agent itself. This is the "width" of the agent, not a radius surrounding the agent.
+        :type agent_radius: float.
+        """
+        self.agent_radius = agent_radius
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            _,
+        ) = self.compute_state_information(state_dict)
+
+        default_feature_vector = np.ones(1)
+
+        social_force_feature_vector = social_force_features(
+            self.agent_radius, agent_position, agent_velocity, ped_positions
+        )
+
+        # goal orienting features
+        goal_position = state_dict["goal_state"]
+        angle_to_goal_feature_vector = angle_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        vector_to_goal_feature_vector = vector_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        out_features = np.concatenate(
+            (
+                social_force_feature_vector,
                 angle_to_goal_feature_vector,
                 vector_to_goal_feature_vector,
                 default_feature_vector,

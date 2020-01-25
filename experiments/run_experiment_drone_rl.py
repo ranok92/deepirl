@@ -145,6 +145,9 @@ def main():
         DroneFeatureOccup,
         DroneFeatureRisk,
         DroneFeatureRisk_v2,
+        VasquezF1,
+        VasquezF2,
+        VasquezF3,
     )
     from featureExtractor.gridworld_featureExtractor import (
         FrontBackSide,
@@ -297,6 +300,16 @@ def main():
             thresh1=18,
             thresh2=30,
         )
+
+    if args.feat_extractor == 'VasquezF1':
+        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+
+    if args.feat_extractor == 'VasquezF2':
+        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+
+    if args.feat_extractor == 'VasquezF3':
+        feat_ext = VasquezF3(agent_width)
+
 
     if feat_ext is None:
         print("Please enter proper feature extractor!")

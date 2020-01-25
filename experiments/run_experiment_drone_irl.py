@@ -27,6 +27,8 @@ from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_speed,
     DroneFeatureRisk_speedv2,
     VasquezF1,
+    VasquezF2,
+    VasquezF3
 )
 
 
@@ -339,6 +341,12 @@ def main():
 
     if args.feat_extractor == 'VasquezF1':
         feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+
+    if args.feat_extractor == 'VasquezF2':
+        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+
+    if args.feat_extractor == 'VasquezF3':
+        feat_ext = VasquezF3(agent_width)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
