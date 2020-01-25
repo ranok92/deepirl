@@ -161,6 +161,10 @@ def main():
         DroneFeatureRisk_speedv2,
     )
 
+    from featureExtractor.drone_feature_extractor import (
+        VasquezF1,
+    )
+
     save_folder = None
 
     if not args.dont_save and not args.play:
@@ -302,10 +306,10 @@ def main():
         )
 
     if args.feat_extractor == 'VasquezF1':
-        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+        feat_ext = VasquezF1(agent_width*6, 0.5, 1.0)
 
     if args.feat_extractor == 'VasquezF2':
-        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
+        feat_ext = VasquezF1(agent_width*6, 0.5, 1.0)
 
     if args.feat_extractor == 'VasquezF3':
         feat_ext = VasquezF3(agent_width)
