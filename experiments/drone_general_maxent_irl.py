@@ -1,12 +1,13 @@
-import sys, time  # NOQA
-import pdb
+""" run general deep maxent (Wulfmeier et. al) on drone environment. """
+import sys
+import time
 import os
 import argparse
 import matplotlib
-import numpy as np
 
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
+from irlmethods.irlUtils import read_expert_states
 from logger.logger import Logger
 import utils
 import gym
@@ -26,7 +27,6 @@ from featureExtractor.gridworld_featureExtractor import (
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_speed,
     DroneFeatureRisk_speedv2,
-    VasquezF1,
 )
 
 
@@ -74,6 +74,7 @@ parser.add_argument(
     "--save-folder",
     type=str,
     default=None,
+    required=True,
     help="The name of the directory to store the results in. The name will be used to \
                     save the plots, the policy and the reward networks.(Relative path)",
 )
@@ -81,6 +82,7 @@ parser.add_argument(
 parser.add_argument(
     "--exp-trajectory-path",
     type=str,
+    required=True,
     default=None,
     help="The name of the directory in which \
                     the expert trajectories are stored.(Relative path)",
@@ -89,6 +91,7 @@ parser.add_argument(
 parser.add_argument(
     "--feat-extractor",
     type=str,
+    required=True,
     default=None,
     help="The name of the \
                      feature extractor to be used in the experiment.",
@@ -170,9 +173,11 @@ parser.add_argument("--play-interval", type=int, default=10)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
 
+parser.add_argument("--num-trajectory-samples", type=int, default=100)
 
-# IMPORTANT*** search for 'CHANGE HERE' to find that most probably need changing
-# before running on different settings
+parser.add_argument("--entropy-target", type=float, default=0.3)
+
+
 def main():
     args = parser.parse_args()
 
@@ -183,14 +188,8 @@ def main():
         # pygame without monitor
         os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-    #####for the logger
     ts = time.time()
     st = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d_%H:%M:%S")
-    ###################
-
-    if not args.save_folder:
-        print("Provide save folder.")
-        exit()
 
     policy_net_dims = "-policy_net-"
     for dim in args.policy_net_hidden_dims:
@@ -209,6 +208,7 @@ def main():
         + policy_net_dims
         + reward_net_dims
     )
+
     to_save = (
         "./results/"
         + str(args.save_folder)
@@ -229,32 +229,17 @@ def main():
     experiment_logger.log_header("Arguments for the experiment :")
     experiment_logger.log_info(vars(args))
 
-    # from rlmethods.rlutils import LossBasedTermination
-    # for rl
     from rlmethods.b_actor_critic import ActorCritic
     from rlmethods.soft_ac_pi import SoftActorCritic
     from rlmethods.soft_ac import SoftActorCritic as QSAC
     from rlmethods.rlutils import ReplayBuffer
 
-    # for irl
-    from irlmethods.deep_maxent import DeepMaxEnt
-    import irlmethods.irlUtils as irlUtils
-    from featureExtractor.gridworld_featureExtractor import (
-        OneHot,
-        LocalGlobal,
-        SocialNav,
-        FrontBackSideSimple,
-    )
+    from irlmethods.general_deep_maxent import GeneralDeepMaxent, play
 
     agent_width = 10
     step_size = 2
     obs_width = 10
     grid_size = 10
-
-    if args.feat_extractor is None:
-
-        print("Feature extractor missing.")
-        exit()
 
     # check for the feature extractor being used
     # initialize feature extractor
@@ -337,9 +322,6 @@ def main():
             thresh2=30,
         )
 
-    if args.feat_extractor == 'VasquezF1':
-        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
-
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
 
@@ -347,27 +329,6 @@ def main():
     if not args.dont_save and args.save_folder is None:
         print("Specify folder to save the results.")
         exit()
-
-    """
-    environment can now initialize without an annotation file
-    if args.annotation_file is None:
-        print('Specify annotation file for the environment.')
-        exit()
-    """
-    if args.exp_trajectory_path is None:
-        print("Specify expert trajectory folder.")
-        exit()
-
-    """
-    env = GridWorld(display=args.render, is_onehot= False,is_random=False,
-                    rows =10,
-                    cols =10,
-                    seed = 7,
-                    obstacles = [np.asarray([5,5])],
-                                
-                    goal_state = np.asarray([1,5]))
-
-    """
 
     env = GridWorld(
         display=args.render,
@@ -395,13 +356,6 @@ def main():
     experiment_logger.log_header("Environment details :")
     experiment_logger.log_info(env.__dict__)
 
-    # CHANGE HEREq
-
-    # CHANGE HERE
-    # initialize loss based termination
-    # intialize RL method
-    # CHANGE HERE
-
     if args.rl_method == "ActorCritic":
         rl_method = ActorCritic(
             env,
@@ -419,6 +373,7 @@ def main():
         if not env.continuous_action:
             print("The action space needs to be continuous for SAC to work.")
             exit()
+
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
         rl_method = SoftActorCritic(
@@ -446,7 +401,7 @@ def main():
             args.replay_buffer_sample_size,
             learning_rate=args.lr_rl,
             entropy_tuning=True,
-            entropy_target=0.3,
+            entropy_target=args.entropy_target,
             play_interval=args.play_interval,
         )
 
@@ -458,43 +413,33 @@ def main():
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
-    # initialize IRL method
-    # CHANGE HERE
-    trajectory_path = args.exp_trajectory_path
+    expert_states, num_expert_trajs = read_expert_states(args.exp_trajectory_path)
 
-    if args.scale_svf is None:
-        scale = False
-
-    if args.scale_svf:
-        scale = args.scale_svf
-    irl_method = DeepMaxEnt(
-        trajectory_path,
-        rlmethod=rl_method,
+    irl_method = GeneralDeepMaxent(
+        rl=rl_method,
         env=env,
-        iterations=args.irl_iterations,
-        on_server=args.on_server,
-        l1regularizer=args.regularizer,
+        expert_states=expert_states,
+        num_expert_trajs=num_expert_trajs,
         learning_rate=args.lr_irl,
-        seed=args.seed,
-        graft=False,
-        scale_svf=scale,
-        hidden_dims=args.reward_net_hidden_dims,
-        clipping_value=args.clipping_value,
-        enumerate_all=True,
-        save_folder=parent_dir,
-        rl_max_ep_len=args.rl_ep_length,
-        rl_episodes=args.rl_episodes,
+        save_folder=to_save,
     )
 
     print("IRL method intialized.")
-    print(irl_method.reward)
+    print(irl_method.reward_net)
 
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
-    rewardNetwork = irl_method.train()
 
-    if not args.dont_save:
-        pass
+    irl_method.train(
+        args.irl_iterations,
+        args.rl_episodes,
+        args.rl_ep_length,
+        args.num_trajectory_samples,
+        args.rl_ep_length,
+    )
+
+    import pdb; pdb.set_trace()
+
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import sys
+import warnings
 import math
 import pdb
 import itertools
@@ -16,9 +17,43 @@ from numba import njit, jit
 
 @njit
 def angle_between(v1, v2):
-    v1_conv = v1.astype(np.dtype('float'))
-    v2_conv = v2.astype(np.dtype('float'))
-    return np.arctan2(np.linalg.det(np.stack((v1_conv,v2_conv))), np.dot(v1_conv,v2_conv))
+    v1_conv = v1.astype(np.dtype("float"))
+    v2_conv = v2.astype(np.dtype("float"))
+    return np.abs(
+        np.arctan2(
+            np.linalg.det(np.stack((v1_conv, v2_conv))),
+            np.dot(v1_conv, v2_conv),
+        )
+    )
+
+
+@njit
+def total_angle_between(v1, v2):
+    """
+    Calculate total angle between v1 and v2. Resulting angle is in range [-pi, pi].
+
+    :param v1: first vector.
+    :type v1: np.array
+    :param v2: second vector.
+    :type v2: np.array
+    :return: angle between v1 and v2, in range [-pi, pi].
+    :rtype: float.
+    """
+    v1_conv = v1.astype(np.dtype("float"))
+    v2_conv = v2.astype(np.dtype("float"))
+    return np.arctan2(
+        np.linalg.det(np.stack((v1_conv, v2_conv))), np.dot(v1_conv, v2_conv),
+    )
+
+
+@njit
+def dist_2d(v1, v2):
+    return math.sqrt((v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2)
+
+
+@njit
+def norm_2d(vector):
+    return math.sqrt(vector[0] ** 2 + vector[1] ** 2)
 
 
 def deg_to_rad(deg):
@@ -151,6 +186,10 @@ def get_abs_orientation(agent_state, orientation_approximator):
 
 
 def get_rel_orientation(prev_frame_info, agent_state, goal_state):
+    """
+    Calculates and bins the angle between (agent_pos - goal_pos) and agent velocity.
+    in effect, this is the "error" in the agent's heading.
+    """
     # returns the relative orientation of the agent with the direction
     # of the goal.
     # Primarily for use in IRL
@@ -187,6 +226,11 @@ def get_rel_goal_orientation(
     agent_abs_orientation,
     goal_state,
 ):
+    """
+    Calculates a vector from the agent to the goal.
+    This vector is in the agent's coordinate system, e.g. zero degrees is forward.
+    This vector is binned into a one hot vector based on orientation_approximator.
+    """
     # returns the relative orientation of the goal wrt to the agent
     # Dim:8
 
@@ -210,18 +254,6 @@ def get_rel_goal_orientation(
         relative_goal, orientation_approximator
     )
 
-    """
-    if diff_in_angle < np.pi/4:
-        rel_orientation = 0
-
-    elif diff_in_angle < np.pi*3/4 and diff_in_angle >= np.pi/4:
-        rel_orientation = 1
-
-    else:
-        rel_orientation = 2
-
-    relative_orientation_vector[rel_orientation] = 1 
-    """
     return relative_orientation_vector
 
 
@@ -253,8 +285,522 @@ def calculate_social_forces(
     )
 
 
-#################################################################################
-#################################################################################
+@njit
+def radial_density_features(agent_position, pedestrian_positions, radius):
+    """
+    implements the 'density features' from:
+    IRL Algorithms and Features for Robot navigation in Crowds: Vasquez et. al
+
+    :param agent_position: position of agent.
+    :type agent_position: numpy array or tuple.
+    :param pedestrian_positions: list or array of pedestrian positions.
+    :type pedestrian_positions: list or np array of tuples or np arrays.
+    """
+    pedestrian_count = 0
+
+    # Using indexing necessary for Numba to work
+    for ped_idx in range(len(pedestrian_positions)):
+        if dist_2d(pedestrian_positions[ped_idx], agent_position) <= radius:
+            pedestrian_count += 1
+
+            if pedestrian_count >= 5:
+                return np.array([0.0, 0.0, 1.0])
+
+    if pedestrian_count < 2:
+        return np.array([1.0, 0.0, 0.0])
+
+    elif 2 <= pedestrian_count < 5:
+        return np.array([0.0, 1.0, 0.0])
+
+    else:
+        raise ValueError
+
+
+@njit
+def speed_features(
+    agent_velocity,
+    pedestrian_velocities,
+    lower_threshold=0.015,
+    upper_threshold=0.025,
+):
+    """
+    Computes speed features as described in Vasquez et. al's paper: "Learning
+    to navigate through crowded environments".
+
+    :param agent_velocity: velocity of agent (robot)
+    :type agent_velocity: 2D np.array or tuple
+
+    :param pedestrian_velocities: velocities of pedestrians
+    :type pedestrian_velocities: list or np.array of 2d arrays or tuples.
+
+    :param lower_threshold: Lower magnitude of speed threshold threshold used
+    for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param upper_threshold: Higher magnitude of speed threshold
+    used for binning. This is 0.025 in the paper.
+    :type upper_threshold: float
+
+    :return: magnitude feature np.array of shape (3,)
+    :rtype: float np.array
+    """
+
+    assert lower_threshold < upper_threshold
+
+    feature = np.zeros(3)
+
+    for pedestrian_vel in pedestrian_velocities:
+        speed = dist_2d(pedestrian_vel, agent_velocity)
+
+        # put value into proper bin
+        if 0 <= speed < lower_threshold:
+            feature[0] += 1
+        elif lower_threshold <= speed < upper_threshold:
+            feature[1] += 1
+        elif speed >= upper_threshold:
+            feature[2] += 1
+        else:
+            raise ValueError(
+                "Error in binning speed. speed does not fit into any bin."
+            )
+
+    return feature
+
+
+@njit
+def orientation_features(
+    agent_position, agent_velocity, pedestrian_positions, pedestrian_velocities
+):
+    """
+    Computes the orientation features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: np.array or list, containing 2d arrays or tuples.
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: np.array or list, containing 2d arrays or tuples.
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    feature = np.zeros(3)
+
+    # Check that same number of pedestrian positions and velocities are passed in.
+    assert len(pedestrian_positions) == len(pedestrian_velocities)
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = agent_position - pedestrian_positions[ped_id]
+        relative_vel = agent_velocity - pedestrian_velocities[ped_id]
+
+        # angle_between produces only positive angles
+        angle = angle_between(relative_pos, relative_vel)
+
+        # put into bins
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if 0.75 * np.pi < angle <= np.pi:
+            feature[0] += 1
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            feature[1] += 1
+        elif 0.0 <= angle < 0.25 * np.pi:
+            feature[2] += 1
+        else:
+            raise ValueError(
+                "Error in binning orientation. Orientation does not fit into any bin."
+            )
+
+    return feature
+
+@njit
+def velocity_features(
+    agent_position,
+    agent_velocity,
+    pedestrian_positions,
+    pedestrian_velocities,
+    lower_speed_threshold=0.015,
+    upper_speed_threshold=0.025,
+):
+    """
+    Computes the velocity features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: 2d float np.array.
+
+    :param lower_speed_threshold: Lower magnitude of speed threshold
+    threshold used for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param upper_speed_threshold: Higher magnitude of speed threshold
+    threshold used for binning. This is 0.025 in the paper.
+    :type upper_threshold: float
+
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: 2d float np.array.
+
+    :param lower_threshold: Lower magnitude of speed threshold threshold used
+    for binning. This is 0.015 in the paper.
+    :type lower_threshold: float
+
+    :param upper_threshold: Higher magnitude of speed threshold threshold
+    used for binning. This is 0.025 in the paper.
+    :type upper_threshold: float
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    assert lower_speed_threshold < upper_speed_threshold
+    feature = np.zeros((3, 3))
+
+    assert len(pedestrian_positions) == len(pedestrian_velocities)
+
+    # used to group pedestrians with the same orientation bin together using
+    # their ID.
+    ped_sorted_by_orientation = [np.empty(0, dtype=np.int64)] * 3
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = agent_position - pedestrian_positions[ped_id]
+        relative_vel = agent_velocity - pedestrian_velocities[ped_id]
+
+        # angle_between produces only positive angles
+
+        if (relative_pos == np.zeros(2)).all() or (
+            relative_vel == np.zeros(2)
+        ).all():
+            # cannot calculate angle between zero vectors
+            angle = 0.0
+
+        else:
+            angle = angle_between(relative_pos, relative_vel)
+
+        # put into bins
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if 0.75 * np.pi < angle <= np.pi:
+            ped_sorted_by_orientation[0] = np.append(
+                ped_sorted_by_orientation[0], ped_id
+            )
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            ped_sorted_by_orientation[1] = np.append(
+                ped_sorted_by_orientation[1], ped_id
+            )
+        elif 0.0 <= angle < 0.25 * np.pi:
+            ped_sorted_by_orientation[2] = np.append(
+                ped_sorted_by_orientation[2], ped_id
+            )
+        else:
+            raise ValueError("Orientation does not fit into any bin.")
+
+    for idx, ped_ids in enumerate(ped_sorted_by_orientation):
+        velocities = pedestrian_velocities[ped_ids]
+
+        if not velocities.size:
+            break
+        else:
+            mean_speeds = np.mean(np.abs(velocities))
+
+        # bin speeds
+        if 0 <= mean_speeds < lower_speed_threshold:
+            feature[idx, 0] = 1
+        elif lower_speed_threshold <= mean_speeds < upper_speed_threshold:
+            feature[idx, 1] = 1
+        elif mean_speeds >= upper_speed_threshold:
+            feature[idx, 2] = 1
+        else:
+            raise ValueError("Average speed does not fit in any bins.")
+
+    return feature.flatten()
+
+
+def social_force_features(
+    agent_radius, agent_position, agent_velocity, pedestrian_positions
+):
+    """
+    Computes the social forces features described in Vasquez et. al's paper:
+    "Learning to navigate through crowded environments".
+
+    :param agent_radius: radius of agent(s) in the environment. Note: this is
+    the radius of the agent's graphical circle, not a radius around the
+    agent.
+    :type agent_radius: float.
+
+    :param agent_position: position of the agent (robot)
+    :type agent_position: 2d np.array or tuple
+
+    :param agent_velocity: velocity of the agent (robot)
+    :type agent_velocity: 2d np.array or tuple
+
+    :param pedestrian_positions: positions of pedestrians.
+    :type pedestrian_positions: 2d float np.array.
+
+    :param pedestrian_velocities: velocities of pedestrians.
+    :type pedestrian_velocities: 2d float np.array.
+
+    :return: orientation feature vector.
+    :rtype: float np.array of shape (3,)
+    """
+
+    # in the paper formula, 'i' is our agent, while 'j's are the pedestrians.
+
+    rel_positions = pedestrian_positions - agent_position
+    rel_distances = np.linalg.norm(rel_positions, axis=1)
+    normalized_rel_positions = rel_positions / np.max(rel_distances)
+
+    assert rel_positions.shape == normalized_rel_positions.shape
+
+    rel_angles = np.zeros(rel_distances.shape)
+
+    # used to group pedestrians with the same orientation bin together using
+    # their ID.
+    feature = np.zeros(3)
+    ped_orientation_bins = [np.empty(0, dtype=np.int64)] * 3
+
+    for ped_id in range(len(pedestrian_positions)):
+        relative_pos = rel_positions[ped_id]
+
+        # angle_between produces only positive angles
+        angle = angle_between(relative_pos, agent_velocity)
+        rel_angles[ped_id] = angle
+
+        # put into bins
+        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+        if 0.75 * np.pi < angle <= np.pi:
+            ped_orientation_bins[0] = np.append(
+                ped_orientation_bins[0], ped_id
+            )
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            ped_orientation_bins[1] = np.append(
+                ped_orientation_bins[1], ped_id
+            )
+        elif 0.0 <= angle < 0.25 * np.pi:
+            ped_orientation_bins[2] = np.append(
+                ped_orientation_bins[2], ped_id
+            )
+        else:
+            raise ValueError("Orientation does not fit into any bin.")
+
+    exp_multiplier = np.exp(2 * agent_radius - rel_distances).reshape(-1, 1)
+    anisotropic_term = (2.0 - 0.5 * (1.0 + np.cos(rel_angles))).reshape(-1, 1)
+    social_forces = (
+        exp_multiplier * normalized_rel_positions * anisotropic_term
+    )
+
+    forces_above_threshold = np.linalg.norm(social_forces, axis=1) > 0.5
+
+    feature[0] = np.sum(forces_above_threshold[ped_orientation_bins[0]])
+    feature[1] = np.sum(forces_above_threshold[ped_orientation_bins[1]])
+    feature[2] = np.sum(forces_above_threshold[ped_orientation_bins[2]])
+
+    return feature
+
+
+@njit
+def angle_to_goal_features(goal_position, agent_position, agent_orientation):
+    """
+    computes features based on the error in the agent's heading towards the
+    goal. Error is the angle between agent heading vector and vector
+    (goal_pos - agent_pos). The features are binary features based on where
+    the angle fits in the bins [0-pi/8, pi/8-pi/4, pi/4-3/4pi, 3/4pi-pi].
+    This is meant to mimic the goal_rel_orientation function.
+
+    :param goal_position: position of the goal.
+    :type goal_position: 2d numpy vector.
+
+    :param agent_position: position of agent.
+    :type agent_position: 2d numpy vector.
+
+    :param agent_orientation: orientation vector of agent.
+    :type agent_orientation: 2d numpy vector.
+
+    :raises ValueError: If angle does not fit in the [0,pi] interval,
+    something unexpected has happened.
+
+    :return: feature vector representing binned angles.
+    :rtype: float np.array
+    """
+
+    features = np.zeros(4)
+
+    vector_to_goal = goal_position - agent_position
+
+    angle = angle_between(agent_orientation, vector_to_goal)
+
+    # bin in angle bins
+    if 0.0 <= angle < 0.125 * np.pi:
+        features[0] = 1.0
+    elif 0.125 * np.pi <= angle < 0.25 * np.pi:
+        features[1] = 1.0
+    elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+        features[2] = 1.0
+    elif 0.75 * np.pi <= angle <= np.pi:
+        features[3] = 1.0
+    else:
+        raise ValueError("Cannot bin angle in [0,pi] interval.")
+
+    return features
+
+
+@njit
+def vector_to_goal_features(goal_position, agent_position, agent_orientation):
+
+    features = np.zeros(8)
+
+    vector_to_goal = goal_position - agent_position
+
+    angle = total_angle_between(agent_orientation, vector_to_goal)
+
+    # mimic finding closest relative vector by binning angle
+    if -0.125 * np.pi <= angle < 0.125 * np.pi:
+        features[0] = 1.0
+    elif 0.125 * np.pi <= angle < 0.375 * np.pi:
+        features[1] = 1.0
+    elif 0.375 * np.pi <= angle < 0.625 * np.pi:
+        features[2] = 1.0
+    elif 0.625 * np.pi <= angle < 0.875 * np.pi:
+        features[3] = 1.0
+    elif 0.875 * np.pi <= angle < np.pi:
+        features[4] = 1.0
+    elif -np.pi <= angle < -0.875 * np.pi:
+        features[4] = 1.0
+    elif -0.875 * np.pi <= angle < -0.625 * np.pi:
+        features[5] = 1.0
+    elif -0.625 * np.pi <= angle < -0.375 * np.pi:
+        features[6] = 1.0
+    elif -0.375 * np.pi <= angle < -0.125 * np.pi:
+        features[7] = 1.0
+    else:
+        raise ValueError("Faled to bin angles in [-pi, pi] range.")
+
+    return features
+
+
+class BaseVasquez:
+    def compute_state_information(self, state_dict):
+        """
+        Vasquez et. al's features are based on agent positions and
+        velocities. This function computes those values and returns them in
+        the proper format.
+
+        :param state_dict: State dictionary of the environment.
+        :type state_dict: dictionary.
+
+        :return: agent position, agent velocity, pedestrian positions,
+        pedestrian velocities
+        :rtype: 2d float np.array, 2d float np.array, (num_peds x 2) float
+        np.array, (num_peds x2) float np.array
+        """
+
+        # get necessary info about pedestrians
+        ped_info_list = state_dict["obstacles"]
+
+        ped_velocities = np.zeros((len(ped_info_list), 2))
+        ped_positions = np.zeros((len(ped_info_list), 2))
+
+        for ped_index, ped_info in enumerate(ped_info_list):
+            ped_orientation = ped_info["orientation"]
+
+            if ped_orientation is not None:
+                ped_orientation = ped_orientation / norm_2d(ped_orientation)
+                ped_velocities[ped_index] = ped_orientation * ped_info["speed"]
+            else:
+                # can't calculate velocity if orientation is not known.
+                ped_velocities[ped_index] = np.zeros(2)
+
+            ped_positions[ped_index] = ped_info["position"]
+
+        # get necessary info about agent
+        agent_orientation = state_dict["agent_state"]["orientation"]
+        normalizing_factor = norm_2d(agent_orientation)
+        assert normalizing_factor is not None
+
+        if normalizing_factor != 0.0:
+            agent_orientation = agent_orientation / normalizing_factor
+        else:
+            warnings.warn(
+                "division by zero side-stepped - agent has (0,0) orinetation."
+            )
+
+        agent_speed = state_dict["agent_state"]["speed"]
+        agent_velocity = agent_orientation * agent_speed
+
+        agent_position = state_dict["agent_state"]["position"]
+
+        return (
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            ped_velocities,
+        )
+
+    def hash_function(self, feature):
+        return feature.tobytes()
+
+    def recover_state_from_hash_value(self, hash_value):
+        return np.frombuffer(hash_value)
+
+
+class VasquezF1(BaseVasquez):
+    def __init__(
+        self, density_radius, lower_speed_threshold, upper_speed_threshold
+    ):
+        self.density_radius = density_radius
+        self.lower_speed_threshold = lower_speed_threshold
+        self.upper_speed_threshold = upper_speed_threshold
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            ped_velocities,
+        ) = self.compute_state_information(state_dict)
+
+        density_feature_vector = radial_density_features(
+            agent_position, ped_positions, self.density_radius
+        )
+
+        velocity_feature_vector = velocity_features(
+            agent_position,
+            agent_velocity,
+            ped_positions,
+            ped_velocities,
+            lower_speed_threshold=self.lower_speed_threshold,
+            upper_speed_threshold=self.upper_speed_threshold,
+        )
+
+        default_feature_vector = np.ones(1)
+
+        # goal orienting features
+        goal_position = state_dict["goal_state"]
+        angle_to_goal_feature_vector = angle_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        vector_to_goal_feature_vector = vector_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        out_features = np.concatenate(
+            (
+                density_feature_vector,
+                velocity_feature_vector,
+                angle_to_goal_feature_vector,
+                vector_to_goal_feature_vector,
+                default_feature_vector,
+            )
+        )
+
+        return out_features
+
+
 class DroneFeatureSAM1:
     """
     Features to put in:
@@ -420,24 +966,11 @@ class DroneFeatureSAM1:
 
     def recover_state_from_hash_value(self, hash_value):
 
-        size = self.state_rep_size
-        state_val = np.zeros(size)
-        i = 0
-        while hash_value > 0:
-            state_val[i] = int(hash_value) % 2
-            hash_value = math.floor((hash_value) // 2)
-            i += 1
-
-        return state_val
+        return np.frombuffer(hash_value)
 
     def hash_function(self, state):
 
-        hash_value = 0
-        size = len(self.hash_variable_list)
-        for i in range(size):
-            hash_value += int(self.hash_variable_list[i] * state[i])
-
-        return hash_value
+        return state.tobytes()
 
     def get_info_from_state(self, state):
         # read information from the state
@@ -453,7 +986,6 @@ class DroneFeatureSAM1:
 
         return 0
 
-    @jit(nopython=False)
     def populate_orientation_bin(
         self, agent_orientation_val, agent_state, obs_state_list
     ):
@@ -468,34 +1000,22 @@ class DroneFeatureSAM1:
             Bin value in each of the ring is based on the orientation_approximator
 
         """
-        # for debugging purposes
-        # print('***INSIDE populate_orientation_bin ***')
 
         for obs_state in obs_state_list:
 
-            distance = np.linalg.norm(
-                obs_state["position"] - agent_state["position"]
-            )
-            # pdb.set_trace()
+            distance = dist_2d(obs_state["position"], agent_state["position"])
+
             if obs_state["orientation"] is not None:
                 obs_orientation_ref_point = (
                     obs_state["position"] + obs_state["orientation"]
                 )
+
             else:
                 obs_orientation_ref_point = obs_state["position"]
 
-            ring_1 = False
-            ring_2 = False
             if distance < self.thresh2:
                 # classify obs as considerable
-                # check the distance
                 temp_obs = {}
-                if distance < self.thresh1:
-                    # classify obstacle in the inner ring
-                    ring_1 = True
-                else:
-                    # classify obstacle in the outer ring
-                    ring_2 = True
 
                 # check for the orientation
                 # obtain relative orientation
@@ -513,29 +1033,22 @@ class DroneFeatureSAM1:
                 rel_coord_obs = np.matmul(rot_matrix, vec_to_obs)
                 rel_coord_orient_ref = np.matmul(rot_matrix, vec_to_orient_ref)
 
-                angle_diff = np.zeros(8)
-                for i in range(len(self.orientation_approximator)):
-                    # print('The orientation val')
-                    # print(orientation)
-                    """
-                    print("***")
-                    print(self.orientation_approximator[i])
-                    print("---")
-                    print(rel_coord_obs)
-                    print("+++")
-                    print(vec_to_obs)
-                    print("####")
-                    print(rot_matrix)
-                    print("+++")
-                    print(agent_orientation_val)
-                    print("***")
-                    """
-                    angle_diff[i] = angle_between(
-                        self.orientation_approximator[i], rel_coord_obs
-                    )
-                bin_val = np.argmin(angle_diff)
+                bin_val = 0
+                angle_diff = angle_between(
+                    self.orientation_approximator[0], rel_coord_obs
+                )
 
-                if ring_2:
+                for i, orientation_approx in enumerate(
+                    self.orientation_approximator[1:]
+                ):
+                    new_angle_diff = angle_between(
+                        orientation_approx, rel_coord_obs
+                    )
+                    if new_angle_diff < angle_diff:
+                        angle_diff = new_angle_diff
+                        bin_val = i
+
+                if distance > self.thresh1:
                     bin_val += 8
 
                 # orientation of the obstacle needs to be changed as it will change with the
@@ -545,22 +1058,9 @@ class DroneFeatureSAM1:
                 temp_obs["position"] = rel_coord_obs
                 temp_obs["speed"] = obs_state["speed"]
 
-                """
-                #******for debugging purposes
-                print('The current agent heading direction :', agent_orientation_val)
-                print('Change in position : before :{}, after :{}'.format(obs_state['position'],
-                                                                          temp_obs['position']))
-                print('Change in orientation : before :{}, after : {}'.format(obs_state['orientation'],
-                                                                              temp_obs['orientation']))
-                print('Change in speed : before :{}, after :{}'.format(obs_state['speed'], temp_obs['speed']))
-                #pdb.set_trace()
-                """
-
                 self.bins[str(bin_val)].append(temp_obs)
-        # if the obstacle does not classify to be considered
 
     def overlay_bins(self, state):
-
         # a visualizing tool to debug if the binning is being done properly
         # draws the bins on the game surface for a visual inspection of the
         # classification of the obstacles in their respective bins
@@ -712,18 +1212,14 @@ class DroneFeatureSAM1:
             goal_state,
         )
 
-        # print('The absolute approx orientation :', abs_approx_orientation)
-        ##print('The relative orientation', relative_orientation)
-
         # empty bins before populating
         for i in range(16):
             self.bins[str(i)] = []
 
-        # print('Here')
         self.populate_orientation_bin(
             agent_orientation_angle, agent_state, obstacles
         )
-        # pdb.set_trace()
+
         (
             sam_vector,
             inner_ring_density,
@@ -731,7 +1227,7 @@ class DroneFeatureSAM1:
         ) = self.compute_bin_info()
 
         extracted_feature = np.concatenate(
-            (  # abs_approx_orientation,
+            (
                 relative_orientation_goal,
                 relative_orientation,
                 np.reshape(sam_vector, (-1)),
@@ -739,15 +1235,7 @@ class DroneFeatureSAM1:
                 outer_ring_density,
             )
         )
-        """
-        flag = False
-        for i in range(16):
-            if len(self.bins[str(i)]) > 0:
-                flag = True
-        if flag:    
-            pdb.set_trace()
-            pass
-        """
+
         self.agent_state_history.append(copy.deepcopy(state["agent_state"]))
 
         return reset_wrapper(extracted_feature)
@@ -1162,8 +1650,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
         thresh_value = (
             1.4 * (self.agent_width / 2 + self.obs_width / 2) + self.step_size
         )
-        # thresh_value += self.agent_width #padding
-        # pdb.set_trace()
 
         intimate_space_dist = int(
             self.step_size + (self.agent_width + self.obs_width) * 1.4 // 2
@@ -1177,14 +1663,6 @@ class DroneFeatureRisk(DroneFeatureSAM1):
             rot_matrix, agent_state["orientation"]
         )
 
-        # ***for debugging purposes****
-        """
-        print('Agent orientation val :', agent_orientation_val)
-        print('Agent orientation :', agent_state['orientation'])
-        print('Rotated agent orientation :', rotated_agent_orientation)
-        print('Current agent speed :', agent_state['speed'], np.linalg.norm(agent_state['orientation']))
-        #*****************************
-        """
         rotated_agent_orientation = (
             rotated_agent_orientation * agent_state["speed"]
         )

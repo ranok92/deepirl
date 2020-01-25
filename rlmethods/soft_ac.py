@@ -4,7 +4,6 @@ et. al 2019.
 """
 import sys
 import copy
-import pdb
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -12,6 +11,7 @@ from torch.optim import Adam
 from torch.distributions import Categorical
 from torch.distributions.kl import kl_divergence
 import numpy as np
+from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
 
@@ -78,6 +78,8 @@ class QNetwork(BaseNN):
         self.hidden2 = nn.Linear(hidden_layer_width, hidden_layer_width)
         self.head = nn.Linear(hidden_layer_width, action_length)
 
+        self.alpha=1.0
+
     def forward(self, states):
         # actions need to be byte or long to be used as indices
         x = F.relu(self.in_layer(states))
@@ -86,6 +88,25 @@ class QNetwork(BaseNN):
         x = self.head(x)
 
         return x
+
+    def sample_action(self, state):
+        softmax_over_actions = F.softmax(
+            (1.0/self.alpha) * self.__call__(state),
+            dim=-1
+        )
+        dist = Categorical(softmax_over_actions)
+        action = dist.sample()
+
+        return action, dist.log_prob(action), dist
+
+    def eval_action(self, state):
+        softmax_over_actions = F.softmax(
+            (1.0/self.alpha) * self.__call__(state),
+            dim=-1
+        )
+        action = torch.argmax(softmax_over_actions)
+
+        return action
 
 
 class PolicyNetwork(BaseNN):
@@ -131,6 +152,7 @@ class SoftActorCritic:
             self,
             env,
             replay_buffer,
+            feature_extractor,
             buffer_sample_size=10**4,
             gamma=0.99,
             learning_rate=3e-4,
@@ -140,15 +162,15 @@ class SoftActorCritic:
             tau=0.005,
             log_alpha=-2.995,
             q_net=None,
-            feat_extractor=None
+            play_interval=1,
     ):
         self.env = env
-        self.feat_extractor = feat_extractor
+        self.feature_extractor = feature_extractor
 
         starting_state = self.env.reset()
 
-        if self.feat_extractor is not None:
-            starting_state = self.feat_extractor.extract_features(starting_state)
+        if self.feature_extractor is not None:
+            starting_state = self.feature_extractor.extract_features(starting_state)
         state_size = starting_state.shape[0]
 
         # buffer
@@ -157,16 +179,20 @@ class SoftActorCritic:
 
         # NNs
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 2048)
+            self.q_net = QNetwork(state_size, env.action_space.n, 256)
         else:
             self.q_net = q_net
 
         self.avg_q_net = copy.deepcopy(self.q_net)
 
+        # Dummy policy, it's just q_net in disguise!
+        self.policy = self.q_net
+
         # initialize weights of moving avg Q net
         copy_params(self.q_net, self.avg_q_net)
         self.q_net.to(DEVICE)
         self.avg_q_net.to(DEVICE)
+
         # set hyperparameters
         self.log_alpha = torch.tensor(log_alpha).to(DEVICE)
         self.log_alpha = self.log_alpha.detach().requires_grad_(True)
@@ -178,14 +204,16 @@ class SoftActorCritic:
         self.training_i = 0
         self.play_i = 0
         self.entropy_tuning = entropy_tuning
+        self.play_interval = play_interval
 
         # optimizers
+        self.learning_rate = learning_rate
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
         self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
         # tensorboardX settings
         if not tbx_writer:
-            self.tbx_writer = SummaryWriter('runs/generic_soft_ac')
+            self.tbx_writer = SummaryWriter()
         else:
             self.tbx_writer = tbx_writer
 
@@ -194,7 +222,6 @@ class SoftActorCritic:
 
         :param state: Current state vector. must be Torch 32 bit float tensor.
         """
-        #pdb.set_trace()
         softmax_over_actions = F.softmax(
             (1.0/alpha) * self.q_net(state),
             dim=-1
@@ -204,13 +231,17 @@ class SoftActorCritic:
 
         return action, dist.log_prob(action), dist
 
-    def populate_buffer(self):
+    def populate_buffer(self, max_env_steps):
         """
         Fill in entire replay buffer with state action pairs using current
         policy.
         """
         while len(self.replay_buffer) < self.buffer_sample_size:
-            self.play()
+            self.play(max_env_steps)
+
+    def reset_training(self):
+        self.q_optim = Adam(self.q_net.parameters(), lr=self.learning_rate)
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 
     def tbx_logger(self, log_dict, training_i):
         """Logs the tag-value pairs in log_dict using TensorboardX.
@@ -221,11 +252,11 @@ class SoftActorCritic:
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
-    def train_episode(self):
+    def train_episode(self, max_env_steps, reward_net=None):
         """Train Soft Actor Critic"""
 
         # Populate the buffer
-        self.populate_buffer()
+        self.populate_buffer(max_env_steps)
 
         # weight updates
         replay_samples = self.replay_buffer.sample(self.buffer_sample_size)
@@ -235,8 +266,15 @@ class SoftActorCritic:
         next_state_batch = torch.from_numpy(replay_samples[3]).to(DEVICE)
         dones = torch.from_numpy(replay_samples[4]).type(torch.long).to(DEVICE)
 
+        # if reward net exists, replace reward batch with fresh one
+        if reward_net:
+            fresh_rewards = reward_net(next_state_batch).flatten()
+            assert fresh_rewards.shape == reward_batch.shape
+            reward_batch = fresh_rewards
+
         # alpha must be clamped with a minumum of zero, so use exponential.
         alpha = self.log_alpha.exp().detach()
+        self.policy.alpha = alpha
 
         with torch.no_grad():
             # Figure out value function
@@ -300,29 +338,45 @@ class SoftActorCritic:
 
         self.training_i += 1
 
-    def play(self):
+    def play(self, max_env_steps, reward_network=None, render=False, best_action=False):
         """
         Play one complete episode in the environment's gridworld.
         Automatically appends to replay buffer, and logs with Tensorboardx.
+
+        :param max_env_steps: Maximum number of steps to take in playthrough.
+        :param reward_network: Replaces environment's builtin rewards.
+        :param render: If True, renders the playthrough.
+        :param best_action: If True, uses best actions instead of stochastic actions.
         """
 
         done = False
         total_reward = np.zeros(1)
         state = self.env.reset()
-        if self.feat_extractor is not None:
-            state = self.feat_extractor.extract_features(state)
+        if self.feature_extractor is not None:
+            state = self.feature_extractor.extract_features(state)
         episode_length = 0
 
-        while not done:
+        for _ in range(max_env_steps):
             # Env returns numpy state so convert to torch
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE)
 
             alpha = self.log_alpha.exp().detach()
-            action, _, _ = self.select_action(torch_state, alpha)
+
+            # select an action to do
+            if best_action:
+                action = self.policy.eval_action(torch_state)
+            else:
+                action, _, _ = self.select_action(torch_state, alpha)
+
             next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
-            if self.feat_extractor is not None:
-                next_state = self.feat_extractor.extract_features(next_state)
+            next_state = self.feature_extractor.extract_features(next_state)
+
+            if render:
+                self.env.render()
+
+            if reward_network:
+                reward = reward_network(torch_state).cpu().item()
 
             if max_steps_elapsed:
                 self.replay_buffer.push((
@@ -345,6 +399,9 @@ class SoftActorCritic:
             total_reward += reward
             episode_length += 1
 
+            if done:
+                break
+
         self.tbx_writer.add_scalar(
             'rewards/episode_reward',
             total_reward.item(),
@@ -359,7 +416,7 @@ class SoftActorCritic:
 
         self.play_i += 1
 
-    def train_and_play(self, num_episodes, play_interval):
+    def train(self, num_episodes, max_env_steps, reward_network=None):
         """Train and play environment every play_interval, appending obtained
         states, actions, rewards, and dones to the replay buffer.
 
@@ -367,8 +424,10 @@ class SoftActorCritic:
         :param play_interval: trainig episodes between each play session.
         """
 
-        for i in range(num_episodes):
-            self.train_episode()
+        print("Training RL . . .")
 
-            if self.training_i % play_interval == 0:
-                self.play()
+        for _ in tqdm(range(num_episodes)):
+            self.train_episode(max_env_steps, reward_network)
+
+            if self.training_i % self.play_interval == 0:
+                self.play(max_env_steps, reward_network=reward_network)

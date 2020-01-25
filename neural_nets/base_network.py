@@ -121,6 +121,21 @@ class BasePolicy(BaseNN):
 
         return self.sample_action(state)
 
+    def train(self, num_episodes, max_episode_length, reward_network=None):
+        """Train RL algorithm for num_episode number of episodes, and don't
+        exceed max_episode_length when sampling from the environment.
+        :param num_episodes: number of episodes to train RL for.
+        :type num_episodes: int
+        :param max_episode_length: maximum length of trajectories sampled
+        from environment (if any.)
+        :type max_episode_length: int
+        :param reward_network: A reward network for obtaining rewards,
+        defaults to None
+        :type reward_network: pytorch policy, optional
+        :return policy: trained policy.
+        """
+        raise NotImplementedError
+
 
 ModelTuple = namedtuple("ModelTuple", "model optimizer")
 
@@ -142,9 +157,11 @@ class Checkpointer:
         parent_path = pathlib.Path(folder_path)
 
         if create_folder:
-            folder_name = '_'.join(["run", self.name, timestamp()])
+            folder_name = "_".join(["run", self.name, timestamp()])
             self.path = parent_path / folder_name
-            self.path.mkdir(parents=True, exist_ok=True) # pylint: disable=no-member
+            self.path.mkdir(
+                parents=True, exist_ok=True
+            )  # pylint: disable=no-member
 
         else:
             self.path = parent_path
@@ -204,7 +221,7 @@ class Checkpointer:
             "models": self.models,
             "checkpoint_interval": self.checkpoint_interval,
             "checkpoint_counter": self.checkpoint_counter,
-            'name': self.name,
+            "name": self.name,
         }
 
         filename = (
@@ -229,13 +246,13 @@ class Checkpointer:
 
         checkpointer = Checkpointer(
             folder_path,
-            state['checkpoint_interval'],
-            state['name'],
-            create_folder=False
+            state["checkpoint_interval"],
+            state["name"],
+            create_folder=False,
         )
 
-        checkpointer.models = state['models']
+        checkpointer.models = state["models"]
 
-        checkpointer.checkpoint_counter = state['checkpoint_counter']
+        checkpointer.checkpoint_counter = state["checkpoint_counter"]
 
         return checkpointer
