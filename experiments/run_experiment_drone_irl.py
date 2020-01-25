@@ -26,6 +26,7 @@ from featureExtractor.gridworld_featureExtractor import (
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_speed,
     DroneFeatureRisk_speedv2,
+    VasquezF1,
 )
 
 
@@ -335,6 +336,9 @@ def main():
             thresh1=18,
             thresh2=30,
         )
+
+    if args.feat_extractor == 'VasquezF1':
+        feat_ext = VasquezF1(agent_width*10, 0.5, 1.0)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
