@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
@@ -72,26 +73,21 @@ def play(env, policy, feature_extractor, max_env_steps, render=False):
 class RewardNet(BaseNN):
     """Reward network"""
 
-    def __init__(self, state_dims, hidden_dims=[128]):
+    def __init__(self, state_dims, hidden_dims=128):
         super(RewardNet, self).__init__()
 
-        self.input = nn.Sequential(
-            nn.Linear(state_dims, hidden_dims[0]), nn.ELU(),
-        )
-        self.hidden_layers = []
-        for i in range(1, len(hidden_dims)):
-            self.hidden_layers.append(
-                nn.Sequential(
-                    nn.Linear(hidden_dims[i - 1], hidden_dims[i]), nn.ELU(),
-                )
-            )
-        self.hidden_layers = nn.ModuleList(self.hidden_layers)
-        self.head = nn.Linear(hidden_dims[-1], 1)
+        self.input = nn.Linear(state_dims, hidden_dims)
+
+        self.linear1 = nn.Linear(hidden_dims, hidden_dims)
+        self.linear2 = nn.Linear(hidden_dims, hidden_dims)
+
+        self.head = nn.Linear(hidden_dims, 1)
 
     def forward(self, x):
-        x = self.input(x)
-        for i in range(len(self.hidden_layers)):
-            x = self.hidden_layers[i](x)
+        x = F.relu(self.input(x))
+
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
 
         x = torch.tanh(self.head(x))
 
@@ -123,7 +119,7 @@ class GeneralDeepMaxent:
         ).shape[0]
 
         # reward net
-        self.reward_net = RewardNet(state_size, hidden_dims=[256] * 2)
+        self.reward_net = RewardNet(state_size, hidden_dims=256)
         self.reward_net = self.reward_net.to(DEVICE)
         self.reward_optim = Adam(
             self.reward_net.parameters(), lr=learning_rate, weight_decay=1e-5,

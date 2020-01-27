@@ -1,16 +1,19 @@
 """ run general deep maxent (Wulfmeier et. al) on drone environment. """
 import sys
 import time
+import datetime
 import os
 import argparse
 import matplotlib
+import gym
+import glob
 
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from irlmethods.irlUtils import read_expert_states
+from irlmethods.general_deep_maxent import GeneralDeepMaxent
 from logger.logger import Logger
 import utils
-import gym
 
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureSAM1,
@@ -18,7 +21,6 @@ from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_v2,
 )
 from featureExtractor.gridworld_featureExtractor import (
-    FrontBackSide,
     LocalGlobal,
     OneHot,
     SocialNav,
@@ -29,9 +31,11 @@ from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_speedv2,
 )
 
+from rlmethods.b_actor_critic import ActorCritic
+from rlmethods.soft_ac_pi import SoftActorCritic
+from rlmethods.soft_ac import SoftActorCritic as QSAC
+from rlmethods.rlutils import ReplayBuffer
 
-import datetime
-from logger.logger import Logger
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--policy-path", type=str, nargs="?", default=None)
@@ -75,8 +79,8 @@ parser.add_argument(
     type=str,
     default=None,
     required=True,
-    help="The name of the directory to store the results in. The name will be used to \
-                    save the plots, the policy and the reward networks.(Relative path)",
+    help="Relative path to save folder. If save folder exists, and continue \
+    option is selected, training will resume.",
 )
 
 parser.add_argument(
@@ -179,6 +183,8 @@ parser.add_argument("--entropy-target", type=float, default=0.3)
 
 
 def main():
+    """Runs experiment"""
+
     args = parser.parse_args()
 
     if args.on_server:
@@ -201,14 +207,6 @@ def main():
         reward_net_dims += str(dim)
         reward_net_dims += "-"
 
-    parent_dir = (
-        "./results/"
-        + str(args.save_folder)
-        + st
-        + policy_net_dims
-        + reward_net_dims
-    )
-
     to_save = (
         "./results/"
         + str(args.save_folder)
@@ -228,13 +226,6 @@ def main():
     experiment_logger = Logger(to_save, log_file)
     experiment_logger.log_header("Arguments for the experiment :")
     experiment_logger.log_info(vars(args))
-
-    from rlmethods.b_actor_critic import ActorCritic
-    from rlmethods.soft_ac_pi import SoftActorCritic
-    from rlmethods.soft_ac import SoftActorCritic as QSAC
-    from rlmethods.rlutils import ReplayBuffer
-
-    from irlmethods.general_deep_maxent import GeneralDeepMaxent, play
 
     agent_width = 10
     step_size = 2
@@ -351,6 +342,9 @@ def main():
         reset_wrapper=utils.reset_wrapper,
         consider_heading=True,
         is_onehot=False,
+        show_orientation=True,
+        show_comparison=True,
+        show_trail=True,
     )
 
     experiment_logger.log_header("Environment details :")
@@ -388,7 +382,7 @@ def main():
     if args.rl_method == "discrete_SAC":
         if not isinstance(env.action_space, gym.spaces.Discrete):
             print(
-                "discrete SAC requires a discrete action space environmnet to work."
+                "discrete SAC requires a discrete action space to work."
             )
             exit()
 
@@ -413,7 +407,9 @@ def main():
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
-    expert_states, num_expert_trajs = read_expert_states(args.exp_trajectory_path)
+    expert_states, num_expert_trajs = read_expert_states(
+        args.exp_trajectory_path
+    )
 
     irl_method = GeneralDeepMaxent(
         rl=rl_method,
