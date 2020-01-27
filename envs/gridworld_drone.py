@@ -736,7 +736,7 @@ class GridWorldDrone(GridWorld):
                         if self.cur_ped is None:
                             self.cur_ped = 1
                         else:
-                            self.cur_ped += 1
+                            self.cur_ped = (self.cur_ped + 1) % no_of_peds
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
                     else:

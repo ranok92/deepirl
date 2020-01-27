@@ -332,7 +332,7 @@ def main():
 
     env = GridWorld(
         display=args.render,
-        is_random=True,
+        is_random=False,
         rows=576,
         cols=720,
         agent_width=agent_width,
