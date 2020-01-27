@@ -330,7 +330,7 @@ class GridWorldDrone(GridWorld):
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['orientation'] = orientation
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['speed'] = speed
 
-            self.last_pedestrian = max(list(map(int, list(self.pedestrian_dict.keys()))))
+        self.last_pedestrian = max(list(map(int, list(self.pedestrian_dict.keys()))))
 
 
 
