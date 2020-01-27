@@ -203,6 +203,9 @@ class GridWorldDrone(GridWorld):
         self.env_font = pygame.font.SysFont('Comic Sans MS', 20)
         self.tickSpeed = tick_speed
 
+    def disable_rendering(self):
+        self.display=False
+
     def generate_annotation_list(self):
         '''
         Reads lines from an annotation file and creates a list
