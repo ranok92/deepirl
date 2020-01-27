@@ -570,7 +570,7 @@ class GridWorldDrone(GridWorld):
         if not self.release_control:
             self.state['agent_state'] = copy.deepcopy(self.agent_state)
             self.state['agent_head_dir'] = self.cur_heading_dir
-
+            self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
         if self.external_control:
             if done:
                 self.release_control = True
@@ -700,9 +700,7 @@ class GridWorldDrone(GridWorld):
             if self.ghost:
                 self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
-            if self.ghost:
-                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
-
+            self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
             self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
             self.cur_heading_dir = 0
             self.heading_dir_history = []
@@ -804,6 +802,7 @@ class GridWorldDrone(GridWorld):
             self.ghost_state = copy.deepcopy(self.agent_state)
             self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
 
+        self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.heading_dir_history = []
         self.heading_dir_history.append(self.cur_heading_dir)
