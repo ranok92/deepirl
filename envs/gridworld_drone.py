@@ -116,6 +116,7 @@ class GridWorldDrone(GridWorld):
         self.annotation_file = annotation_file#file from which the video information will be used
         self.annotation_dict = {}
         self.pedestrian_dict = {}
+        self.last_pedestrian = 0
         self.current_frame = 0
         self.final_frame = -1
         self.initial_frame = 999999999999 #a large number
@@ -328,7 +329,8 @@ class GridWorldDrone(GridWorld):
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['position'] = pos
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['orientation'] = orientation
             self.pedestrian_dict[str(entry[1])][str(entry[0])]['speed'] = speed
-        #pdb.set_trace()
+
+            self.last_pedestrian = max(list(map(int, list(self.pedestrian_dict.keys()))))
 
 
 
@@ -733,10 +735,10 @@ class GridWorldDrone(GridWorld):
                     if self.is_random:
                         self.cur_ped = np.random.randint(1,no_of_peds+1)
                     else:
-                        if self.cur_ped is None:
+                        if self.cur_ped is None or self.cur_ped == self.last_pedestrian:
                             self.cur_ped = 1
                         else:
-                            self.cur_ped = (self.cur_ped + 1) % no_of_peds
+                            self.cur_ped += 1
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
                     else:
