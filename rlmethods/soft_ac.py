@@ -17,7 +17,7 @@ from tensorboardX import SummaryWriter
 
 sys.path.insert(0, '..')
 from rlmethods.rlutils import ReplayBuffer  # NOQA
-from neural_nets.base_network import BaseNN  # NOQA
+from neural_nets.base_network import BaseNN, reset_parameters  # NOQA
 
 DEVICE = ('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -240,6 +240,8 @@ class SoftActorCritic:
             self.play(max_env_steps)
 
     def reset_training(self):
+        self.q_net.apply(reset_parameters)
+        self.avg_q_net = copy.deepcopy(self.q_net)
         self.q_optim = Adam(self.q_net.parameters(), lr=self.learning_rate)
         self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
 

@@ -106,6 +106,7 @@ class GeneralDeepMaxent:
         expert_states,
         num_expert_trajs,
         learning_rate=1e-3,
+        l2_regularization=1e-5,
         save_folder="./",
     ):
         # RL related
@@ -122,7 +123,7 @@ class GeneralDeepMaxent:
         self.reward_net = RewardNet(state_size, hidden_dims=256)
         self.reward_net = self.reward_net.to(DEVICE)
         self.reward_optim = Adam(
-            self.reward_net.parameters(), lr=learning_rate, weight_decay=1e-5,
+            self.reward_net.parameters(), lr=learning_rate, weight_decay=l2_regularization,
         )
 
         # expert info

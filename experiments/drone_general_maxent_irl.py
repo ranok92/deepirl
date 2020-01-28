@@ -181,6 +181,8 @@ parser.add_argument("--num-trajectory-samples", type=int, default=100)
 
 parser.add_argument("--entropy-target", type=float, default=0.3)
 
+parser.add_argument("--tau", type=float, default=0.05)
+
 
 def main():
     """Runs experiment"""
@@ -397,6 +399,7 @@ def main():
             entropy_tuning=True,
             entropy_target=args.entropy_target,
             play_interval=args.play_interval,
+            tau=args.tau,
         )
 
     print("RL method initialized.")
@@ -417,6 +420,7 @@ def main():
         expert_states=expert_states,
         num_expert_trajs=num_expert_trajs,
         learning_rate=args.lr_irl,
+        l2_regularization=args.regularizer,
         save_folder=to_save,
     )
 

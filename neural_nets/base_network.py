@@ -22,6 +22,11 @@ def timestamp():
     return t
 
 
+def reset_parameters(layer):
+    if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+        layer.reset_parameters()
+
+
 class BaseNN(nn.Module):
     """Base neural network, implements convenient saving and loading. All NNs
     should subclass"""
