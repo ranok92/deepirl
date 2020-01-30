@@ -510,7 +510,6 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -518,7 +517,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'Dronefeature_risk_hit/'
+    feature_extractor_name = 'Dronefeature_risk_hit_2/'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -555,7 +554,6 @@ if __name__=='__main__':
                        folder_to_save, show_states=False,
                        display=False, trajectory_length_limit=None)
     
-    '''
     #****************************************************
     #******** section to record trajectories
     '''
@@ -622,10 +620,11 @@ if __name__=='__main__':
     
     #******** section for preprocessing data ************
     
+    """
     file_name = './t-junction-3.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
-    
+    """    
 
     
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')

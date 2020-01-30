@@ -183,6 +183,8 @@ parser.add_argument("--entropy-target", type=float, default=0.3)
 
 parser.add_argument("--tau", type=float, default=0.05)
 
+parser.add_argument("--reset-rl", action="store_true")
+
 
 def main():
     """Runs experiment"""
@@ -422,6 +424,7 @@ def main():
         learning_rate=args.lr_irl,
         l2_regularization=args.regularizer,
         save_folder=to_save,
+        reset_rl=args.reset_rl,
     )
 
     print("IRL method intialized.")
@@ -429,6 +432,8 @@ def main():
 
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
+
+    import pdb; pdb.set_trace()
 
     irl_method.train(
         args.irl_iterations,
