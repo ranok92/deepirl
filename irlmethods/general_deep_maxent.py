@@ -169,6 +169,7 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
+        reset_training,
     ):
         """
         perform IRL training.
@@ -188,12 +189,14 @@ class GeneralDeepMaxent:
         both when training RL agent and when generating rollouts.
         :type max_env_steps: int
 
-        :param episode_i: Current IRL iteration count.
-        :type episode_i: int
+        :param reset_training: Whether to reset RL training every iteration or not.
+        :type reset_training: Boolean.
         """
 
         # train RL agent
-        self.rl.reset_training()
+        if reset_training:
+            self.rl.reset_training()
+
         self.rl.train(
             num_rl_episodes,
             max_rl_episode_length,
@@ -246,6 +249,7 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
+        reset_training=False,
     ):
         for _ in range(num_irl_episodes):
             print("IRL episode {}".format(self.training_i))
@@ -254,4 +258,5 @@ class GeneralDeepMaxent:
                 max_rl_episode_length,
                 num_trajectory_samples,
                 max_env_steps,
+                reset_training,
             )
