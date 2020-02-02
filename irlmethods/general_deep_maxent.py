@@ -108,11 +108,9 @@ class GeneralDeepMaxent:
         learning_rate=1e-3,
         l2_regularization=1e-5,
         save_folder="./",
-        reset_rl=False,
     ):
         # RL related
         self.rl = rl
-        self.reset_rl = reset_rl
         self.feature_extractor = self.rl.feature_extractor
 
         # environment attributes
@@ -195,9 +193,7 @@ class GeneralDeepMaxent:
         """
 
         # train RL agent
-        if self.reset_rl:
-            self.rl.reset_training()
-        
+        self.rl.reset_training()
         self.rl.train(
             num_rl_episodes,
             max_rl_episode_length,
