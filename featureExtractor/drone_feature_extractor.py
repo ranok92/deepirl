@@ -1177,7 +1177,7 @@ class DroneFeatureSAM1:
                 )
 
                 for i, orientation_approx in enumerate(
-                    self.orientation_approximator[1:]
+                    self.orientation_approximator[1:], start=1
                 ):
                     new_angle_diff = angle_between(
                         orientation_approx, rel_coord_obs
