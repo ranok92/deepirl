@@ -173,16 +173,15 @@ parser.add_argument(
     default="ActorCritic",
     help="The RL trainer to be used.",
 )
-parser.add_argument("--play-interval", type=int, default=10)
+parser.add_argument("--play-interval", type=int, default=1)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
-
 parser.add_argument("--num-trajectory-samples", type=int, default=100)
-
 parser.add_argument("--entropy-target", type=float, default=0.3)
-
 parser.add_argument("--tau", type=float, default=0.05)
-
+parser.add_argument("--reset-training", action="store_true")
+parser.add_argument("--account-for-terminal-state", action="store_true")
+parser.add_argument("--gamma", type=float, default=0.99)
 
 def main():
     """Runs experiment"""
@@ -383,9 +382,7 @@ def main():
 
     if args.rl_method == "discrete_SAC":
         if not isinstance(env.action_space, gym.spaces.Discrete):
-            print(
-                "discrete SAC requires a discrete action space to work."
-            )
+            print("discrete SAC requires a discrete action space to work.")
             exit()
 
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
@@ -400,6 +397,7 @@ def main():
             entropy_target=args.entropy_target,
             play_interval=args.play_interval,
             tau=args.tau,
+            gamma=args.gamma,
         )
 
     print("RL method initialized.")
@@ -436,9 +434,10 @@ def main():
         args.rl_ep_length,
         args.num_trajectory_samples,
         args.rl_ep_length,
+        reset_training=args.reset_training,
+        account_for_terminal_state=args.account_for_terminal_state,
+        gamma=args.gamma,
     )
-
-
 
 if __name__ == "__main__":
     main()
