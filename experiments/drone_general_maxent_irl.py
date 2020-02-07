@@ -10,7 +10,7 @@ import glob
 
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
-from irlmethods.irlUtils import read_expert_states
+from irlmethods.irlUtils import read_expert_trajectories
 from irlmethods.general_deep_maxent import GeneralDeepMaxent
 from logger.logger import Logger
 import utils
@@ -408,15 +408,14 @@ def main():
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
-    expert_states, num_expert_trajs = read_expert_states(
+    expert_trajectories = read_expert_trajectories(
         args.exp_trajectory_path
     )
 
     irl_method = GeneralDeepMaxent(
         rl=rl_method,
         env=env,
-        expert_states=expert_states,
-        num_expert_trajs=num_expert_trajs,
+        expert_trajectories=expert_trajectories,
         learning_rate=args.lr_irl,
         l2_regularization=args.regularizer,
         save_folder=to_save,

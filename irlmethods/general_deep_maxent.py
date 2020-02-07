@@ -17,12 +17,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def play(
-    env,
-    policy,
-    feature_extractor,
-    max_env_steps,
-    render=False,
-    account_for_terminal_state=False,
+    env, policy, feature_extractor, max_env_steps, render=False,
 ):
     """
     Plays the environment using actions from supplied policy. Returns list of
@@ -74,12 +69,7 @@ def play(
 
         steps_counter += 1
 
-    if account_for_terminal_state:
-        remaining_steps = max_env_steps - steps_counter
-        assert remaining_steps >= 0
-        features.extend([features[-1]] * remaining_steps)
-
-    return features
+    return torch.stack(features, dim=0)
 
 
 class RewardNet(BaseNN):
@@ -115,8 +105,7 @@ class GeneralDeepMaxent:
         self,
         rl,
         env,
-        expert_states,
-        num_expert_trajs,
+        expert_trajectories,
         learning_rate=1e-3,
         l2_regularization=1e-5,
         save_folder="./",
@@ -141,8 +130,9 @@ class GeneralDeepMaxent:
         )
 
         # expert info
-        self.expert_states = expert_states.to(torch.float).to(DEVICE)
-        self.num_expert_trajs = num_expert_trajs
+        self.expert_trajectories = [
+            traj.to(torch.float).to(DEVICE) for traj in expert_trajectories
+        ]
 
         # logging and saving
         self.save_path = Path(save_folder)
@@ -154,7 +144,7 @@ class GeneralDeepMaxent:
         self.training_i = 0
 
     def generate_trajectories(
-        self, num_trajectories, max_env_steps, account_for_terminal_state=False
+        self, num_trajectories, max_env_steps,
     ):
         """
         Generate trajectories in environemnt using leanred RL policy.
@@ -176,12 +166,26 @@ class GeneralDeepMaxent:
                 self.rl.policy,
                 self.feature_extractor,
                 max_env_steps,
-                account_for_terminal_state=account_for_terminal_state,
             )
 
             states.append(generated_states)
 
         return states
+
+    def discounted_rewards(self, rewards, gamma, account_for_terminal_state):
+        discounted_sum = 0
+        t = 0
+        for t, reward in enumerate(rewards[:-1]):
+            discounted_sum += gamma ** t * reward
+
+        if account_for_terminal_state:
+            discounted_sum += (
+                (gamma / (1 - gamma)) * gamma ** (t + 1) * rewards[-1]
+            )
+        else:
+            discounted_sum += gamma ** (t + 1) * rewards[-1]
+
+        return discounted_sum
 
     def train_episode(
         self,
@@ -234,26 +238,28 @@ class GeneralDeepMaxent:
         )
 
         # expert loss
-        expert_loss = self.reward_net(self.expert_states).sum()
+        expert_loss = 0
+        for traj in self.expert_trajectories:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
 
         # policy loss
         trajectories = self.generate_trajectories(
-            num_trajectory_samples,
-            max_env_steps,
-            account_for_terminal_state=account_for_terminal_state,
+            num_trajectory_samples, max_env_steps,
         )
 
         policy_loss = 0
         for traj in trajectories:
-            torch_trajs = torch.stack(traj).to(torch.float).to(DEVICE)
-
-            rewards = self.reward_net(torch_trajs)
-
-            for t, reward in enumerate(rewards):
-                policy_loss += gamma**t * reward
+            policy_rewards = self.reward_net(traj)
+            policy_loss += self.discounted_rewards(
+                policy_rewards, gamma, account_for_terminal_state
+            )
 
         policy_loss = (
-            self.num_expert_trajs / num_trajectory_samples
+            len(self.expert_trajectories) / num_trajectory_samples
         ) * policy_loss
 
         # Backpropagate IRL loss
@@ -305,5 +311,5 @@ class GeneralDeepMaxent:
                 max_env_steps,
                 reset_training,
                 account_for_terminal_state,
-                gamma
+                gamma,
             )
