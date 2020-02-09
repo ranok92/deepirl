@@ -29,6 +29,9 @@ from featureExtractor.gridworld_featureExtractor import (
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureRisk_speed,
     DroneFeatureRisk_speedv2,
+    VasquezF1,
+    VasquezF2,
+    VasquezF3,
 )
 
 from rlmethods.b_actor_critic import ActorCritic
@@ -313,6 +316,15 @@ def main():
             thresh1=18,
             thresh2=30,
         )
+
+    if args.feat_extractor == "VasquezF1":
+        feat_ext = VasquezF1(6*agent_width, 18, 30)
+
+    if args.feat_extractor == "VasquezF2":
+        feat_ext = VasquezF2(6*agent_width, 18 ,30)
+
+    if args.feat_extractor == "VasquezF3":
+        feat_ext = VasquezF3(6*agent_width)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
