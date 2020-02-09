@@ -393,6 +393,7 @@ def main():
             entropy_target=args.entropy_target,
         )
 
+    import pdb; pdb.set_trace()
     # log RL info
     if not args.dont_save and not args.play:
 

@@ -17,7 +17,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def play(
-    env, policy, feature_extractor, max_env_steps, render=False,
+    env, policy, feature_extractor, max_env_steps, stochastic, render=False,
 ):
     """
     Plays the environment using actions from supplied policy. Returns list of
@@ -53,7 +53,10 @@ def play(
     features.append(torch_feature)
 
     while not done and steps_counter < max_env_steps:
-        action = policy.eval_action(torch_feature)
+        if stochastic:
+            action = policy.sample_action(torch_feature)
+        else:
+            action = policy.eval_action(torch_feature)
 
         # TODO: Fix misalignmnet in implementations of eval_action.
         # action = action.cpu().numpy()
@@ -144,7 +147,7 @@ class GeneralDeepMaxent:
         self.training_i = 0
 
     def generate_trajectories(
-        self, num_trajectories, max_env_steps,
+        self, num_trajectories, max_env_steps, stochastic,
     ):
         """
         Generate trajectories in environemnt using leanred RL policy.
@@ -166,6 +169,7 @@ class GeneralDeepMaxent:
                 self.rl.policy,
                 self.feature_extractor,
                 max_env_steps,
+                stochastic,
             )
 
             states.append(generated_states)
@@ -196,6 +200,7 @@ class GeneralDeepMaxent:
         reset_training,
         account_for_terminal_state,
         gamma,
+        stochastic_sampling,
     ):
         """
         perform IRL training.
@@ -225,6 +230,13 @@ class GeneralDeepMaxent:
         length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
         s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
         :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+
+        :param stochastic_sampling: Sample trajectories using stochastic
+        policy instead of deterministic 'best action policy'
+        :type stochastic_sampling: Boolean.
         """
 
         # train RL agent
@@ -248,7 +260,7 @@ class GeneralDeepMaxent:
 
         # policy loss
         trajectories = self.generate_trajectories(
-            num_trajectory_samples, max_env_steps,
+            num_trajectory_samples, max_env_steps, stochastic_sampling
         )
 
         policy_loss = 0
@@ -296,6 +308,7 @@ class GeneralDeepMaxent:
         reset_training=False,
         account_for_terminal_state=False,
         gamma=0.99,
+        stochastic_sampling=False,
     ):
         """
         Runs the train_episode() function for 'num_irl_episodes' times. Other
@@ -312,4 +325,5 @@ class GeneralDeepMaxent:
                 reset_training,
                 account_for_terminal_state,
                 gamma,
+                stochastic_sampling,
             )
