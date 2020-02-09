@@ -349,7 +349,8 @@ def speed_features(
 
     feature = np.zeros(3)
 
-    for pedestrian_vel in pedestrian_velocities:
+    for idx in range(len(pedestrian_velocities)):
+        pedestrian_vel = pedestrian_velocities[idx]
         speed = dist_2d(pedestrian_vel, agent_velocity)
 
         # put value into proper bin
