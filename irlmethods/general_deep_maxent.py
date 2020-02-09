@@ -3,10 +3,13 @@ Implements deep maxent IRL (Wulfmeier et. all) in a general, feature-type
 agnostic way.
 """
 import sys
+import os
+import functools
 from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.multiprocessing as mp
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
@@ -14,6 +17,8 @@ sys.path.insert(0, "..")
 from neural_nets.base_network import BaseNN
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+mp.set_start_method("spawn", force=True)
 
 
 def play(
@@ -73,6 +78,40 @@ def play(
         steps_counter += 1
 
     return torch.stack(features, dim=0)
+
+
+def generate_trajectories(
+    env,
+    policy,
+    feature_extractor,
+    num_trajectories,
+    max_env_steps,
+    stochastic,
+):
+    """
+    Generate trajectories in environemnt using leanred RL policy.
+
+    :param num_trajectories: number of trajectories to generate.
+    :type num_trajectories: int
+
+    :param max_env_steps: max steps to take in environment (rollout length.)
+    :type max_env_steps: int
+
+    :return: list of features encountered in playthrough.
+    :rtype: list of tensors of shape (num_states x feature_length)
+    """
+    trajectories = []
+
+    for _ in range(num_trajectories):
+
+        generated_states = play(
+            env, policy, feature_extractor, max_env_steps, stochastic,
+        )
+
+        trajectories.append(generated_states)
+
+
+    return trajectories
 
 
 class RewardNet(BaseNN):
@@ -146,36 +185,6 @@ class GeneralDeepMaxent:
         # training meta
         self.training_i = 0
 
-    def generate_trajectories(
-        self, num_trajectories, max_env_steps, stochastic,
-    ):
-        """
-        Generate trajectories in environemnt using leanred RL policy.
-
-        :param num_trajectories: number of trajectories to generate.
-        :type num_trajectories: int
-
-        :param max_env_steps: max steps to take in environment (rollout length.)
-        :type max_env_steps: int
-
-        :return: list of features encountered in playthrough.
-        :rtype: list of tensors of shape (num_states x feature_length)
-        """
-        states = []
-
-        for _ in range(num_trajectories):
-            generated_states = play(
-                self.env,
-                self.rl.policy,
-                self.feature_extractor,
-                max_env_steps,
-                stochastic,
-            )
-
-            states.append(generated_states)
-
-        return states
-
     def discounted_rewards(self, rewards, gamma, account_for_terminal_state):
         discounted_sum = 0
         t = 0
@@ -201,6 +210,7 @@ class GeneralDeepMaxent:
         account_for_terminal_state,
         gamma,
         stochastic_sampling,
+        pool,
     ):
         """
         perform IRL training.
@@ -239,16 +249,6 @@ class GeneralDeepMaxent:
         :type stochastic_sampling: Boolean.
         """
 
-        # train RL agent
-        if reset_training:
-            self.rl.reset_training()
-
-        self.rl.train(
-            num_rl_episodes,
-            max_rl_episode_length,
-            reward_network=self.reward_net,
-        )
-
         # expert loss
         expert_loss = 0
         for traj in self.expert_trajectories:
@@ -259,12 +259,40 @@ class GeneralDeepMaxent:
             )
 
         # policy loss
-        trajectories = self.generate_trajectories(
-            num_trajectory_samples, max_env_steps, stochastic_sampling
+        # trajectories = self.generate_trajectories(
+        #     num_trajectory_samples, max_env_steps, stochastic_sampling
+        # )
+
+        assert (
+            num_trajectory_samples % 4 == 0
+        ), "Num samples not divisble by num threads."
+
+        trajs = [
+            pool.apply_async(
+                generate_trajectories,
+                (
+                    self.env,
+                    self.rl.policy,
+                    self.rl.feature_extractor,
+                    num_trajectory_samples // 4,
+                    max_env_steps,
+                    stochastic_sampling,
+                ),
+            )
+            for _ in range(4)
+        ]
+
+        sampled_trajectories = [traj.wait() for traj in trajs]
+        sampled_trajectories = [traj.get() for traj in trajs]
+
+        sampled_trajectories = functools.reduce(
+            lambda a, b: a + b, sampled_trajectories
         )
 
+        assert len(sampled_trajectories) == num_trajectory_samples
+
         policy_loss = 0
-        for traj in trajectories:
+        for traj in sampled_trajectories:
             policy_rewards = self.reward_net(traj)
             policy_loss += self.discounted_rewards(
                 policy_rewards, gamma, account_for_terminal_state
@@ -280,6 +308,16 @@ class GeneralDeepMaxent:
         self.reward_optim.zero_grad()
         loss.backward()
         self.reward_optim.step()
+
+        # train RL agent
+        if reset_training:
+            self.rl.reset_training()
+
+        self.rl.train(
+            num_rl_episodes,
+            max_rl_episode_length,
+            reward_network=self.reward_net,
+        )
 
         # logging
         self.tbx_writer.add_scalar(
@@ -315,15 +353,27 @@ class GeneralDeepMaxent:
         parameters are identical to the aforementioned function, with the same
         description and requirements.
         """
+
+        self.rl.policy.share_memory()
+
+        # create threadpool
+        pool = mp.Pool(4)
+
+        # correct number of trajectory samples so they are a multiple of avaialble processes in the pool
+        num_traj_samples = num_trajectory_samples - (
+            num_trajectory_samples % 4
+        )
+
         for _ in range(num_irl_episodes):
             print("IRL episode {}".format(self.training_i))
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,
-                num_trajectory_samples,
+                num_traj_samples,
                 max_env_steps,
                 reset_training,
                 account_for_terminal_state,
                 gamma,
                 stochastic_sampling,
+                pool,
             )
