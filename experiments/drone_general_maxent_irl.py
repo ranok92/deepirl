@@ -324,7 +324,7 @@ def main():
         feat_ext = VasquezF2(6*agent_width, 18 ,30)
 
     if args.feat_extractor == "VasquezF3":
-        feat_ext = VasquezF3(6*agent_width)
+        feat_ext = VasquezF3(agent_width)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
