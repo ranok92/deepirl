@@ -2,6 +2,7 @@
 
 import numpy as np
 from featureExtractor.drone_feature_extractor import dist_2d, angle_between
+import warnings
 
 
 def compute_trajectory_smoothness(trajectory):
@@ -158,14 +159,19 @@ def anisotropic_intrusions(trajectory, radius, lambda_param=2.0):
 
         for ped in pedestrians:
             ped_position = ped["position"]
-            ped_orientation = ped["orienation"]
+            ped_orientation = ped["orientation"]
 
             vector_to_agent = agent_position - ped_position
+
+            if ped_orientation is None:
+                warnings.warn("pedestrian orientation is none, setting to (1.0, 0.0)")
+                ped_orientation = np.array([1.0, 0.0])
+
             angle = angle_between(vector_to_agent, ped_orientation)
             distance = dist_2d(agent_position, ped_position)
 
             # evaluate if agent is in anisotropic radius
-            anisotropy_factor = lambda_param - 0.5(1 - lambda_param) * (
+            anisotropy_factor = lambda_param - 0.5 * (1 - lambda_param) * (
                 1 + np.cos(angle)
             )
             anisotropic_radius = radius * anisotropy_factor
