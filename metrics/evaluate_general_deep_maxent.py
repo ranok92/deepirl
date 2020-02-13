@@ -2,6 +2,7 @@ import argparse
 import sys  # NOQA
 import os
 import copy
+import pathlib
 from datetime import datetime
 
 import numpy as np
@@ -189,30 +190,7 @@ def main():
 
     output["metric_results"] = metric_results
 
-    # for ped_id in range(num_peds):
-    #     print("Collecting trajectory for pedestrian {}".format(ped_id))
-
-    #     state = env.reset()
-    #     done = False
-    #     t = 0
-    #     traj = [copy.deepcopy(state)]
-
-    #     while not done and t < args.max_ep_length:
-
-    #         print("playing timestep {}".format(t), end="\r")
-
-    #         feat = feat_ext.extract_features(state)
-    #         feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
-
-    #         action = policy.eval_action(feat)
-    #         state, _, done, _ = env.step(action)
-    #         traj.append(copy.deepcopy(state))
-
-    #         t += 1
-
-    #     # metrics
-    #     metric_results = metric_applicator.apply([traj])
-    #     output["metric_results"][ped_id] = metric_results
+    pathlib.Path('./results/').mkdir(exist_ok=True)
 
     with open(
         "./results/"
