@@ -1,6 +1,10 @@
 """ Utilities for generating results from metrics """
 
 from collections import defaultdict
+import copy
+import torch
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class MetricApplicator:
@@ -86,3 +90,72 @@ class MetricApplicator:
         :rtype: dictionary.
         """
         return self.metrics_dict
+
+
+def collect_trajectories_and_metrics(
+    env,
+    feature_extractor,
+    policy,
+    num_trajectories,
+    max_episode_length,
+    metric_applicator,
+):
+    """
+    Helper function that collects trajectories and applies metrics from a
+    metric applicator on a per trajectory basis.
+
+    :param env: environment to collect trajectories from.
+    :type env: any gym-like environment.
+
+    :param feature_extractor: a feature extractor to translate state
+    dictionary to a feature vector.
+    :type feature_extractor: feature extractor class.
+
+    :param policy: Policy to extract actions from.
+    :type policy: standard policy child of BasePolicy.
+
+    :param num_trajectories: Number of trajectories to sample.
+    :type num_trajectories: int.
+
+    :param max_episode_length: Maximum length of individual trajectories.
+    :type max_episode_length: int.
+
+    :param metric_applicator: a metric applicator class containing all
+    metrics that need to be applied.
+    :type metric_applicator: Instance, child, or similar to
+    metric_utils.MetricApplicator.
+
+    :return: dictionary mapping trajectory to metric results from that
+    trajectory.
+    :rtype: dictionary
+    """
+
+    metric_results = {}
+
+    for traj_idx in range(num_trajectories):
+
+        print("Collecting trajectory {}".format(traj_idx))
+
+        state = env.reset()
+        done = False
+        t = 0
+        traj = [copy.deepcopy(state)]
+
+        while not done and t < max_episode_length:
+
+            print("playing timestep {}".format(t), end="\r")
+
+            feat = feature_extractor.extract_features(state)
+            feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
+
+            action = policy.eval_action(feat)
+            state, _, done, _ = env.step(action)
+            traj.append(copy.deepcopy(state))
+
+            t += 1
+
+        # metrics
+        traj_metric_result = metric_applicator.apply([traj])
+        metric_results[traj_idx] = traj_metric_result
+
+    return metric_results
