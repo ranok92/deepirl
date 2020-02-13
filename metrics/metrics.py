@@ -248,3 +248,14 @@ def goal_reached(trajectory, goal_radius, agent_radius):
 
     return dist_2d(agent_position, goal_position) <= goal_radius + agent_radius
 
+def trajectory_length(trajectory):
+    """
+    Returns the length of the trajectory.
+
+    :param trajectory: Trajectory of agent in envrionment.
+    :type trajectory: List of state dictionaries.
+    :return: length of trajectory.
+    :rtype: int.
+    """
+    return len(trajectory)
+
