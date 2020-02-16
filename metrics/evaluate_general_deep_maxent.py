@@ -1,7 +1,5 @@
 import argparse
 import sys  # NOQA
-import os
-import copy
 import pathlib
 from datetime import datetime
 
@@ -12,7 +10,6 @@ import torch
 sys.path.insert(0, "..")  # NOQA: E402
 sys.path.insert(0, "../..")  # NOQA: E402
 
-import matplotlib
 import pickle
 
 

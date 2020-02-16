@@ -7,7 +7,10 @@ from itertools import islice
 
 from matplotlib import pyplot as plt
 import numpy as np
+import torch
 sys.path.insert(0, '..')
+
+DEVICE = 'cuda' if torch.cuda.is_available else 'cpu'
 
 
 class LossBasedTermination():
@@ -147,6 +150,50 @@ class ContigousReplayBuffer(ReplayBuffer):
             dones
         )
 
+def play(policy, env, feature_extractor, max_env_steps, render=False, best_action=True):
+    """
+    Plays the environment given the policy. use to render or debug environment/policy.
+
+    :param policy: Policy to execute actions from.
+    :type policy: Child of BasePolicy
+    :param env: environment to play in.
+    :type env: gym like environment.
+    :param feature_extractor: feature extractor to use. Use identity feature
+    extractor for gym environments.
+    :type feature_extractor: Feature extractor like class.
+    :param max_env_steps: maximum number of environment steps to take.
+    :type max_env_steps: int.
+    :param render: whether to render the environment or not., defaults to False
+    :type render: bool, optional
+    :param best_action: Whether to choose best (average) policy action or
+    sample a random action according to policy., defaults to True
+    :type best_action: bool, optional
+    """
+    done = False
+    steps_counter = 0
+
+    state = env.reset()
+    state = feature_extractor.extract_features(state)
+    state = torch.tensor(state).to(torch.float).to(DEVICE)
+
+    if render:
+        env.render()
+
+    while not done and steps_counter < max_env_steps:
+
+        if best_action:
+            action = policy.eval_action(state)
+        else:
+            action, _, _ = policy.sample_action(state)
+
+        next_state, _, done, _ = env.step(action)
+        state = feature_extractor.extract_features(next_state)
+        state = torch.tensor(state).to(torch.float).to(DEVICE)
+
+        steps_counter += 1
+
+        if render:
+            env.render()
 
 if __name__ == '__main__':
 

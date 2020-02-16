@@ -371,7 +371,7 @@ class SoftActorCritic:
             else:
                 action, _, _ = self.select_action(torch_state, alpha)
 
-            next_state, reward, done, max_steps_elapsed = self.env.step(action.item())
+            next_state, reward, done, _ = self.env.step(action.item())
             next_state = self.feature_extractor.extract_features(next_state)
 
             if render:
@@ -380,7 +380,7 @@ class SoftActorCritic:
             if reward_network:
                 reward = reward_network(torch_state).cpu().item()
 
-            if max_steps_elapsed:
+            if episode_length > max_env_steps:
                 self.replay_buffer.push((
                     state,
                     action.cpu().numpy(),
