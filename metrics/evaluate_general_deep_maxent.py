@@ -37,7 +37,7 @@ parser.add_argument(
                      feature extractor to be used in the experiment.",
 )
 
-parser.add_argument("--replace-subject", action="store_true")
+parser.add_argument("--dont-replace-subject", action="store_false")
 
 parser.add_argument(
     "--annotation-file",
@@ -86,7 +86,7 @@ def main():
         step_size=step_size,
         agent_width=agent_width,
         external_control=True,
-        replace_subject=args.replace_subject,
+        dont_replace_subject=args.dont_replace_subject,
         show_comparison=True,
         consider_heading=consider_heading,
         show_orientation=True,
