@@ -86,7 +86,7 @@ def main():
         step_size=step_size,
         agent_width=agent_width,
         external_control=True,
-        dont_replace_subject=args.dont_replace_subject,
+        replace_subject=args.dont_replace_subject,
         show_comparison=True,
         consider_heading=consider_heading,
         show_orientation=True,
