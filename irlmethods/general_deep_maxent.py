@@ -54,7 +54,7 @@ def play(
 
     while not done and steps_counter < max_env_steps:
         if stochastic:
-            action = policy.sample_action(torch_feature)
+            action, _, _ = policy.sample_action(torch_feature)
         else:
             action = policy.eval_action(torch_feature)
 
@@ -239,16 +239,6 @@ class GeneralDeepMaxent:
         :type stochastic_sampling: Boolean.
         """
 
-        # train RL agent
-        if reset_training:
-            self.rl.reset_training()
-
-        self.rl.train(
-            num_rl_episodes,
-            max_rl_episode_length,
-            reward_network=self.reward_net,
-        )
-
         # expert loss
         expert_loss = 0
         for traj in self.expert_trajectories:
@@ -280,6 +270,16 @@ class GeneralDeepMaxent:
         self.reward_optim.zero_grad()
         loss.backward()
         self.reward_optim.step()
+
+        # train RL agent
+        if reset_training:
+            self.rl.reset_training()
+
+        self.rl.train(
+            num_rl_episodes,
+            max_rl_episode_length,
+            reward_network=self.reward_net,
+        )
 
         # logging
         self.tbx_writer.add_scalar(

@@ -36,7 +36,8 @@ from featureExtractor.drone_feature_extractor import (
 
 from rlmethods.b_actor_critic import ActorCritic
 from rlmethods.soft_ac_pi import SoftActorCritic
-from rlmethods.soft_ac import SoftActorCritic as QSAC
+from rlmethods.soft_ac import QSoftActorCritic as QSAC
+from rlmethods.soft_ac import SoftActorCritic as DiscreteSAC
 from rlmethods.rlutils import ReplayBuffer
 
 
@@ -185,6 +186,12 @@ parser.add_argument("--tau", type=float, default=0.05)
 parser.add_argument("--reset-training", action="store_true")
 parser.add_argument("--account-for-terminal-state", action="store_true")
 parser.add_argument("--gamma", type=float, default=0.99)
+parser.add_argument(
+    "--stochastic-sampling",
+    action="store_true",
+    help="Whether to use stochastic policy to sample trajectories for IRL.",
+)
+
 
 def main():
     """Runs experiment"""
@@ -318,10 +325,10 @@ def main():
         )
 
     if args.feat_extractor == "VasquezF1":
-        feat_ext = VasquezF1(6*agent_width, 18, 30)
+        feat_ext = VasquezF1(6 * agent_width, 18, 30)
 
     if args.feat_extractor == "VasquezF2":
-        feat_ext = VasquezF2(6*agent_width, 18 ,30)
+        feat_ext = VasquezF2(6 * agent_width, 18, 30)
 
     if args.feat_extractor == "VasquezF3":
         feat_ext = VasquezF3(agent_width)
@@ -392,7 +399,7 @@ def main():
             buffer_sample_size=args.replay_buffer_sample_size,
         )
 
-    if args.rl_method == "discrete_SAC":
+    if args.rl_method == "discrete_QSAC":
         if not isinstance(env.action_space, gym.spaces.Discrete):
             print("discrete SAC requires a discrete action space to work.")
             exit()
@@ -400,6 +407,26 @@ def main():
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
         rl_method = QSAC(
+            env,
+            replay_buffer,
+            feat_ext,
+            args.replay_buffer_sample_size,
+            learning_rate=args.lr_rl,
+            entropy_tuning=True,
+            entropy_target=args.entropy_target,
+            play_interval=args.play_interval,
+            tau=args.tau,
+            gamma=args.gamma,
+        )
+
+    if args.rl_method == "discrete_SAC":
+        if not isinstance(env.action_space, gym.spaces.Discrete):
+            print("discrete SAC requires a discrete action space to work.")
+            exit()
+
+        replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
+        rl_method = DiscreteSAC(
             env,
             replay_buffer,
             feat_ext,
@@ -420,9 +447,7 @@ def main():
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
-    expert_trajectories = read_expert_trajectories(
-        args.exp_trajectory_path
-    )
+    expert_trajectories = read_expert_trajectories(args.exp_trajectory_path)
 
     irl_method = GeneralDeepMaxent(
         rl=rl_method,
@@ -448,7 +473,9 @@ def main():
         reset_training=args.reset_training,
         account_for_terminal_state=args.account_for_terminal_state,
         gamma=args.gamma,
+        stochastic_sampling=args.stochastic_sampling,
     )
+
 
 if __name__ == "__main__":
     main()

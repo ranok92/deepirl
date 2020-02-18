@@ -232,19 +232,6 @@ class SoftActorCritic:
         else:
             self.tbx_writer = tbx_writer
 
-    # def select_action(self, state, alpha):
-    #     """Generate an action based on state vector using current policy.
-
-    #     :param state: Current state vector. must be Torch 32 bit float tensor.
-    #     """
-    #     softmax_over_actions = F.softmax(
-    #         (1.0 / alpha) * self.q_net(state), dim=-1
-    #     )
-    #     dist = Categorical(softmax_over_actions)
-    #     action = dist.sample()
-
-    #     return action, dist.log_prob(action), dist
-
     def populate_buffer(self, max_env_steps):
         """
         Fill in entire replay buffer with state action pairs using current
