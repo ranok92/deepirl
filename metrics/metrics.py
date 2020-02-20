@@ -4,7 +4,6 @@ import numpy as np
 from featureExtractor.drone_feature_extractor import dist_2d, angle_between
 import warnings
 
-
 def compute_trajectory_smoothness(trajectory):
     """
     Returns the total and per step change in the orientation (in degrees)
@@ -260,8 +259,14 @@ def trajectory_length(trajectory):
 
     :param trajectory: Trajectory of agent in envrionment.
     :type trajectory: List of state dictionaries.
-    :return: length of trajectory.
+    :return: length of trajectory by calculating the distance between the position of
+             the agent in consequtive frames. 
     :rtype: int.
     """
-    return len(trajectory)
+    agent_cur_pos = trajectory[0]['agent_state']['position']
+    traj_length = 0
+    for state in trajectory[1:]:
+        traj_length += dist_2d(agent_cur_pos, state['agent_state']['position'])
+        agent_cur_pos = state['agent_state']['position']
+    return traj_length
 
