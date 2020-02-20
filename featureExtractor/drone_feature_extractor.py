@@ -349,7 +349,8 @@ def speed_features(
 
     feature = np.zeros(3)
 
-    for pedestrian_vel in pedestrian_velocities:
+    for idx in range(len(pedestrian_velocities)):
+        pedestrian_vel = pedestrian_velocities[idx]
         speed = dist_2d(pedestrian_vel, agent_velocity)
 
         # put value into proper bin
@@ -1180,7 +1181,7 @@ class DroneFeatureSAM1:
                 )
 
                 for i, orientation_approx in enumerate(
-                    self.orientation_approximator[1:]
+                    self.orientation_approximator[1:], start=1
                 ):
                     new_angle_diff = angle_between(
                         orientation_approx, rel_coord_obs

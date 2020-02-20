@@ -888,7 +888,7 @@ def save_bar_plot(list1, list2, diff_list, iteration, save_folder):
         list2 = list2[10:]
         diff_list = diff_list[10:]    
 
-def read_expert_states(folder_path):
+def read_expert_trajectories(folder_path):
     """
     reads expert features found in folder_path.
 
@@ -899,12 +899,12 @@ def read_expert_states(folder_path):
     features_path = Path(folder_path) / '*.states'
     feature_files = glob.glob(str(features_path))
 
-    list_of_features = []
+    list_of_trajectories = []
 
     for feature_file in feature_files:
-        list_of_features.append(torch.load(feature_file))
+        list_of_trajectories.append(torch.load(feature_file))
 
-    return torch.cat(list_of_features), len(feature_files)
+    return list_of_trajectories
 
 if __name__ == '__main__':
 

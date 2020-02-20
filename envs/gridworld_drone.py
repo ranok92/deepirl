@@ -979,7 +979,53 @@ class GridWorldDrone(GridWorld):
 
 
 
+class UCYWorld(GridWorldDrone):
+    """
+    Child of GridWorldDrone with reasonable defaults and UCY dataset.
+    """
+    def __init__(
+        self,
+        display=False,
+        is_onehot=False,
+        seed=7,
+        obstacles=None,
+        show_trail=False,
+        is_random=False,
+        annotation_file="./expert_datasets/university_students/"+
+                        "annotation/processed/frame_skip_1/"+
+                        "students003_processed_corrected.txt",
+        subject=None,
+        tick_speed=60,
+        obs_width=10,
+        step_size=2,
+        agent_width=10,
+        replace_subject=True,
+        segment_size=None,
+        external_control=True,
+        step_reward=0.001,
+        show_comparison=True,
+        consider_heading=True,
+        show_orientation=True,
+        rows=576,
+        cols=720,
+        width=10,
+        ):
 
+        args = copy.deepcopy(locals())
+
+        # these arguments are side effects of calling locals()
+        del args['self']
+        del args['__class__']
+
+        # construct path from current script directory
+        annotation_file_path = os.path.join(
+            os.path.dirname(__file__),
+            annotation_file
+            )
+
+        args['annotation_file'] = annotation_file_path
+
+        super().__init__(**args)
 
 
 

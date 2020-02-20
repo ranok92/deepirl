@@ -16,7 +16,9 @@ from neural_nets.base_network import BaseNN
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def play(env, policy, feature_extractor, max_env_steps, render=False):
+def play(
+    env, policy, feature_extractor, max_env_steps, stochastic, render=False,
+):
     """
     Plays the environment using actions from supplied policy. Returns list of
     features encountered.
@@ -51,7 +53,10 @@ def play(env, policy, feature_extractor, max_env_steps, render=False):
     features.append(torch_feature)
 
     while not done and steps_counter < max_env_steps:
-        action = policy.eval_action(torch_feature)
+        if stochastic:
+            action, _, _ = policy.sample_action(torch_feature)
+        else:
+            action = policy.eval_action(torch_feature)
 
         # TODO: Fix misalignmnet in implementations of eval_action.
         # action = action.cpu().numpy()
@@ -67,7 +72,7 @@ def play(env, policy, feature_extractor, max_env_steps, render=False):
 
         steps_counter += 1
 
-    return features
+    return torch.stack(features, dim=0)
 
 
 class RewardNet(BaseNN):
@@ -103,9 +108,9 @@ class GeneralDeepMaxent:
         self,
         rl,
         env,
-        expert_states,
-        num_expert_trajs,
+        expert_trajectories,
         learning_rate=1e-3,
+        l2_regularization=1e-5,
         save_folder="./",
     ):
         # RL related
@@ -122,12 +127,15 @@ class GeneralDeepMaxent:
         self.reward_net = RewardNet(state_size, hidden_dims=256)
         self.reward_net = self.reward_net.to(DEVICE)
         self.reward_optim = Adam(
-            self.reward_net.parameters(), lr=learning_rate, weight_decay=1e-5,
+            self.reward_net.parameters(),
+            lr=learning_rate,
+            weight_decay=l2_regularization,
         )
 
         # expert info
-        self.expert_states = expert_states.to(torch.float).to(DEVICE)
-        self.num_expert_trajs = num_expert_trajs
+        self.expert_trajectories = [
+            traj.to(torch.float).to(DEVICE) for traj in expert_trajectories
+        ]
 
         # logging and saving
         self.save_path = Path(save_folder)
@@ -138,7 +146,9 @@ class GeneralDeepMaxent:
         # training meta
         self.training_i = 0
 
-    def generate_trajectories(self, num_trajectories, max_env_steps):
+    def generate_trajectories(
+        self, num_trajectories, max_env_steps, stochastic,
+    ):
         """
         Generate trajectories in environemnt using leanred RL policy.
 
@@ -155,12 +165,31 @@ class GeneralDeepMaxent:
 
         for _ in range(num_trajectories):
             generated_states = play(
-                self.env, self.rl.policy, self.feature_extractor, max_env_steps
+                self.env,
+                self.rl.policy,
+                self.feature_extractor,
+                max_env_steps,
+                stochastic,
             )
 
-            states.extend(generated_states)
+            states.append(generated_states)
 
         return states
+
+    def discounted_rewards(self, rewards, gamma, account_for_terminal_state):
+        discounted_sum = 0
+        t = 0
+        for t, reward in enumerate(rewards[:-1]):
+            discounted_sum += gamma ** t * reward
+
+        if account_for_terminal_state:
+            discounted_sum += (
+                (gamma / (1 - gamma)) * gamma ** (t + 1) * rewards[-1]
+            )
+        else:
+            discounted_sum += gamma ** (t + 1) * rewards[-1]
+
+        return discounted_sum
 
     def train_episode(
         self,
@@ -168,6 +197,10 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
+        reset_training,
+        account_for_terminal_state,
+        gamma,
+        stochastic_sampling,
     ):
         """
         perform IRL training.
@@ -187,31 +220,48 @@ class GeneralDeepMaxent:
         both when training RL agent and when generating rollouts.
         :type max_env_steps: int
 
-        :param episode_i: Current IRL iteration count.
-        :type episode_i: int
+        :param reset_training: Whether to reset RL training every iteration
+        or not.
+        :type reset_training: Boolean.
+
+        :param account_for_terminal_state: Whether to account for a state
+        being terminal or not. If true, (gamma/1-gamma)*R will be immitated
+        by padding the trajectory with its ending state until max_env_steps
+        length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
+        s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
+        :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+
+        :param stochastic_sampling: Sample trajectories using stochastic
+        policy instead of deterministic 'best action policy'
+        :type stochastic_sampling: Boolean.
         """
 
-        # train RL agent
-        self.rl.reset_training()
-        self.rl.train(
-            num_rl_episodes,
-            max_rl_episode_length,
-            reward_network=self.reward_net,
-        )
-
         # expert loss
-        expert_loss = self.reward_net(self.expert_states).sum()
+        expert_loss = 0
+        for traj in self.expert_trajectories:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
 
         # policy loss
         trajectories = self.generate_trajectories(
-            num_trajectory_samples, max_env_steps
+            num_trajectory_samples, max_env_steps, stochastic_sampling
         )
 
-        torch_trajs = torch.stack(trajectories).to(torch.float).to(DEVICE)
+        policy_loss = 0
+        for traj in trajectories:
+            policy_rewards = self.reward_net(traj)
+            policy_loss += self.discounted_rewards(
+                policy_rewards, gamma, account_for_terminal_state
+            )
 
-        policy_loss = self.reward_net(torch_trajs).sum()
         policy_loss = (
-            self.num_expert_trajs / num_trajectory_samples
+            len(self.expert_trajectories) / num_trajectory_samples
         ) * policy_loss
 
         # Backpropagate IRL loss
@@ -220,6 +270,16 @@ class GeneralDeepMaxent:
         self.reward_optim.zero_grad()
         loss.backward()
         self.reward_optim.step()
+
+        # train RL agent
+        if reset_training:
+            self.rl.reset_training()
+
+        self.rl.train(
+            num_rl_episodes,
+            max_rl_episode_length,
+            reward_network=self.reward_net,
+        )
 
         # logging
         self.tbx_writer.add_scalar(
@@ -245,7 +305,16 @@ class GeneralDeepMaxent:
         max_rl_episode_length,
         num_trajectory_samples,
         max_env_steps,
+        reset_training=False,
+        account_for_terminal_state=False,
+        gamma=0.99,
+        stochastic_sampling=False,
     ):
+        """
+        Runs the train_episode() function for 'num_irl_episodes' times. Other
+        parameters are identical to the aforementioned function, with the same
+        description and requirements.
+        """
         for _ in range(num_irl_episodes):
             print("IRL episode {}".format(self.training_i))
             self.train_episode(
@@ -253,4 +322,8 @@ class GeneralDeepMaxent:
                 max_rl_episode_length,
                 num_trajectory_samples,
                 max_env_steps,
+                reset_training,
+                account_for_terminal_state,
+                gamma,
+                stochastic_sampling,
             )
