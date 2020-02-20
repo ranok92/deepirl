@@ -747,6 +747,9 @@ class BaseVasquez:
     def recover_state_from_hash_value(self, hash_value):
         return np.frombuffer(hash_value)
 
+    def overlay_bins(self, state):
+
+        return None
 
 class VasquezF1(BaseVasquez):
     def __init__(

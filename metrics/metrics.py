@@ -112,6 +112,7 @@ def proxemic_intrusions(trajectory, units_to_meters_ratio):
                 continue
             else:
                 raise ValueError("Distance did not fit in any bins.")
+            
 
     return intimiate_intrusions, personal_intrusions, social_intrusions
 
@@ -156,7 +157,7 @@ def anisotropic_intrusions(trajectory, radius, lambda_param=2.0):
 
         for ped in pedestrians:
             ped_position = ped["position"]
-            ped_orientation = ped["orienation"]
+            ped_orientation = ped["orientation"]
 
             vector_to_agent = agent_position - ped_position
             angle = angle_between(vector_to_agent, ped_orientation)
@@ -179,6 +180,11 @@ def anisotropic_intrusions(trajectory, radius, lambda_param=2.0):
                     raise ValueError(
                         "Cannot bin angle in any of the thresholds."
                     )
+
+            print('Anisotropic intrusion : ', front_anisotropic_intrusion,
+                                            side_anisotropic_intrusion,
+                                            back_anisotropic_intrusion
+                                            )
 
     return (
         front_anisotropic_intrusion,
