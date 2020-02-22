@@ -43,7 +43,7 @@ parser.add_argument(
     "--reward-net-hidden-dims", nargs="*", type=int, default=[128]
 )
 
-parser.add_argument("--lr", type=float, default=0.001)
+parser.add_argument("--lr", type=float, default=0.0001)
 parser.add_argument("--on-server", action="store_true")
 
 parser.add_argument(
@@ -114,6 +114,7 @@ parser.add_argument("--play-interval", type=int, default=100)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
 parser.add_argument("--entropy-target", type=float, default=0.3)
+parser.add_argument("--gamma", type=float, default=0.99)
 
 
 def main():
@@ -136,7 +137,7 @@ def main():
     mp.set_start_method("spawn")
 
     from rlmethods.b_actor_critic import ActorCritic
-    from rlmethods.soft_ac import SoftActorCritic
+    from rlmethods.soft_ac import SoftActorCritic, QSoftActorCritic
     from rlmethods.rlutils import ReplayBuffer
 
     from envs.gridworld_drone import GridWorldDrone
@@ -391,9 +392,25 @@ def main():
             entropy_tuning=True,
             play_interval=args.play_interval,
             entropy_target=args.entropy_target,
+            gamma=args.gamma,
+            learning_rate=args.lr
         )
 
-    import pdb; pdb.set_trace()
+    if args.rl_method == "discrete_QSAC":
+
+        replay_buffer = ReplayBuffer(args.replay_buffer_size)
+
+        model = QSoftActorCritic(
+            env,
+            replay_buffer,
+            feat_ext,
+            buffer_sample_size=args.replay_buffer_sample_size,
+            entropy_tuning=True,
+            play_interval=args.play_interval,
+            entropy_target=args.entropy_target,
+            gamma=args.gamma,
+            learning_rate=args.lr
+        )
     # log RL info
     if not args.dont_save and not args.play:
 
@@ -423,7 +440,7 @@ def main():
             if args.policy_path:
                 model.policy.load(args.policy_path)
 
-            if args.rl_method == "SAC":
+            if args.rl_method == "SAC" or args.rl_method == 'discrete_QSAC':
                 model.train(
                     args.total_episodes, args.max_ep_length
                 )
