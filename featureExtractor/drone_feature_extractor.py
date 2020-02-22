@@ -684,7 +684,34 @@ def vector_to_goal_features(goal_position, agent_position, agent_orientation):
     return features
 
 
+@njit
+def orientation_change_features(new_orientation, old_orientation):
+    thresholds = np.array(
+        [0, np.pi / 9, 2 * np.pi / 9, np.pi * 3 / 9, 4 * np.pi / 9]
+    )
+
+    if old_orientation is None:
+        print("Warning: old orientation is none, assuming old=new.")
+        orientation_change = 0.0
+
+    else:
+        orientation_change = angle_between(new_orientation, old_orientation)
+
+
+    # bin based on thresholds
+    features = np.zeros(5)
+
+    index = np.argmin(np.abs(orientation_change - thresholds))
+
+    features[index] = 1.0
+
+    return features
+
+
 class BaseVasquez:
+    def __init__(self):
+        self.old_agent_velocity = None
+
     def compute_state_information(self, state_dict):
         """
         Vasquez et. al's features are based on agent positions and
@@ -752,6 +779,7 @@ class BaseVasquez:
 
         return None
 
+
 class VasquezF1(BaseVasquez):
     def __init__(
         self, density_radius, lower_speed_threshold, upper_speed_threshold
@@ -771,6 +799,8 @@ class VasquezF1(BaseVasquez):
         binning features based on speed.
         :type upper_speed_threshold: float.
         """
+
+        super().__init__()
 
         self.density_radius = density_radius
         self.lower_speed_threshold = lower_speed_threshold
@@ -797,6 +827,11 @@ class VasquezF1(BaseVasquez):
             upper_speed_threshold=self.upper_speed_threshold,
         )
 
+        orientation_change_feature_vector = orientation_change_features(
+            agent_velocity, self.old_agent_velocity
+        )
+        self.old_agent_velocity = agent_velocity
+
         default_feature_vector = np.ones(1)
 
         # goal orienting features
@@ -815,6 +850,7 @@ class VasquezF1(BaseVasquez):
                 velocity_feature_vector,
                 angle_to_goal_feature_vector,
                 vector_to_goal_feature_vector,
+                orientation_change_feature_vector,
                 default_feature_vector,
             )
         )
@@ -841,6 +877,7 @@ class VasquezF2(BaseVasquez):
         binning features based on speed.
         :type upper_speed_threshold: float.
         """
+        super().__init__()
 
         self.density_radius = density_radius
         self.lower_speed_threshold = lower_speed_threshold
@@ -871,6 +908,11 @@ class VasquezF2(BaseVasquez):
 
         default_feature_vector = np.ones(1)
 
+        orientation_change_feature_vector = orientation_change_features(
+            agent_velocity, self.old_agent_velocity
+        )
+        self.old_agent_velocity = agent_velocity
+
         # goal orienting features
         goal_position = state_dict["goal_state"]
         angle_to_goal_feature_vector = angle_to_goal_features(
@@ -888,6 +930,7 @@ class VasquezF2(BaseVasquez):
                 orientation_feature_vector,
                 angle_to_goal_feature_vector,
                 vector_to_goal_feature_vector,
+                orientation_change_feature_vector,
                 default_feature_vector,
             )
         )
@@ -905,6 +948,7 @@ class VasquezF3(BaseVasquez):
         :param agent_radius: radius of agent itself. This is the "width" of the agent, not a radius surrounding the agent.
         :type agent_radius: float.
         """
+        super().__init__()
         self.agent_radius = agent_radius
 
     def extract_features(self, state_dict):
@@ -931,11 +975,17 @@ class VasquezF3(BaseVasquez):
             goal_position, agent_position, agent_velocity
         )
 
+        orientation_change_feature_vector = orientation_change_features(
+            agent_velocity, self.old_agent_velocity
+        )
+        self.old_agent_velocity = agent_velocity
+
         out_features = np.concatenate(
             (
                 social_force_feature_vector,
                 angle_to_goal_feature_vector,
                 vector_to_goal_feature_vector,
+                orientation_change_feature_vector,
                 default_feature_vector,
             )
         )
