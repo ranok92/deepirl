@@ -11,6 +11,7 @@ from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,Fr
 
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
+from featureExtractor.drone_feature_extractor import VasquezF1, VasquezF2, VasquezF3
 from scipy.interpolate import splev, splprep
 
 
@@ -510,7 +511,7 @@ if __name__=='__main__':
 
     
     #********* section to extract trajectories **********
-    '''
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -518,7 +519,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'Dronefeature_risk_hit/'
+    feature_extractor_name = 'vasquezF3/'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -537,12 +538,14 @@ if __name__=='__main__':
 
     
     #initialize the feature extractor
-    feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
-                                               agent_width=10, obs_width=10,
-                                               debug=True,
-                                               grid_size=10, step_size=step_size)
+    #feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
+    #                                           agent_width=10, obs_width=10,
+    #                                           debug=True,
+    #                                           grid_size=10, step_size=step_size)
 
-   
+    
+
+    feature_extractor = VasquezF3(agent_width*6,)
     #feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
     #                                agent_width=agent_width, 
     #                                obs_width=obs_width,
@@ -555,7 +558,7 @@ if __name__=='__main__':
                        folder_to_save, show_states=False,
                        display=False, trajectory_length_limit=None)
     
-    '''
+    
     #****************************************************
     #******** section to record trajectories
     '''
@@ -621,7 +624,7 @@ if __name__=='__main__':
 
     
     #******** section for preprocessing data ************
-    
+    '''
     file_name = './t-junction-3.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
@@ -631,14 +634,14 @@ if __name__=='__main__':
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
     
-
+    '''
     #*****************************************************
     #********** getting information of the trajectories
     '''
     expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speed_segments'
     get_expert_trajectory_info(expert_traj_folder)
-    ''' 
-
+    
+    '''
     #*****************************************************
     #************* classify pedestrians based on presence of nearby obstacles
     '''
