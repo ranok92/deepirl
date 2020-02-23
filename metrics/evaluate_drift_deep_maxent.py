@@ -31,7 +31,7 @@ from featureExtractor.drone_feature_extractor import dist_2d
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
-#general arguments 
+#general arguments
 
 parser.add_argument('--max-ep-length', type=int, default=600, help='Max length of a single episode.')
 
@@ -39,42 +39,56 @@ parser.add_argument('--feat-extractor', type=str, default=None, help='The name o
                      feature extractor to be used in the experiment.')
 
 
+parser.add_argument('--ped-list', type=str, nargs="*", default=["./ped_lists/easy.npy",
+                    "./ped_lists/med.npy", "./ped_lists/hard.npy"],
+                    help="Pedestrian list to work with.")
+
+
+parser.add_argument('--save-filename', type=str, default=None)
+
+parser.add_argument('--plot', action='store_true', default=False)
+
 #**************************************************************************#
 #arguments related to the environment
 
-parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, default='../envs/expert_datasets/\
+university_students/annotation/processed/frame_skip_1/\
+students003_processed_corrected.txt', 
+                    help='The location of the annotation file to \
                     be used to run the environment.')
 
 
+parser.add_argument("--render" , action='store_true')
 #**************************************************************************#
 #agent related arguments
 
-parser.add_argument('--agent-type', type=str, default='Potential_field', help='The type of agent to be used to \
+parser.add_argument('--agent-type', type=str, nargs="*", default=['Potential_field'], help='The type of agent to be used to \
                     in the environment. It can be either a RL/IRL agent, or an alternative controller agent. \
                     Different agents will then have different arguments.')
 
 #arguments for a network based agent
 
-parser.add_argument('--policy-path', type=str, nargs='?', default=None)
+parser.add_argument('--policy-path', type=str, nargs="*", default=None)
 parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
-
-#arguments for a potential field agent
-'''
-/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/
-Drone_environment_univ_students003_DroneFeatureRisk_updated_risk_v2_general_3kiter2019-09-27 10:24:41-reg-0-seed-8788-lr-0.001/
-saved-models/17.pt
-'''
-
-#argument for some other agent
-
 
 
 #*************************************************************************#
-#parameters for informatio collector
 
 parser.add_argument('--save-folder', type=str, default=None, 
                     help='The name of the folder to \
                     store experiment related information.')
+
+
+parser.add_argument('--start-interval', type=int, default=20, help='The initial number of \
+                    frames after which the position of the agent will be reset.')
+
+parser.add_argument('--end-interval', type=int, default=60, help='The final number of \
+                    frames after which the position of the agent will be reset.')
+
+parser.add_argument('--increment-interval', type=int, default=30, help='The number of \
+                    frames by which the interval should increase.')
+
+
 
 #************************************************************************#
 
@@ -123,8 +137,8 @@ def agent_drift_analysis(agent,
     drift_value = 0
     segment_counter = 0
     env.cur_ped = None
-    print('Starting drift analysis of agent :{}. Reset\
-            interval :{}'.format(agent_type, pos_reset))
+    print('Starting drift analysis of agent :{}. Reset interval :{}'.format(agent_type, 
+                                                                     pos_reset))
 
     #an array containing the drift value for each pedestrian
     drift_info_detailed = np.zeros(len(ped_list))
@@ -238,23 +252,50 @@ def drift_analysis(agent_list,
     return drift_lists
     
 
+def plot_drift_results(drift_lists):
+    """
+    Plots the dirft results.
+        input: 
+            drift_lists : 3 dimensional list where:
+                            The outer most dimension represents the number of agents' 
+                            runs present in the list
+                            The next dimension represents number of drift intervals present.
+                            The final dimension represents number of pedestrians against which
+                            the drift values have been calculated.
+        
+        output : plot of the result.
+
+    """
+    start_interval = args.start_interval
+    reset_int = args.increment_interval
+    reset_lim = args.end_interval
+
+    agent_type_list = args.agent_type
+    x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
+    #get the mean and std deviation of pedestrians from drift_lists
+
+    _, ax = plt.subplots()
+    for i in range(len(drift_lists)):
+        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in drift_lists[i]]
+        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in drift_lists[i]]
+        
+        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i]+str(i),
+                    capsize=5, capthick=3, alpha=0.5)
+    ax.set_xticks(x_axis)
+    ax.set_xticklabels(start_interval+x_axis*reset_int)
+    ax.set_xlabel('Reset interval (in frames)')
+    ax.set_ylabel('Divergence from ground truth')
+    ax.legend()
+    plt.show()
 
 
 
+def run_analysis(args):
 
-if __name__ == '__main__':
-
-    #**************************************************
     step_size = 2
     agent_width = 10
     obs_width = 10
     grid_size = 3
-
-    #**************************************************
-    ts=time.time()
-    st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-
-    args = parser.parse_args()
 
     #checks if all the parameters are in order
     check_parameters(args)
@@ -265,17 +306,16 @@ if __name__ == '__main__':
 
     consider_heading = True
     env = GridWorldDrone(display=args.render, is_onehot=False,
-                        seed=args.seed, obstacles=None,
+                        obstacles=None,
                         show_trail=True,
                         is_random=False,
-                        subject=args.subject,
                         annotation_file=args.annotation_file,
                         tick_speed=60,
                         obs_width=10,
                         step_size=step_size,
                         agent_width=agent_width,
                         external_control=True,
-                        replace_subject=args.run_exact,
+                        replace_subject=True,
                         show_comparison=True,
                         consider_heading=consider_heading,
                         show_orientation=True,
@@ -289,6 +329,7 @@ if __name__ == '__main__':
 
     from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speedv2
 
+    feat_ext = None
     if args.feat_extractor == 'DroneFeatureRisk_speedv2':
 
         feat_ext = DroneFeatureRisk_speedv2(agent_width=agent_width,
@@ -299,78 +340,67 @@ if __name__ == '__main__':
 
     #*************************************************
     #initialize the agent
-
-    if args.agent_type == 'Policy_network':
-        #initialize the network
-        print(args.policy_net_hidden_dims)
-        print(feat_ext.state_rep_size)
-        print(env.action_space)
-
-        agent = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
-
-        if args.policy_path:
-
-            agent.load(args.policy_path)
-
-        else:
-
-            print('Provide a policy path')
-
-
-    if args.agent_type == 'Potential_field':
-        #initialize the PF agent
-        max_speed = env.max_speed
-        orient_quant = env.orient_quantization
-        orient_div = len(env.orientation_array)
-        speed_quant = env.speed_quantization
-        speed_div = len(env.speed_array)
-
-        attr_mag = 3
-        rep_mag = 2
-        agent = PFController(speed_div, orient_div, orient_quant)
-
-
-    if args.agent_type == 'Social_forces':
-
-        orient_quant = env.orient_quantization
-        orient_div = len(env.orientation_array)
-        speed_quant = env.speed_quantization
-        speed_div = len(env.speed_array)
-        agent = SocialForcesController(speed_div, orient_div, orient_quant)
-
-
     agent_list = []
-
-    #easy, med, hard = classify_pedestrians(args.annotation_file, 30)
-
-    #agent_type_list = ['Potential_field']
     agent_type_list = []
+
+    for i in range(len(args.agent_type)):
+
+        if args.agent_type[i] == 'Policy_network':
+            #initialize the network
+            agent = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
+
+            if args.policy_path:
+                agent.load(args.policy_path[i])
+            else:
+                print('Provide a policy path')
+
+
+        if args.agent_type[i] == 'Potential_field':
+            #initialize the PF agent
+            max_speed = env.max_speed
+            orient_quant = env.orient_quantization
+            orient_div = len(env.orientation_array)
+            speed_quant = env.speed_quantization
+            speed_div = len(env.speed_array)
+
+            attr_mag = 3
+            rep_mag = 2
+            agent = PFController(speed_div, orient_div, orient_quant)
+
+
+        if args.agent_type[i] == 'Social_forces':
+
+            orient_quant = env.orient_quantization
+            orient_div = len(env.orientation_array)
+            speed_quant = env.speed_quantization
+            speed_div = len(env.speed_array)
+            agent = SocialForcesController(speed_div, orient_div, orient_quant)
+
+        agent_list.append(agent)
+        agent_type_list.append(args.agent_type[i])
+
+    #****************************************************
+
+
+
     #agent initialized from the commandline
-    agent_file_list = ['/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-hit-full-run-suppressed-local-updated-features2019-12-14_16:38:00-policy_net-256--reward_net-256--reg-0.001-seed-9-lr-0.0005/saved-models/28.pt']
-    agent_file_list.append('/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/RL Runs/Possible_strawman2019-12-16 12:22:05DroneFeatureRisk_speedv2-seed-789-policy_net-256--reward_net-128--total-ep-8000-max-ep-len-500/policy-models/0.pt')
-    
-    for agent_file in agent_file_list:
-        
-        agent_temp = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
-        agent_temp.load(agent_file)
-        agent_list.append(agent_temp)
-        agent_type_list.append('Policy_network')
-    
-    start_interval = 50
-    reset_int = 30
-    reset_lim = 170
 
     
+    start_interval = args.start_interval
+    reset_int = args.increment_interval
+    reset_lim = args.end_interval
 
-    #dirft list is list where [[agent1_drift info][agent2_drift_info]]
-    #where agent1_dirft_info = [[array containing drift info of peds for a given reset pos]]
-    data = np.genfromtxt('./Pedestrian_info/all150.csv', delimiter=' ')
-    ped_list = data[:, 1]
-    ped_list = ped_list.astype(int)
+    #getting the pedestrian list
+    ped_list = np.zeros(1)
+    for list_name in args.ped_list:
+        ped_list = np.concatenate((ped_list, np.load(list_name)), axis=0)
+   
+    ped_list = ped_list[1:].astype(int)
 
     ped_list = np.sort(ped_list)
-    #ped_list = np.concatenate((easy, med, hard), axis=0)
-    ped_list_name = 'all'
+
+    #****************************************************
+
     drift_lists = drift_analysis(agent_list, agent_type_list, env,
                                 ped_list,
                                 feat_extractor=feat_ext,
@@ -378,27 +408,37 @@ if __name__ == '__main__':
                                 reset_interval=reset_int, max_interval=reset_lim)
     
     drift_info_numpy = np.asarray(drift_lists)
-    np.save('master_drift_array-50-170-30', drift_info_numpy)
     pdb.set_trace()
-    ###################
+    #****************************************************
 
-    x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
-    #get the mean and std deviation of pedestrians from drift_lists
 
-    fig, ax = plt.subplots()
-    for i in range(len(drift_lists)):
-        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in drift_lists[i]]
-        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in drift_lists[i]]
+    if args.save_filename:
         
-        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i]+str(i),
-                    capsize=5, capthick=3, alpha=0.5)
-    ax.set_xticks(x_axis)
-    ax.set_xticklabels(start_interval+x_axis*reset_int)
-    ax.set_xlabel('Reset interval (in frames)')
-    ax.set_ylabel('Divergence from ground truth')
-    ax.legend()
-    plt.show()
-    #*******************************************
+        filename = args.save_filename + str(start_interval) + \
+                '-' + str(reset_lim) + '-' + str(reset_int)
+        np.save('./drift_results/'+ filename, drift_info_numpy)
+
+
+
+    #****************************************************
+
+    if args.plot:
+        
+        plot_drift_results(drift_lists)
+    
+
+
+
+
+
+
+
+if __name__ == '__main__':
+
+    args = parser.parse_args()
+    #****************************************************
+    run_analysis(args)
+    #****************************************************
     '''
     data = np.genfromtxt('./Pedestrian_info/all150.csv', delimiter=' ')
     pdb.set_trace()
