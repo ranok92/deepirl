@@ -519,7 +519,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'vasquezF3/'
+    feature_extractor_name = 'VasquezF3/'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -544,8 +544,10 @@ if __name__=='__main__':
     #                                           grid_size=10, step_size=step_size)
 
     
+    #feature_extractor = VasquezF1(agent_width*6, 0, 2)
+    #feature_extractor = VasquezF2(agent_width*6, 0, 2)
 
-    feature_extractor = VasquezF3(agent_width*6,)
+    feature_extractor = VasquezF3(agent_width*6)
     #feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
     #                                agent_width=agent_width, 
     #                                obs_width=obs_width,
