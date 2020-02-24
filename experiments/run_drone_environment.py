@@ -20,6 +20,7 @@ from utils import step_wrapper, reset_wrapper
 import copy
 import pygame
 from alternateController.potential_field_controller import PotentialFieldController as PFController
+from alternateController.social_forces_controller import SocialForcesController
 from rlmethods.b_actor_critic import ActorCritic
 from rlmethods.b_actor_critic import Policy
 from tqdm import tqdm
@@ -263,6 +264,16 @@ if args.agent_type == 'Potential_field':
     attr_mag = 3
     rep_mag = 2
     agent = PFController(speed_div, orient_div, orient_quant)
+
+
+if args.agent_type == 'Social_forces':
+
+    orient_quant = env.orient_quantization
+    orient_div = len(env.orientation_array)
+    speed_quant = env.speed_quantization
+    speed_div = len(env.speed_array)
+    agent = SocialForcesController(speed_div, orient_div, orient_quant)
+
 
 if args.agent_type == 'Default':
 

@@ -25,7 +25,9 @@ from rlmethods.b_actor_critic import Policy
 from envs.drone_data_utils import classify_pedestrians
 from envs.drone_data_utils import get_pedestrians_in_viscinity
 from metrics.metrics import (compute_distance_displacement_ratio,
-                            compute_trajectory_smoothness)
+                            compute_trajectory_smoothness,
+                            proxemic_intrusions,
+                            anisotropic_intrusions)
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -252,6 +254,10 @@ def main():
 
             total_smoothness, avg_smoothness = compute_trajectory_smoothness(traj)
             ratio = compute_distance_displacement_ratio(traj)
+
+            proxemic_intrusions(traj, 10)
+            anisotropic_intrusions(traj, 30)
+            pdb.set_trace()
 
 if __name__ == "__main__":
     main()
