@@ -697,7 +697,6 @@ def orientation_change_features(new_orientation, old_orientation):
     else:
         orientation_change = angle_between(new_orientation, old_orientation)
 
-
     # bin based on thresholds
     features = np.zeros(5)
 
@@ -706,6 +705,169 @@ def orientation_change_features(new_orientation, old_orientation):
     features[index] = 1.0
 
     return features
+
+
+@njit
+def SAM_features(
+    agent_position,
+    agent_velocity,
+    pedestrian_positions,
+    pedestrian_velocities,
+    inner_radius,
+    outer_radius,
+    lower_speed_threshold,
+    upper_speed_threshold,
+):
+    """
+    Calculates entire sam features based on Fahad et. al's 2018 paper:
+    "Learning How Pedestrians Navigate: A Deep Inverse Reinforcement Learning Approach"
+
+    :param agent_position: Position of the agent.
+    :type agent_position: 2d numpy float array.
+    :param agent_velocity: Agent velocity.
+    :type agent_velocity: 2d numpy float array.
+    :param pedestrian_positions: Px2 vector of the position of all pedestrians.
+    :type pedestrian_positions: Px2 numpy float array where P is the number
+    of pedestrians.
+    :param pedestrian_velocities: Px2 vector of the velocity of all pedestrians.
+    :type pedestrian_velocities: Px2 numpy float array where P is the number
+    of pedestrians.
+    :param inner_radius: Radius of inner circle of feature extractor.
+    :type inner_radius: float.
+    :param outer_radius: Radius of outer circle of feature extractor.
+    :type outer_radius: float.
+    :param lower_speed_threshold: lower binning threshold for speed.
+    :type lower_speed_threshold: float.
+    :param upper_speed_threshold: upper binning threshold for speed.
+    :type upper_speed_threshold: float.
+    :return: tuple (SAM_features, density) where SAM_features are the
+    features and density is total number of pedestrians inside all bins.
+    :rtype: tuples(numpy 1d array, float)
+    """
+
+    num_pedestrians = pedestrian_positions.shape[0]
+
+    # classify pedestrians in either inner or outer ring
+    ring_designation = np.zeros(num_pedestrians)
+    for idx in range(num_pedestrians):
+        ped_distance = dist_2d(agent_position, pedestrian_positions[idx])
+
+        if ped_distance <= outer_radius:
+            if ped_distance > inner_radius:
+                ring_designation[idx] = 2
+            else:
+                ring_designation[idx] = 1
+
+    inner_ped_positions = pedestrian_positions[ring_designation == 1]
+    inner_ped_velocities = pedestrian_velocities[ring_designation == 1]
+    outer_ped_positions = pedestrian_positions[ring_designation == 2]
+    outer_ped_velocities = pedestrian_velocities[ring_designation == 2]
+
+    assert inner_ped_positions.shape[0] == inner_ped_velocities.shape[0]
+    assert outer_ped_positions.shape[0] == outer_ped_velocities.shape[0]
+
+    num_inner_pedestrians = inner_ped_positions.shape[0]
+    num_outer_pedestrians = outer_ped_positions.shape[0]
+
+    # classify pedestrians in each bin, and add up their velocities per bin
+    peds_in_bin_counts = np.zeros(10)
+    average_velocities = np.zeros((10, 2))
+
+    for idx in range(num_inner_pedestrians):
+
+        ped_relative_position = inner_ped_positions[idx] - agent_position
+        ped_velocity = inner_ped_velocities[idx]
+
+        angle = total_angle_between(agent_velocity, ped_relative_position)
+
+        if -0.25 * np.pi < angle < 0.25 * np.pi:
+            peds_in_bin_counts[0] += 1
+            average_velocities[0] += ped_velocity
+
+        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+            peds_in_bin_counts[1] += 1
+            average_velocities[1] += ped_velocity
+
+        elif 0.75 * np.pi <= angle < np.pi or -np.pi < angle < -0.75 * np.pi:
+            peds_in_bin_counts[2] += 1
+            average_velocities[2] += ped_velocity
+
+        elif -0.75 * np.pi <= angle <= -0.25 * np.pi:
+            peds_in_bin_counts[3] += 1
+            average_velocities[3] += ped_velocity
+
+        else:
+            raise ValueError("angle couldn't be binned.")
+
+    for idx in range(num_outer_pedestrians):
+        ped_relative_position = outer_ped_positions[idx] - agent_position
+        ped_velocity = outer_ped_velocities[idx]
+
+        angle = total_angle_between(agent_velocity, ped_relative_position)
+
+        if -0.25 * np.pi < angle < 0.25 * np.pi:
+            peds_in_bin_counts[4] += 1
+            average_velocities[4] += ped_velocity
+
+        elif 0.25 * np.pi <= angle < 0.5 * np.pi:
+            peds_in_bin_counts[9] += 1
+            average_velocities[9] += ped_velocity
+
+        elif 0.5 * np.pi <= angle < 0.75 * np.pi:
+            peds_in_bin_counts[8] += 1
+            average_velocities[8] += ped_velocity
+
+        elif 0.75 * np.pi <= angle < np.pi or -np.pi < angle < -0.75 * np.pi:
+            peds_in_bin_counts[7] += 1
+            average_velocities[7] += ped_velocity
+
+        elif -0.5 * np.pi <= angle < -0.25 * np.pi:
+            peds_in_bin_counts[5] += 1
+            average_velocities[5] += ped_velocity
+
+        elif -0.75 * np.pi <= angle < -0.5 * np.pi:
+            peds_in_bin_counts[6] += 1
+            average_velocities[6] += ped_velocity
+
+        else:
+            raise ValueError("angle couldn't be binned.")
+
+    nonzero_mask = peds_in_bin_counts != 0
+
+    average_velocities[nonzero_mask] /= peds_in_bin_counts[
+        nonzero_mask
+    ].reshape(-1, 1)
+
+    heading_feat_vect = np.zeros((10, 3))
+    velocity_feat_vect = np.zeros((10, 3))
+
+    # 0 degree degree vector used as reference for judging absolute angles.
+    angle_origin = np.array([1.0, 0.0])
+
+    for idx in range(len(average_velocities)):
+        avg_velocity = average_velocities[idx]
+
+        heading = angle_between(avg_velocity, angle_origin)
+        heading_thresholds = np.array([0.25 * np.pi, 0.75 * np.pi])
+        heading_idx = np.digitize(np.array(heading), heading_thresholds)
+        heading_feat_vect[idx][heading_idx] = 1
+
+        vel_idx = np.digitize(
+            np.array(norm_2d(avg_velocity)),
+            np.array([lower_speed_threshold, upper_speed_threshold]),
+        )
+        velocity_feat_vect[idx][vel_idx] = 1
+
+    velocity_feat_vect = np.concatenate(
+        (heading_feat_vect, velocity_feat_vect), axis=1
+    ).reshape(-1, 1)
+
+    SAM_vector = np.concatenate(
+        (peds_in_bin_counts.reshape(-1, 1), velocity_feat_vect)
+    ).flatten()
+    density = np.sum(peds_in_bin_counts)
+
+    return SAM_vector, density
 
 
 class BaseVasquez:
