@@ -5,8 +5,8 @@ import torch
 import pdb
 import sys
 import matplotlib.pyplot as plt
-
-
+import pygame
+from PIL import Image
 
 sys.path.insert(0, '..')  # NOQA: E402
 
@@ -76,6 +76,19 @@ def generate_reward_map(env, feat_extractor, reward_network,
 
     env.current_frame = frame_id
     env.step()
+
+    env.agent_state['position'] = current_position
+    env.agent_state['speed'] = 0
+    env.state['agent_state'] = copy.deepcopy(env.agent_state)
+    
+    env.render()
+
+    env_display = env.gameDisplay
+
+    data = pygame.image.tostring(env_display, 'RGBA')
+    img = np.asarray(Image.frombytes('RGBA', (cols, rows), data))
+
+    pygame.image.save(env_display, 'screencapture_fid'+str(frame_id)+'.png')
     while current_position[0] < rows:
 
         current_position[1] = 0
@@ -101,8 +114,7 @@ def generate_reward_map(env, feat_extractor, reward_network,
         current_position[0] += sample_rate[0]
         row_counter += 1
 
-    pdb.set_trace()
-    return reward_map
+    return img, reward_map
 
 
 def set_agent_orientation(env):
@@ -112,21 +124,28 @@ def set_agent_orientation(env):
     """
 
 
-def plot_map(map_array, colormap=None):
+def plot_map(map_array, frame_img=None, colormap=None):
     """
     Plots and stores the plot of a heat map of the 2d array provided.
     input :
         map_array - A 2d numpy array containing the reward values obtained 
                     at a particular frame.
+        frame_img - 
 
 
     """
+    extent = 0, 720, 0, 576
     cmap=None
     if colormap is not None:
         cmap = plt.get_cmap('PiYG')
     fig, ax = plt.subplots()
+    pdb.set_trace()
 
-    im = ax.imshow(map_array, cmap=cmap)
+    if frame_img is not None:
+
+        im1 = ax.imshow(frame_img, extent=extent, alpha=1)
+
+    im = ax.imshow(map_array, cmap=cmap, alpha=0.5, extent=extent)
     fig.colorbar(im, ax=ax)
 
     # We want to show all ticks...
@@ -189,7 +208,7 @@ def main():
     from envs.gridworld_drone import GridWorldDrone
 
     env = GridWorldDrone(
-        display=args.render,
+        display=True,
         is_onehot=False,
         obstacles=None,
         show_trail=False,
@@ -216,13 +235,13 @@ def main():
     print(next(reward_net.parameters()).is_cuda)
     #run stuff
 
-    reward_map = generate_reward_map(env, feat_ext, 
+    screenshot, reward_map = generate_reward_map(env, feat_ext, 
                         reward_net, 
                         render=args.render,
                         sample_rate=args.sample_rate, 
                         frame_id=args.frame_id)
 
-    plot_map(reward_map)
+    plot_map(reward_map, frame_img=screenshot)
 
 if __name__=='__main__':
 
