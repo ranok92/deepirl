@@ -4,6 +4,9 @@ import argparse
 import torch
 import pdb
 import sys
+import matplotlib.pyplot as plt
+
+
 
 sys.path.insert(0, '..')  # NOQA: E402
 
@@ -30,7 +33,7 @@ parser.add_argument('--sample-rate', type=int, nargs="*", default=[1, 1],
                     help='The gap in which to move the agent in the board to\
 calculate the reward')
 
-parser.add_argument('--render', action='store_true', default='False')
+parser.add_argument('--render', action='store_true')
 
 
 
@@ -66,7 +69,7 @@ def generate_reward_map(env, feat_extractor, reward_network,
     rows = env.rows 
     cols = env.cols
 
-    reward_map = np.zeros([int(rows/sample_rate[0]), int(cols/sample_rate[1])])
+    reward_map = np.zeros([int(rows/sample_rate[0])+1, int(cols/sample_rate[1])+1])
 
     row_counter = 0
     col_counter = 0
@@ -107,6 +110,48 @@ def set_agent_orientation(env):
     Given the environment changes the orientation of the agennt so that it
     faces towards the goal.
     """
+
+
+def plot_map(map_array, colormap=None):
+    """
+    Plots and stores the plot of a heat map of the 2d array provided.
+    input :
+        map_array - A 2d numpy array containing the reward values obtained 
+                    at a particular frame.
+
+
+    """
+    cmap=None
+    if colormap is not None:
+        cmap = plt.get_cmap('PiYG')
+    fig, ax = plt.subplots()
+
+    im = ax.imshow(map_array, cmap=cmap)
+    fig.colorbar(im, ax=ax)
+
+    # We want to show all ticks...
+    #ax.set_xticks(np.arange(map_array.shape[1]))
+    #ax.set_yticks(np.arange(map_array.shape[0]))
+    # ... and label them with the respective list entries
+    
+    #ax.set_xticklabels(farmers)
+    #ax.set_yticklabels(vegetables)
+
+    # Rotate the tick labels and set their alignment.
+    #plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+    #         rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    #for i in range(map_array.shape[1]):
+    #    for j in range(map_array.shape[0]):
+    #        text = ax.text(j, i, map_array[j, i],
+    #                       ha="center", va="center", color="w")
+
+    ax.set_title("Reward plot")
+    fig.tight_layout()
+    plt.show()
+
+
 
 
 def main():
@@ -171,11 +216,13 @@ def main():
     print(next(reward_net.parameters()).is_cuda)
     #run stuff
 
-    generate_reward_map(env, feat_ext, 
+    reward_map = generate_reward_map(env, feat_ext, 
                         reward_net, 
                         render=args.render,
                         sample_rate=args.sample_rate, 
                         frame_id=args.frame_id)
+
+    plot_map(reward_map)
 
 if __name__=='__main__':
 
