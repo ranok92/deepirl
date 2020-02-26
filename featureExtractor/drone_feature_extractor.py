@@ -845,6 +845,9 @@ def SAM_features(
     angle_origin = np.array([1.0, 0.0])
 
     for idx in range(len(average_velocities)):
+        if peds_in_bin_counts[idx] == 0.0:
+            continue
+
         avg_velocity = average_velocities[idx]
 
         heading = angle_between(avg_velocity, angle_origin)
@@ -868,6 +871,26 @@ def SAM_features(
     density = np.sum(peds_in_bin_counts)
 
     return SAM_vector, density
+
+
+@njit
+def distance_from_goal_features(agent_position, goal_position):
+    """
+    Calculates manhattan distance between agent position and goal position.
+    This distance is calculated in a discrete manner, taken from floor of
+    distance vector. Which results in an integer.
+
+    :param agent_position: position of agent.
+    :type agent_position: 2d np float array.
+    :param goal_position: position of goal.
+    :type goal_position: 2d np float array.
+    :return: manhattan distance from goal.
+    :rtype: int.
+    """
+    distance = goal_position - agent_position
+    manhattan_distance = np.sum(np.abs(np.floor(distance)))
+
+    return manhattan_distance
 
 
 class BaseVasquez:
@@ -1154,6 +1177,125 @@ class VasquezF3(BaseVasquez):
 
         return out_features
 
+
+class Fahad(BaseVasquez):
+    def __init__(
+        self,
+        inner_radius,
+        outer_radius,
+        lower_speed_threshold,
+        upper_speed_threshold,
+    ):
+        super().__init__()
+
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+        self.lower_speed_threshold = lower_speed_threshold
+        self.upper_speed_threshold = upper_speed_threshold
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+        ) = self.compute_state_information(state_dict)
+
+        SAM_vector, density_vector = SAM_features(
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+            self.inner_radius,
+            self.outer_radius,
+            self.lower_speed_threshold,
+            self.upper_speed_threshold,
+        )
+
+        distance_feature_vect = distance_from_goal_features(
+            agent_position, state_dict["goal_state"]
+        )
+
+        default_feature = np.array([1.0])
+
+        output_feature = np.concatenate(
+            (
+                SAM_vector,
+                np.array([density_vector]),
+                np.array([distance_feature_vect]),
+                default_feature,
+            )
+        )
+
+        return output_feature
+
+class GoalConditionedFahad(BaseVasquez):
+    def __init__(
+        self,
+        inner_radius,
+        outer_radius,
+        lower_speed_threshold,
+        upper_speed_threshold,
+    ):
+        super().__init__()
+
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+        self.lower_speed_threshold = lower_speed_threshold
+        self.upper_speed_threshold = upper_speed_threshold
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+        ) = self.compute_state_information(state_dict)
+
+        SAM_vector, density_vector = SAM_features(
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+            self.inner_radius,
+            self.outer_radius,
+            self.lower_speed_threshold,
+            self.upper_speed_threshold,
+        )
+
+        default_feature = np.array([1.0])
+
+        # goal orienting features
+        goal_position = state_dict["goal_state"]
+
+        angle_to_goal_feature_vector = angle_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        vector_to_goal_feature_vector = vector_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        orientation_change_feature_vector = orientation_change_features(
+            agent_velocity, self.old_agent_velocity
+        )
+
+        self.old_agent_velocity = agent_velocity
+
+        default_feature = np.ones(1)
+
+        output_feature = np.concatenate(
+            (
+                SAM_vector,
+                np.array([density_vector]),
+                angle_to_goal_feature_vector,
+                vector_to_goal_feature_vector,
+                orientation_change_feature_vector,
+                default_feature,
+            )
+        )
+
+        return output_feature
 
 class DroneFeatureSAM1:
     """

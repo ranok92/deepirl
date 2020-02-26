@@ -149,6 +149,8 @@ def main():
         VasquezF1,
         VasquezF2,
         VasquezF3,
+        Fahad,
+        GoalConditionedFahad,
     )
     from featureExtractor.gridworld_featureExtractor import (
         FrontBackSide,
@@ -162,9 +164,7 @@ def main():
         DroneFeatureRisk_speedv2,
     )
 
-    from featureExtractor.drone_feature_extractor import (
-        VasquezF1,
-    )
+    from featureExtractor.drone_feature_extractor import VasquezF1
 
     save_folder = None
 
@@ -306,15 +306,20 @@ def main():
             thresh2=30,
         )
 
-    if args.feat_extractor == 'VasquezF1':
-        feat_ext = VasquezF1(agent_width*6, 0.5, 1.0)
+    if args.feat_extractor == "VasquezF1":
+        feat_ext = VasquezF1(agent_width * 6, 0.5, 1.0)
 
-    if args.feat_extractor == 'VasquezF2':
-        feat_ext = VasquezF1(agent_width*6, 0.5, 1.0)
+    if args.feat_extractor == "VasquezF2":
+        feat_ext = VasquezF1(agent_width * 6, 0.5, 1.0)
 
-    if args.feat_extractor == 'VasquezF3':
+    if args.feat_extractor == "VasquezF3":
         feat_ext = VasquezF3(agent_width)
 
+    if args.feat_extractor == "Fahad":
+        feat_ext = Fahad(36, 60, 20, 40)
+
+    if args.feat_extractor == "GoalConditionedFahad":
+        feat_ext = Fahad(36, 60, 20, 40)
 
     if feat_ext is None:
         print("Please enter proper feature extractor!")
@@ -393,7 +398,7 @@ def main():
             play_interval=args.play_interval,
             entropy_target=args.entropy_target,
             gamma=args.gamma,
-            learning_rate=args.lr
+            learning_rate=args.lr,
         )
 
     if args.rl_method == "discrete_QSAC":
@@ -409,7 +414,7 @@ def main():
             play_interval=args.play_interval,
             entropy_target=args.entropy_target,
             gamma=args.gamma,
-            learning_rate=args.lr
+            learning_rate=args.lr,
         )
     # log RL info
     if not args.dont_save and not args.play:
@@ -440,10 +445,8 @@ def main():
             if args.policy_path:
                 model.policy.load(args.policy_path)
 
-            if args.rl_method == "SAC" or args.rl_method == 'discrete_QSAC':
-                model.train(
-                    args.total_episodes, args.max_ep_length
-                )
+            if args.rl_method == "SAC" or args.rl_method == "discrete_QSAC":
+                model.train(args.total_episodes, args.max_ep_length)
 
             else:
                 model.train()
@@ -521,7 +524,7 @@ def main():
             avg_reward, good_run_frac = compile_results(
                 rewards, state_info, sub_info
             )
-            # pdb.set_trace()
+
             avg_reward_list.append(avg_reward)
             frac_good_run_list.append(good_run_frac)
             plt.plot(avg_reward_list, c="r")
@@ -535,8 +538,6 @@ def main():
         model.generate_trajectory_user(
             args.num_trajs, args.render, path="./user_generated_trajectories/"
         )
-
-    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
