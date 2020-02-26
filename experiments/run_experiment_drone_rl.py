@@ -316,10 +316,10 @@ def main():
         feat_ext = VasquezF3(agent_width)
 
     if args.feat_extractor == "Fahad":
-        feat_ext = Fahad(36, 60, 20, 40)
+        feat_ext = Fahad(36, 60, 0.5, 1.0)
 
     if args.feat_extractor == "GoalConditionedFahad":
-        feat_ext = Fahad(36, 60, 20, 40)
+        feat_ext = GoalConditionedFahad(36, 60, 0.5, 1.0)
 
     if feat_ext is None:
         print("Please enter proper feature extractor!")

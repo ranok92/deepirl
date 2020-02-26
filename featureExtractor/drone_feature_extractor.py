@@ -848,15 +848,15 @@ def SAM_features(
         if peds_in_bin_counts[idx] == 0.0:
             continue
 
-        avg_velocity = average_velocities[idx]
+        relative_velocity = agent_velocity - average_velocities[idx]
 
-        heading = angle_between(avg_velocity, angle_origin)
+        heading = angle_between(relative_velocity, agent_velocity)
         heading_thresholds = np.array([0.25 * np.pi, 0.75 * np.pi])
         heading_idx = np.digitize(np.array(heading), heading_thresholds)
         heading_feat_vect[idx][heading_idx] = 1
 
         vel_idx = np.digitize(
-            np.array(norm_2d(avg_velocity)),
+            np.array(norm_2d(relative_velocity)),
             np.array([lower_speed_threshold, upper_speed_threshold]),
         )
         velocity_feat_vect[idx][vel_idx] = 1
