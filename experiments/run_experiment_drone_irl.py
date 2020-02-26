@@ -350,11 +350,11 @@ def main():
     if args.feat_extractor == 'VasquezF3':
         feat_ext = VasquezF3(agent_width)
 
-    if args.feat_extractor == 'Fahad':
-        feat_ext = Fahad(36, 60, 0, 2)
-    
-    if args.feat_extractor == 'GoalConditionedFahad':
-        feat_ext = GoalConditionedFahad(36, 60, 0, 2)
+    if args.feat_extractor == "Fahad":
+        feat_ext = Fahad(36, 60, 0.5, 1.0)
+
+    if args.feat_extractor == "GoalConditionedFahad":
+        feat_ext = GoalConditionedFahad(36, 60, 0.5, 1.0)
 
 
     experiment_logger.log_header("Parameters of the feature extractor :")
