@@ -172,9 +172,14 @@ def play(policy, env, feature_extractor, max_env_steps, render=False, best_actio
     done = False
     steps_counter = 0
 
+    states = []
+    features = []
+
     state = env.reset()
+    states.append(state)
     state = feature_extractor.extract_features(state)
     state = torch.tensor(state).to(torch.float).to(DEVICE)
+    features.append(state)
 
     if render:
         env.render()
@@ -187,13 +192,17 @@ def play(policy, env, feature_extractor, max_env_steps, render=False, best_actio
             action, _, _ = policy.sample_action(state)
 
         next_state, _, done, _ = env.step(action)
+        states.append(next_state)
         state = feature_extractor.extract_features(next_state)
         state = torch.tensor(state).to(torch.float).to(DEVICE)
+        features.append(state)
 
         steps_counter += 1
 
         if render:
             env.render()
+
+    return states, features
 
 if __name__ == '__main__':
 
