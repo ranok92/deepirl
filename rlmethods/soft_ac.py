@@ -189,14 +189,14 @@ class SoftActorCritic:
 
         # NNs
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 256)
+            self.q_net = QNetwork(state_size, env.action_space.n, 512)
         else:
             self.q_net = q_net
 
         self.q_net.to(DEVICE)
 
         if not policy:
-            self.policy = PolicyNetwork(state_size, 256, env.action_space.n)
+            self.policy = PolicyNetwork(state_size, 512, env.action_space.n)
         else:
             self.policy = policy
 
@@ -224,7 +224,7 @@ class SoftActorCritic:
         self.learning_rate = learning_rate
         self.q_optim = Adam(self.q_net.parameters(), lr=learning_rate)
         self.policy_optim = Adam(self.policy.parameters(), self.learning_rate)
-        self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
+        self.alpha_optim = Adam([self.log_alpha], lr=1e-3)
 
         # tensorboardX settings
         if not tbx_writer:
@@ -476,7 +476,7 @@ class QSoftActorCritic:
 
         # NNs
         if not q_net:
-            self.q_net = QNetwork(state_size, env.action_space.n, 256)
+            self.q_net = QNetwork(state_size, env.action_space.n, 512)
         else:
             self.q_net = q_net
 
