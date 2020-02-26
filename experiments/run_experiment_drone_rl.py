@@ -150,6 +150,7 @@ def main():
         VasquezF2,
         VasquezF3,
         Fahad,
+        GoalConditionedFahad,
     )
     from featureExtractor.gridworld_featureExtractor import (
         FrontBackSide,
@@ -315,6 +316,9 @@ def main():
         feat_ext = VasquezF3(agent_width)
 
     if args.feat_extractor == "Fahad":
+        feat_ext = Fahad(36, 60, 20, 40)
+
+    if args.feat_extractor == "GoalConditionedFahad":
         feat_ext = Fahad(36, 60, 20, 40)
 
     if feat_ext is None:

@@ -1229,6 +1229,73 @@ class Fahad(BaseVasquez):
 
         return output_feature
 
+class GoalConditionedFahad(BaseVasquez):
+    def __init__(
+        self,
+        inner_radius,
+        outer_radius,
+        lower_speed_threshold,
+        upper_speed_threshold,
+    ):
+        super().__init__()
+
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+        self.lower_speed_threshold = lower_speed_threshold
+        self.upper_speed_threshold = upper_speed_threshold
+
+    def extract_features(self, state_dict):
+        (
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+        ) = self.compute_state_information(state_dict)
+
+        SAM_vector, density_vector = SAM_features(
+            agent_position,
+            agent_velocity,
+            pedestrian_positions,
+            pedestrian_velocities,
+            self.inner_radius,
+            self.outer_radius,
+            self.lower_speed_threshold,
+            self.upper_speed_threshold,
+        )
+
+        default_feature = np.array([1.0])
+
+        # goal orienting features
+        goal_position = state_dict["goal_state"]
+
+        angle_to_goal_feature_vector = angle_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        vector_to_goal_feature_vector = vector_to_goal_features(
+            goal_position, agent_position, agent_velocity
+        )
+
+        orientation_change_feature_vector = orientation_change_features(
+            agent_velocity, self.old_agent_velocity
+        )
+
+        self.old_agent_velocity = agent_velocity
+
+        default_feature = np.ones(1)
+
+        output_feature = np.concatenate(
+            (
+                SAM_vector,
+                np.array([density_vector]),
+                angle_to_goal_feature_vector,
+                vector_to_goal_feature_vector,
+                orientation_change_feature_vector,
+                default_feature,
+            )
+        )
+
+        return output_feature
 
 class DroneFeatureSAM1:
     """
