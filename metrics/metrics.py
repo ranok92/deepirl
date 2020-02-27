@@ -275,6 +275,30 @@ def pedestrian_hit(trajectory, agent_radius):
     return False
 
 
+def distance_to_nearest_pedestrian_over_time(trajectory):
+    """
+    At each timestep in trajectory, calculates the distances to the
+    nearest pedestrian.
+
+    :param trajectory: trajectory comprised of states_dicts.
+    :type trajectory: list of state_dicts
+    :return: list of distances to nearest pedestrian, ordered from t=0 to t=end.
+    :rtype: list of floats.
+    """
+    distances = []
+
+    for traj in trajectory:
+        agent_position = traj["agent_state"]["position"]
+        pedestrians = traj["obstacles"]
+        ped_positions = [ped["position"] for ped in pedestrians]
+        distances = [
+            dist_2d(ped_pos, agent_position) for ped_pos in ped_positions
+        ]
+        distances.append(np.min(distances))
+
+    return distances
+
+
 def trajectory_length(trajectory):
     """
     Returns the length of the trajectory.
