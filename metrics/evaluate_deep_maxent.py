@@ -55,7 +55,7 @@ parser.add_argument("--policy-path", type=str, required=True)
 parser.add_argument("--output-name", type=str, default="deep_maxent_eval")
 
 
-def main():
+def main(args):
 
     output = {}
 
@@ -65,7 +65,6 @@ def main():
     obs_width = 10
     grid_size = 10
 
-    args = parser.parse_args()
     output["eval parameters"] = vars(args)
 
     # initialize environment
@@ -203,4 +202,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parser.parse_args()
+
+    main(args)
