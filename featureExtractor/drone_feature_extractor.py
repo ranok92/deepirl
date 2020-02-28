@@ -574,7 +574,7 @@ def social_force_features(
 
         # put into bins
         # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
-        if 0.75 * np.pi < angle <= np.pi:
+        if 0.75 * np.pi <= angle <= np.pi:
             ped_orientation_bins[0] = np.append(
                 ped_orientation_bins[0], ped_id
             )
