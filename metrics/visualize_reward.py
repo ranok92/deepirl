@@ -9,6 +9,9 @@ import pygame
 from PIL import Image
 
 sys.path.insert(0, '..')  # NOQA: E402
+from featureExtractor.drone_feature_extractor import dist_2d, norm_2d
+from featureExtractor.drone_feature_extractor import get_rot_matrix, deg_to_rad
+
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
@@ -25,6 +28,14 @@ parser.add_argument('--reward-path', type=str, default=None,
 
 parser.add_argument('--reward-net-hidden-dims', nargs="*", default=[256], 
                     help='List containing the values of the hidden layers')
+
+
+parser.add_argument('--policy-path', type=str, default=None,
+                     help='Location of the policy file')
+
+parser.add_argument('--policy-net-hidden-dims', nargs="*", default=[256], 
+                    help='List containing the values of the hidden layers')
+
 
 parser.add_argument('--frame-id', type=int, default=1500, 
                     help="The frame in the video to be used to calculate the reward map")
@@ -97,9 +108,8 @@ def generate_reward_map(env, feat_extractor, reward_network,
 
             env.agent_state['position'] = current_position
             env.agent_state['speed'] = 2
-            env.agent_state['orientation'] = np.asarray([1,1])
+            env.agent_state['orientation'] = set_agent_orientation_to_goal(env.state)
             env.state['agent_state'] = copy.deepcopy(env.agent_state)
-            set_agent_orientation(env)
             if render:
                 env.render()
             state_feat = feat_extractor.extract_features(env.state)
@@ -117,11 +127,30 @@ def generate_reward_map(env, feat_extractor, reward_network,
     return img, reward_map
 
 
-def set_agent_orientation(env):
+def set_agent_orientation_to_goal(env_state):
     """
-    Given the environment changes the orientation of the agennt so that it
-    faces towards the goal.
+    Given the state of the environment, returns the orientation the agent should 
+    have inorder to face directly towards the goal.
+
+    input:
+        state       - the current state of the environment
+    
+
+    output:
+        orientation - A 2 dimensional numpy array containing the orientation (unit)vector
+                      of the agent. The orientation vector is of the format [row, col]
     """
+    agent_state = env_state['agent_state']
+    goal_state = env_state['goal_state']
+
+    vect = goal_state - agent_state['position']
+    return vect/norm_2d(vect)
+
+
+
+
+
+
 
 
 def plot_map(map_array, frame_img=None, colormap=None):
@@ -169,6 +198,85 @@ def plot_map(map_array, frame_img=None, colormap=None):
     ax.set_title("Reward plot")
     fig.tight_layout()
     plt.show()
+
+
+def visualize_reward_per_spot(env, feat_extractor, reward_network, 
+                              policy_network, num_traj=20, div=10,
+                              render=True):
+
+    """
+    Runs the agent on the environment using the policy network passed and 
+    displays the reward distribution the agent gets for all possible actions 
+    at each step.
+
+        input:
+            env  - the environmnet
+            feat_extractor - the feature extractor 
+            reward_network - the reward network. A pytorch network.
+            policy_network - The policy network the agent will follow. A pytorch network.
+            render - flag set for rendering
+
+
+        output : 
+            N/A
+    """
+
+    for i in range(num_traj):
+        
+        done = False
+        state = env.reset_and_replace()
+        state_feat = feat_extractor.extract_features(state)
+        state_feat = torch.from_numpy(state_feat).type(torch.FloatTensor).to(DEVICE)
+        t = 0
+        while not done:
+
+            states_numpy = get_nearby_statevector(state, feat_extractor)
+            states_torch = torch.from_numpy(states_numpy).type(torch.FloatTensor).to(DEVICE)
+
+            rewards = reward_network(states_torch)
+            rewards = rewards.detach().cpu().numpy().squeeze()
+            rewards = (rewards-np.min(rewards))*3
+            
+            x_axis = np.linspace(0, 2*np.pi, int(360/div), endpoint=False)
+            width = (2*np.pi)/int(360/div)
+            ax = plt.subplot(111, polar=True)
+            bars = ax.bar(x_axis, rewards, width=width, bottom=2)
+            plt.draw()
+            plt.pause(0.001)
+
+            action = policy_network.eval_action(state_feat)
+            state, _, done, _ = env.step(action)
+            env.render()
+            state_feat = feat_extractor.extract_features(state)
+            state_feat = torch.from_numpy(state_feat).type(torch.FloatTensor).to(DEVICE)
+            t+=1
+
+            if t>600:
+                break
+
+
+
+def get_nearby_statevector(env_state, feat_extractor, div=10):
+
+    """
+    given the current state returns the rewards the agent would be getting if he would 
+    be facing other directions
+    """
+    state_list = []
+    orient_vector = np.asarray([-1, 0]) #starts facing upwards
+    cur_orient_degree = 0
+    for i in range(int(360/div)):
+        env_state['agent_state']['orientation'] = orient_vector
+        state_list.append(feat_extractor.extract_features(env_state))
+        orient_vector = np.matmul(get_rot_matrix(deg_to_rad(cur_orient_degree+div)),
+                                   orient_vector)
+        cur_orient_degree += div
+
+    return np.asarray(state_list)
+
+
+
+
 
 
 
@@ -226,6 +334,14 @@ def main():
         width=grid_size,
     )
 
+    #set up the policy network
+    from rlmethods.b_actor_critic import Policy
+    state_size = feat_ext.extract_features(env.reset()).shape[0]
+    policy_net = Policy(state_size, env.action_space.n, args.policy_net_hidden_dims)
+    policy_net.load(args.policy_path)
+    print(next(policy_net.parameters()).is_cuda)
+
+
     #set up the reward network
     from irlmethods.deep_maxent import RewardNet
 
@@ -234,7 +350,7 @@ def main():
     reward_net.load(args.reward_path)
     print(next(reward_net.parameters()).is_cuda)
     #run stuff
-
+    '''
     screenshot, reward_map = generate_reward_map(env, feat_ext, 
                         reward_net, 
                         render=args.render,
@@ -242,6 +358,11 @@ def main():
                         frame_id=args.frame_id)
 
     plot_map(reward_map, frame_img=screenshot)
+    '''
+
+    visualize_reward_per_spot(env, feat_ext, reward_net, 
+                              policy_net, num_traj=20,
+                              render=True)
 
 if __name__=='__main__':
 
