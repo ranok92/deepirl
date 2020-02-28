@@ -168,8 +168,10 @@ def main():
     metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
     metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
-    metric_applicator.add_metric(metrics.count_collisions, [20])
+    metric_applicator.add_metric(metrics.count_collisions, [10])
     metric_applicator.add_metric(metrics.goal_reached, [10, 10])
+    metric_applicator.add_metric(metrics.pedestrian_hit, [10])
+    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.trajectory_length)
 
     # collect trajectories and apply metrics
