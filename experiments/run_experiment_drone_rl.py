@@ -110,6 +110,14 @@ parser.add_argument(
     default="ActorCritic",
     help="The RL trainer to be used.",
 )
+
+parser.add_argument(
+    '--store-raw-states',
+    action="store_true",
+    help="Set to true if you want to store the trajectory of the policy in the form\
+        of raw state dictionary. "
+)
+
 parser.add_argument("--play-interval", type=int, default=100)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
@@ -343,7 +351,7 @@ def main():
         seed=args.seed,
         obstacles=None,
         show_trail=False,
-        is_random=True,
+        is_random=False,
         annotation_file=args.annotation_file,
         subject=args.subject,
         tick_speed=60,
@@ -505,6 +513,7 @@ def main():
                     rewards, state_info, sub_info = model.generate_trajectory(
                         args.num_trajs,
                         args.render,
+                        store_raw=args.store_raw_states,
                         path=save_folder + "/agent_generated_trajectories/",
                     )
             else:
