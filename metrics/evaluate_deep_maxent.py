@@ -38,12 +38,14 @@ parser.add_argument(
                      feature extractor to be used in the experiment.",
 )
 
-parser.add_argument("--dont-replace-subject", action="store_true")
+parser.add_argument("--dont-replace-subject", action="store_false")
 
 parser.add_argument(
     "--annotation-file",
     type=str,
-    required=True,
+    default='../envs/expert_datasets/university_students/\
+annotation/processed/frame_skip_1/\
+students003_processed_corrected.txt',
     help="The location of the annotation file to \
                     be used to run the environment.",
 )
@@ -105,6 +107,11 @@ def main(args):
         VasquezF3,
     )
 
+    from featureExtractor.drone_feature_extractor import (
+        Fahad,
+        GoalConditionedFahad,
+        )
+
     if args.feat_extractor == "DroneFeatureRisk_speedv2":
 
         feat_ext_args = {
@@ -150,6 +157,28 @@ def main(args):
         }
 
         feat_ext = VasquezF3(feat_ext_args["agent_width"])
+
+    if args.feat_extractor == 'Fahad':
+        feat_ext_args = {
+            "inner_ring_rad" : 36,
+            "outer_ring_rad" : 60,
+            "lower_speed_threshold" : 0.5,
+            "upper_speed_threshold" : 1.0
+        }
+
+        feat_ext = Fahad(36, 60, 0.5, 1.0)
+
+    if args.feat_extractor == 'GoalConditionedFahad':
+        feat_ext_args = {
+            "inner_ring_rad" : 36,
+            "outer_ring_rad" : 60,
+            "lower_speed_threshold" : 0.5,
+            "upper_speed_threshold" : 1.0
+        }
+
+        feat_ext = GoalConditionedFahad(36, 60, 0.5, 1.0)
+
+
 
     output["feature_extractor_params"] = feat_ext_args
     output["feature_extractor"] = feat_ext
