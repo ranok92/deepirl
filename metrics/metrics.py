@@ -4,6 +4,7 @@ import numpy as np
 from featureExtractor.drone_feature_extractor import dist_2d, angle_between
 import warnings
 
+
 def compute_trajectory_smoothness(trajectory):
     """
     Returns the total and per step change in the orientation (in degrees)
@@ -112,7 +113,6 @@ def proxemic_intrusions(trajectory, units_to_meters_ratio):
                 continue
             else:
                 raise ValueError("Distance did not fit in any bins.")
-            
 
     return intimiate_intrusions, personal_intrusions, social_intrusions
 
@@ -164,7 +164,9 @@ def anisotropic_intrusions(trajectory, radius, lambda_param=2.0):
             vector_to_agent = agent_position - ped_position
 
             if ped_orientation is None:
-                warnings.warn("pedestrian orientation is none, setting to (1.0, 0.0)")
+                warnings.warn(
+                    "pedestrian orientation is none, setting to (1.0, 0.0)"
+                )
                 ped_orientation = np.array([1.0, 0.0])
 
             angle = angle_between(vector_to_agent, ped_orientation)
@@ -187,11 +189,6 @@ def anisotropic_intrusions(trajectory, radius, lambda_param=2.0):
                     raise ValueError(
                         "Cannot bin angle in any of the thresholds."
                     )
-
-            print('Anisotropic intrusion : ', front_anisotropic_intrusion,
-                                            side_anisotropic_intrusion,
-                                            back_anisotropic_intrusion
-                                            )
 
     return (
         front_anisotropic_intrusion,
@@ -253,6 +250,55 @@ def goal_reached(trajectory, goal_radius, agent_radius):
 
     return dist_2d(agent_position, goal_position) <= goal_radius + agent_radius
 
+
+def pedestrian_hit(trajectory, agent_radius):
+    """Returns true if pedestrian is hit in the last state_dict of tajectory.
+    
+    :param trajectory: trajecory comprised of states_dicts.
+    :type trajectory: list of state_dicts
+    :param agent_radius: width of the agent in environment.
+    :type agent_radius: float.
+    :return: True if pedestrian hit in last state_dict, false otherwise.
+    :rtype: Boolean.
+    """
+    pedestrians = trajectory[-1]["obstacles"]
+    agent_position = trajectory[-1]["agent_state"]["position"]
+
+    for ped in pedestrians:
+        ped_position = ped["position"]
+
+        distance = dist_2d(ped_position, agent_position)
+
+        if distance <= 2 * agent_radius:
+            return True
+
+    return False
+
+
+def distance_to_nearest_pedestrian_over_time(trajectory):
+    """
+    At each timestep in trajectory, calculates the distances to the
+    nearest pedestrian.
+
+    :param trajectory: trajectory comprised of states_dicts.
+    :type trajectory: list of state_dicts
+    :return: list of distances to nearest pedestrian, ordered from t=0 to t=end.
+    :rtype: list of floats.
+    """
+    distances = []
+
+    for traj in trajectory:
+        agent_position = traj["agent_state"]["position"]
+        pedestrians = traj["obstacles"]
+        ped_positions = [ped["position"] for ped in pedestrians]
+        distances = [
+            dist_2d(ped_pos, agent_position) for ped_pos in ped_positions
+        ]
+        distances.append(np.min(distances))
+
+    return distances
+
+
 def trajectory_length(trajectory):
     """
     Returns the length of the trajectory.
@@ -263,10 +309,10 @@ def trajectory_length(trajectory):
              the agent in consequtive frames. 
     :rtype: int.
     """
-    agent_cur_pos = trajectory[0]['agent_state']['position']
+    agent_cur_pos = trajectory[0]["agent_state"]["position"]
     traj_length = 0
     for state in trajectory[1:]:
-        traj_length += dist_2d(agent_cur_pos, state['agent_state']['position'])
-        agent_cur_pos = state['agent_state']['position']
+        traj_length += dist_2d(agent_cur_pos, state["agent_state"]["position"])
+        agent_cur_pos = state["agent_state"]["position"]
     return traj_length
 
