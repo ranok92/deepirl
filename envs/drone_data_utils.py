@@ -12,6 +12,7 @@ from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,Fr
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 from featureExtractor.drone_feature_extractor import VasquezF1, VasquezF2, VasquezF3
+from featureExtractor.drone_feature_extractor import Fahad, GoalConditionedFahad
 from scipy.interpolate import splev, splprep
 
 
@@ -20,6 +21,7 @@ import os
 import pdb
 import pathlib
 import copy
+import json
 '''
 information regarding datasets and annotations:
 ZARA DATASET:
@@ -200,8 +202,10 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
 
-def extract_trajectory(annotation_file, feature_extractor, 
-                       folder_to_save, display=False, 
+def extract_trajectory(annotation_file, 
+                       folder_to_save, 
+                       feature_extractor=None, 
+                       display=False, 
                        show_states=False, subject=None, 
                        trajectory_length_limit=None):
 
@@ -241,7 +245,7 @@ def extract_trajectory(annotation_file, feature_extractor,
         step_counter_segment = 0
 
         segment_counter = 1
-        world.subject=sub
+        world.subject = sub
         world.reset()
         print('Path lenghth :',world.final_frame - world.current_frame)
         path_len = world.final_frame - world.current_frame
@@ -264,9 +268,10 @@ def extract_trajectory(annotation_file, feature_extractor,
             if disp:
                 feature_extractor.overlay_bins(state)
 
-            state = feature_extractor.extract_features(state)
-
-            state = torch.tensor(state)
+            if feature_extractor is not None:
+                state = feature_extractor.extract_features(state)
+                state = torch.tensor(state)
+            
             trajectory_info.append(state)
 
             if trajectory_length_limit is not None:
@@ -281,8 +286,15 @@ def extract_trajectory(annotation_file, feature_extractor,
                     world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
                     world.state['goal_state'] = copy.deepcopy(world.goal_state) 
                     print('Trajectory length : ', len(trajectory_info))
-                    state_tensors = torch.stack(trajectory_info)
-                    torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+
+                    if feature_extractor is not None:
+                        state_tensors = torch.stack(trajectory_info)
+                        torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+                    else:
+                        with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
+                                  str(segment_counter)), 'w') as fout:
+                            json.dump(trajectory_info, fout)
+                    
                     segment_counter += 1 
                     #pdb.set_trace()
                     step_counter_segment = 0 
@@ -294,11 +306,21 @@ def extract_trajectory(annotation_file, feature_extractor,
 
 
         if trajectory_length_limit is None:
-            state_tensors = torch.stack(trajectory_info)
-            torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_%s.states' % str(sub)))
+            if feature_extractor is not None:
+                state_tensors = torch.stack(trajectory_info)
+                torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+            else:
+                '''
+                with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
+                            str(segment_counter)), 'w') as fout:
+                    pdb.set_trace()
+                    json.dump(trajectory_info, fout)
+                '''
+                np.save('traj_of_sub_{}_segment{}.states'.format(str(sub), 
+                            str(segment_counter)), trajectory_info)
         
-    if feature_extractor.debug_mode:
-        feature_extractor.print_info()
+    #if feature_extractor.debug_mode:
+    #    feature_extractor.print_info()
 
 
     print('The average path length :', total_path_len/len(subject_list))
@@ -519,7 +541,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'VasquezF3/'
+    feature_extractor_name = 'DroneFeatureRisk_speedv2'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -538,26 +560,29 @@ if __name__=='__main__':
 
     
     #initialize the feature extractor
-    #feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
-    #                                           agent_width=10, obs_width=10,
-    #                                           debug=True,
-    #                                           grid_size=10, step_size=step_size)
+    feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
+                                               agent_width=10, obs_width=10,
+                                               debug=True,
+                                               grid_size=10, step_size=step_size)
 
     
     #feature_extractor = VasquezF1(agent_width*6, 0, 2)
     #feature_extractor = VasquezF2(agent_width*6, 0, 2)
 
-    feature_extractor = VasquezF3(agent_width*6)
+    #feature_extractor = VasquezF3(agent_width*6)
     #feature_extractor = LocalGlobal(window_size=11, grid_size=grid_size,
     #                                agent_width=agent_width, 
     #                                obs_width=obs_width,
     #                                step_size=step_size,
     #                              )
     
-    
+    #feature_extractor = Fahad(36, 60, 0.5, 1.0)
+    #feature_extractor = GoalConditionedFahad(36, 60, 0.5, 1.0)
     #print(extract_subjects_from_file(file_name))
-    extract_trajectory(file_name, feature_extractor, 
-                       folder_to_save, show_states=False,
+    extract_trajectory(file_name, 
+                       folder_to_save, 
+                       feature_extractor=feature_extractor, 
+                       show_states=False,
                        display=False, trajectory_length_limit=None)
     
     
