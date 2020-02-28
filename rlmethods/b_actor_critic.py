@@ -273,7 +273,7 @@ class ActorCritic:
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
 
-    def generate_trajectory(self, num_trajs, render, path=None, expert_svf=None):
+    def generate_trajectory(self, num_trajs, render, store_raw=False, path=None, expert_svf=None):
 
         reward_across_trajs = []
         frac_unknown_states_enc = []
@@ -286,16 +286,23 @@ class ActorCritic:
            
             # action and states lists for current trajectory
             actions = []
+            
+            state = self.env.reset()
+
 
             if self.feature_extractor is None:
-                state = self.env.reset()
+                state_features = state
             else:
-                state = self.feature_extractor.extract_features(self.env.reset())
+                state_features = self.feature_extractor.extract_features(self.env.reset())
+                state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(DEVICE)
 
-                if self.env.replace_subject:
-                    subject_list.append(self.env.cur_ped)
-            state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
-            states = [state]
+            if self.env.replace_subject:
+                subject_list.append(self.env.cur_ped)
+
+            if store_raw:
+                states = [state]
+            else:
+                states = [state_features]
 
             done = False
             t= 0
@@ -305,10 +312,10 @@ class ActorCritic:
             
             while not done and t < self.max_episode_length:
                 
-                action = self.policy.eval_action(state)
+                action = self.policy.eval_action(state_features)
 
                 if expert_svf is not None:
-                    if self.feature_extractor.hash_function(state) not in expert_svf.keys():
+                    if self.feature_extractor.hash_function(state_features) not in expert_svf.keys():
                         #print(' Unknown state.')
                         unknown_state_counter+=1
                         #pdb.set_trace()
@@ -320,8 +327,11 @@ class ActorCritic:
                 run_reward+=rewards
 
                 if self.feature_extractor is not None:
-                    state = self.feature_extractor.extract_features(state)
-                state = torch.from_numpy(state).type(torch.FloatTensor).to(DEVICE)
+                    state_features = self.feature_extractor.extract_features(state)
+                    state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(DEVICE)
+
+                else:
+                    state_features = state
 
                 '''
                 print(state[0:9].reshape((3,3)))
@@ -334,26 +344,31 @@ class ActorCritic:
                 print(state[137:])
                 #pdb.set_trace()
                 '''
+                if store_raw:
+                    states.append(state)
+                else:
+                    states.append(state_features)
 
-                states.append(state)
                 t+=1
             reward_across_trajs.append(run_reward)
             frac_unknown_states_enc.append(unknown_state_counter/total_states)
             if path is not None:
-                if run_reward > 1: # not a bad run
 
-                    actions_tensor = torch.tensor(actions)
+                actions_tensor = torch.tensor(actions)
+                if self.feature_extractor and not store_raw:
+
                     states_tensor = torch.stack(states)
-
                     pathlib.Path(path).mkdir(parents=True, exist_ok=True)
-
                     torch.save(actions_tensor,
-                               os.path.join(path, 'traj%s.acts' % str(traj_i)))
-
+                            os.path.join(path, 'traj%s.acts' % str(traj_i)))
                     torch.save(states_tensor,
-                               os.path.join(path, 'traj%s.states' % str(traj_i)))
+                            os.path.join(path, 'traj%s.states' % str(traj_i)))
+                
                 else:
-                    print("Rejecting bad run.")
+                    pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+                    print('Storing for ', traj_i)
+                    np.save(os.path.join(path, 'traj%s.states' % str(traj_i)), states)
+
             
         return reward_across_trajs, frac_unknown_states_enc, subject_list
 
