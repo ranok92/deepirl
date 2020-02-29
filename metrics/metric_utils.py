@@ -162,7 +162,6 @@ def collect_trajectories_and_metrics(
     return metric_results
 
 
-<<<<<<< HEAD
 def collect_trajectories(
     env,
     feature_extractor,
@@ -220,7 +219,6 @@ def collect_trajectories(
         all_trajectories.append(traj)
 
     return all_trajectories
-=======
 
 def read_files_from_directories(parent_directory, folder_dict=None):
     
@@ -275,4 +273,3 @@ def read_files_from_directories(parent_directory, folder_dict=None):
         
     return folder_dict
             
->>>>>>> d117b227e59c357986cbe4939d03f148e63a643b
