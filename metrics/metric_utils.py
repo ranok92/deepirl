@@ -165,11 +165,11 @@ def collect_trajectories_and_metrics(
 
 
 
-def read_files_from_directories(parent_directory):
+def read_files_from_directories(parent_directory, folder_dict=None):
     
     """
     Reads files from a given directory and stores them in the form of a 
-    2D list. Only works with multiple layers. 
+    2D list. Only works with 2 layers.
         eg. parent
                 - dir1
                     -file1
@@ -187,36 +187,34 @@ def read_files_from_directories(parent_directory):
         parent_dictionary : location of the parent dictionary
     
     output:
-        file_list : a hierarchical list containing the files present in the directory 
-                    and its sub directories corresponding to the structure of the 
-                    filesystem.
-                    eg. resulting file_list from the above dir will be 
-                        [
-                            [file1, file2]
-                            [file1, file2, file3]
-                            .
-                            .
-                            .
-                        ]
+        folder_dict : a hierarchical dictionary containing the files in the form of lists
+                    and resembling the file structure of the parent dictionary provided.
+       
     """
 
 
     #check if the directory exists
     if not os.path.exists(parent_directory):
         print("Directory does not exist.")
-        sys.exit()
+        exit()
     
-    for _, dirs, files in os.walk(parent_directory):
+    if folder_dict is None:
+        folder_dict = {}
+        
+    for root, dirs, files in os.walk(parent_directory):
         file_list = []
         if len(files) > 0:
             file_list = files
+            folder_dict = file_list
         for dirname in dirs:
             path = os.path.join(parent_directory, dirname)
             print('Reading directory :', path)
-            file_list_from_sub_dir = read_files_from_directories(path)
+            
+            folder_dict[dir] = {}
+            file_list_from_sub_dir, dir_dict = read_files_from_directories(path, folder_dict[dirname])
             file_list.append(file_list_from_sub_dir)
-        
+            folder_dict[dir] = dir_dict
         break
-    
-    return file_list
+        
+    return folder_dict
             
