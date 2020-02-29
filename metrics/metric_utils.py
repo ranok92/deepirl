@@ -3,6 +3,8 @@
 from collections import defaultdict
 import copy
 import torch
+import os, sys
+import pdb 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -134,9 +136,10 @@ def collect_trajectories_and_metrics(
 
     for traj_idx in range(num_trajectories):
 
-        print("Collecting trajectory {}".format(traj_idx))
 
         state = env.reset()
+        current_pedestrian = env.cur_ped
+        print("Collecting trajectory {}".format(current_pedestrian))
         done = False
         t = 0
         traj = [copy.deepcopy(state)]
@@ -154,11 +157,12 @@ def collect_trajectories_and_metrics(
 
         # metrics
         traj_metric_result = metric_applicator.apply([traj])
-        metric_results[traj_idx] = traj_metric_result
+        metric_results[current_pedestrian] = traj_metric_result
 
     return metric_results
 
 
+<<<<<<< HEAD
 def collect_trajectories(
     env,
     feature_extractor,
@@ -216,3 +220,59 @@ def collect_trajectories(
         all_trajectories.append(traj)
 
     return all_trajectories
+=======
+
+def read_files_from_directories(parent_directory, folder_dict=None):
+    
+    """
+    Reads files from a given directory and stores them in the form of a 
+    2D list. Only works with 2 layers.
+        eg. parent
+                - dir1
+                    -file1
+                    -file2
+                - dir2
+                    -file1
+                    -file2
+                    -file3
+                - dir3
+                    -file1
+                    .
+                    .
+
+    input:
+        parent_dictionary : location of the parent dictionary
+    
+    output:
+        folder_dict : a hierarchical dictionary containing the files in the form of lists
+                    and resembling the file structure of the parent dictionary provided.
+       
+    """
+
+
+    #check if the directory exists
+    if not os.path.exists(parent_directory):
+        print("Directory does not exist.")
+        exit()
+    
+    if folder_dict is None:
+        folder_dict = {}
+        
+    for root, dirs, files in os.walk(parent_directory):
+        file_list = []
+        if len(files) > 0:
+            file_list = files
+            folder_dict = file_list
+        for dirname in dirs:
+            path = os.path.join(parent_directory, dirname)
+            print('Reading directory :', path)
+            
+            folder_dict[dir] = {}
+            file_list_from_sub_dir, dir_dict = read_files_from_directories(path, folder_dict[dirname])
+            file_list.append(file_list_from_sub_dir)
+            folder_dict[dir] = dir_dict
+        break
+        
+    return folder_dict
+            
+>>>>>>> d117b227e59c357986cbe4939d03f148e63a643b
