@@ -3,6 +3,8 @@
 from collections import defaultdict
 import copy
 import torch
+import os, sys
+import pdb 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -160,3 +162,61 @@ def collect_trajectories_and_metrics(
         metric_results[current_pedestrian] = traj_metric_result
 
     return metric_results
+
+
+
+def read_files_from_directories(parent_directory):
+    
+    """
+    Reads files from a given directory and stores them in the form of a 
+    2D list. Only works with multiple layers. 
+        eg. parent
+                - dir1
+                    -file1
+                    -file2
+                - dir2
+                    -file1
+                    -file2
+                    -file3
+                - dir3
+                    -file1
+                    .
+                    .
+
+    input:
+        parent_dictionary : location of the parent dictionary
+    
+    output:
+        file_list : a hierarchical list containing the files present in the directory 
+                    and its sub directories corresponding to the structure of the 
+                    filesystem.
+                    eg. resulting file_list from the above dir will be 
+                        [
+                            [file1, file2]
+                            [file1, file2, file3]
+                            .
+                            .
+                            .
+                        ]
+    """
+
+
+    #check if the directory exists
+    if not os.path.exists(parent_directory):
+        print("Directory does not exist.")
+        sys.exit()
+    
+    for _, dirs, files in os.walk(parent_directory):
+        file_list = []
+        if len(files) > 0:
+            file_list = files
+        for dirname in dirs:
+            path = os.path.join(parent_directory, dirname)
+            print('Reading directory :', path)
+            file_list_from_sub_dir = read_files_from_directories(path)
+            file_list.append(file_list_from_sub_dir)
+        
+        break
+    
+    return file_list
+            
