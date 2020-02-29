@@ -285,7 +285,7 @@ def distance_to_nearest_pedestrian_over_time(trajectory):
     :return: list of distances to nearest pedestrian, ordered from t=0 to t=end.
     :rtype: list of floats.
     """
-    distances = []
+    min_distances = []
 
     for traj in trajectory:
         agent_position = traj["agent_state"]["position"]
@@ -294,9 +294,9 @@ def distance_to_nearest_pedestrian_over_time(trajectory):
         distances = [
             dist_2d(ped_pos, agent_position) for ped_pos in ped_positions
         ]
-        distances.append(np.min(distances))
+        min_distances.append(np.min(distances))
 
-    return distances
+    return min_distances
 
 
 def trajectory_length(trajectory):
