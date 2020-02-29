@@ -134,9 +134,10 @@ def collect_trajectories_and_metrics(
 
     for traj_idx in range(num_trajectories):
 
-        print("Collecting trajectory {}".format(traj_idx))
 
         state = env.reset()
+        current_pedestrian = env.cur_ped
+        print("Collecting trajectory {}".format(current_pedestrian))
         done = False
         t = 0
         traj = [copy.deepcopy(state)]
@@ -156,6 +157,6 @@ def collect_trajectories_and_metrics(
 
         # metrics
         traj_metric_result = metric_applicator.apply([traj])
-        metric_results[traj_idx] = traj_metric_result
+        metric_results[current_pedestrian] = traj_metric_result
 
     return metric_results
