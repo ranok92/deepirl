@@ -50,7 +50,7 @@ for seed in parent_path.glob("./*"):
             reward_path=None,
             policy_path=str(policy.resolve()),
             output_name=output_name,
-            dont_replace_subject=False,
+            dont_replace_subject=True,
         )
 
         main(args)
