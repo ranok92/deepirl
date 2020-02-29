@@ -201,7 +201,7 @@ def main(args):
     metric_applicator.add_metric(metrics.pedestrian_hit, [10])
     metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.trajectory_length)
-
+    metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
     # collect trajectories and apply metrics
     num_peds = len(env.pedestrian_dict.keys())
     output["metrics"] = metric_applicator.get_metrics()
