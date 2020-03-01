@@ -88,11 +88,16 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
         metric_value_len = len(metric_info)
 
 
+    max_seed_number = 0
+    for agent in list_of_dictionary:
+        if max_seed_number < len(agent):
+            max_seed_number = len(agent)
+
+    pdb.set_trace()
     run_information_array = np.zeros([len(list_of_dictionary),
-                                     len(list_of_dictionary[0])*len(ped_list),
+                                     max_seed_number*len(ped_list),
                                      metric_value_len])
 
-    
     total_peds = len(ped_list)
     agent_counter = 0
     seed_counter = 0
@@ -102,6 +107,9 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
             #reading data from a single metric dictionary
             i = 0
             for ped in ped_list:
+                #print('ped', ped)
+                #print('seed_counter', seed_counter)
+                #print('i', i)
                 run_information_array[agent_counter]\
                         [(seed_counter*total_peds)+i][:] = run_info['metric_results'][ped]\
                                                                 [metric_name][0]
@@ -167,8 +175,14 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         metric_value_len = 1
     else:
         metric_value_len = len(metric_info)
+
+    max_seed_number = 0
+    for agent in list_of_dictionary:
+        if max_seed_number < len(agent):
+            max_seed_number = len(agent)
+
     run_information_array = np.zeros([len(list_of_dictionary),
-                                     len(list_of_dictionary[0])*len(ped_list),
+                                     max_seed_number*len(ped_list),
                                      metric_value_len])
 
     total_peds = len(ped_list)
@@ -212,12 +226,16 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         title = fig_title+metric_info[info]
         ax.set_title(title)
         plt.show()
-
+        '''
         file_name = title+'.fig.pickle'
         file_name_eps = title+'.svg'
         with open(file_name, 'w') as f:
             pickle.dump(fig, f)
         plt.savefig(file_name_eps)
+        '''
+
+
+
 
 def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names, 
                                     metric_name, fig_title, metric_info=None,
@@ -274,6 +292,8 @@ def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names,
             for run_info in agent:
                 if len(run_info['metric_results'][ped][metric_name][0]) > max_traj_len:
                     max_traj_len = len(run_info['metric_results'][ped][metric_name][0])
+
+
     x_axis = np.arange(max_traj_len)
     for ped in ped_list:
         agent_counter = 0
@@ -329,10 +349,10 @@ if __name__=='__main__':
                                --fig-title 'Distance displacement ratio'
                                --metric-name 'compute_distance_displacement_ratio'
 
-    """
+    
     plot_histogram(master_dictionary_list, agent_names, 
                    args.metric_name, args.fig_title, ped_list=ped_list)
-   
+    """
     #################################################
     #uncomment this to get barplots with erros
     """
@@ -359,11 +379,11 @@ if __name__=='__main__':
         
         **here the ped_list is modified below.
 
-    
+    """
     ped_list = [11, 12, 13]
     plot_information_per_time_frame(master_dictionary_list, 
                                     agent_names, 
                                     args.metric_name, args.fig_title,
                                     metric_info=args.metric_info,
                                     ped_list=ped_list) 
-    """
+    
