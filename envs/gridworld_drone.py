@@ -132,6 +132,18 @@ class GridWorldDrone(GridWorld):
         self.annotation_list = []
         self.skip_list = [] #dont consider these pedestrians as obstacles
 
+        ######################################################################
+        self.image_file = ['../envs/faces/ped_faces/face_1.jpg',
+                           '../envs/faces/ped_faces/face_2.jpg', 
+                           '../envs/faces/ped_faces/face_3.jpg',
+                           '../envs/faces/ped_faces/face_4.jpg']
+
+        self.agent_image = pygame.image.load('../envs/faces/robot.jpg')
+        self.ped_images = []
+        for i in self.image_file:
+
+            self.ped_images.append(pygame.image.load(i))
+
         ############# this comes with the change in the action space##########
 
         self.continuous_action = continuous_action
@@ -193,6 +205,40 @@ class GridWorldDrone(GridWorld):
         self.show_orientation = show_orientation
 
 
+    def draw_obstacle(self, obs):
+        """
+        ped_position : [row, col]
+        """
+        #pdb.set_trace()
+        font = pygame.freetype.Font(None, 15)
+
+        index = int(obs['id'])%len(self.ped_images)
+        self.gameDisplay.blit(self.ped_images[index], 
+                              (obs['position'][1]-(self.obs_width/2), 
+                               obs['position'][0]-(self.obs_width/2)))
+        font.render_to(self.gameDisplay, 
+                              (obs['position'][1]-(self.obs_width/2)-10,obs['position'][0]-(self.obs_width/2)-5), 
+                              obs['id'], fgcolor=(0,0,0))
+
+        if self.show_orientation:
+            if obs['orientation'] is not None: 
+                pygame.draw.line(self.gameDisplay, self.black, [obs['position'][1],obs['position'][0]], 
+                                    [obs['position'][1]+obs['orientation'][1]*10, obs['position'][0]+obs['orientation'][0]*10], 2)
+
+
+    def draw_agent(self):
+
+        self.gameDisplay.blit(self.agent_image, 
+                              (self.agent_state['position'][1]-(self.agent_width/2), 
+                               self.agent_state['position'][0]-(self.agent_width/2)))
+
+        if self.show_orientation:
+            mag = 10 + 10 * self.agent_state['speed']
+
+            if self.agent_state['orientation'] is not None: 
+                    pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
+                                        [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
+                                        2)
 
     def enable_rendering(self, tick_speed):
         pygame.quit()
@@ -451,31 +497,20 @@ class GridWorldDrone(GridWorld):
         #render obstacles
         if self.obstacles is not None:
             for obs in self.obstacles:
+
+                '''
                 pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2), \
                                 self.obs_width, self.obs_width])
-                font.render_to(self.gameDisplay, 
-                              (obs['position'][1]-(self.obs_width/2)-5,obs['position'][0]-(self.obs_width/2)), 
-                              obs['id'], fgcolor=(0,0,0))
-                if self.show_orientation:
-                    if obs['orientation'] is not None: 
-                        pygame.draw.line(self.gameDisplay, self.black, [obs['position'][1],obs['position'][0]], 
-                                         [obs['position'][1]+obs['orientation'][1]*10, obs['position'][0]+obs['orientation'][0]*10], 2)
+                '''
+                self.draw_obstacle(obs)
+        
         #render goal
         if self.goal_state is not None:
             pygame.draw.rect(self.gameDisplay, self.green, [self.goal_state[1]-(self.cellWidth/2), self.goal_state[0]- \
                              (self.cellWidth/2),self.cellWidth, self.cellWidth])
         #render agent
         if self.agent_state is not None:
-            pygame.draw.rect(self.gameDisplay, self.black,[self.agent_state['position'][1]-(self.agent_width/2), self.agent_state['position'][0]- \
-                            (self.agent_width/2), self.agent_width, self.agent_width])
-
-            if self.show_orientation:
-                mag = 10 + 10 * self.agent_state['speed']
-
-                if self.agent_state['orientation'] is not None: 
-                        pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
-                                         [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
-                                         2)
+            self.draw_agent()
         if self.ghost_state is not None:
 
             pygame.draw.rect(self.gameDisplay, self.ghost_color, [self.ghost_state['position'][1]-(self.agent_width/2), self.ghost_state['position'][0]- \
@@ -713,7 +748,6 @@ class GridWorldDrone(GridWorld):
             return self.state
 
 
-        #pygame.image.save(self.gameDisplay,'traced_trajectories')
 
     def reset_and_replace(self, ped=None):
         '''
@@ -1087,7 +1121,6 @@ if __name__=="__main__":
     orient_div = len(world.orientation_array)
     speed_quant = world.speed_quantization
     speed_div = len(world.speed_array)
-    pdb.set_trace()
     agent = SocialForcesController(speed_div, orient_div, orient_quant)
 
 
