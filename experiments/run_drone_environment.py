@@ -11,6 +11,7 @@ import os
 import glob
 import copy
 import math
+import pathlib
 from logger.logger import Logger
 import matplotlib
 import matplotlib.pyplot as plt
@@ -46,7 +47,10 @@ parser.add_argument('--on-server', action='store_true')
 #**************************************************************************#
 #arguments related to the environment
 
-parser.add_argument('--annotation-file', type=str, default=None, help='The location of the annotation file to \
+parser.add_argument('--annotation-file', type=str, 
+                    default='../envs/expert_datasets/\
+university_students/annotation/processed/frame_skip_1/\
+students003_processed_corrected.txt', help='The location of the annotation file to \
                     be used to run the environment.')
 
 parser.add_argument('--reward-path' , type=str, nargs='?', default= None)
@@ -722,24 +726,26 @@ def agent_drift_analysis_by_density(agent=agent,
     return drift_info_detailed
 '''
 
-def play_environment(ped_list):
+def play_environment(ped_list, path=None, max_traj_length=1000):
 
     agent_type = args.agent_type
     for i in tqdm(range(len(ped_list))):
 
         #reset the world
         state = env.reset_and_replace(ped=ped_list[i])
-        print("Starting pedestrian :", ped_list[i])
+        #print("Starting pedestrian :", ped_list[i])
         final_frame = env.final_frame
         if args.feat_extractor is not None:
             feat_ext.reset()
             state_feat = feat_ext.extract_features(state)
             state_feat = torch.from_numpy(state_feat).type(torch.FloatTensor).to(DEVICE)
 
+        state_list = [state]
         done = False
         t = 0
         abs_counter = env.current_frame
-        while abs_counter < final_frame:
+        #while abs_counter < final_frame:
+        while t < max_traj_length:
             if args.feat_extractor is not None:
 
                 if agent_type == 'Policy_network':
@@ -756,12 +762,19 @@ def play_environment(ped_list):
             else:
                 action = agent.eval_action(state)
             state, reward_true, done, _ = env.step(action)
+            state_list.append(state)
             if args.feat_extractor is not None:
                 state_feat = feat_ext.extract_features(state)
                 state_feat = torch.from_numpy(state_feat).type(torch.FloatTensor).to(DEVICE)
-            
+            if done:
+                if path is not None:
+                    pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+                    #print('Storing for ', ped_list[i])
+                    np.save(os.path.join(path, 'traj%s.states' % str(ped_list[i])), state_list)
+                break
             #info_collector.collect_information_per_frame(state)
             abs_counter += 1
+            t += 1
 
 
 def drift_analysis(agent_list, agent_type_list, 
@@ -821,16 +834,17 @@ if __name__ == '__main__':
     #agent_type_list = ['Potential_field']
     agent_type_list = []
     #agent initialized from the commandline
-    agent_file_list = ['/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-hit-full-run-suppressed-local-updated-features2019-12-14_16:38:00-policy_net-256--reward_net-256--reg-0.001-seed-9-lr-0.0005/saved-models/28.pt']
-    agent_file_list.append('/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/RL Runs/Possible_strawman2019-12-16 12:22:05DroneFeatureRisk_speedv2-seed-789-policy_net-256--reward_net-128--total-ep-8000-max-ep-len-500/policy-models/0.pt')
+    #agent_file_list = ['/home/abhisek/Study/Robotics/deepirl/experiments/results/Beluga/IRL Runs/Variable-speed-hit-full-run-suppressed-local-updated-features2019-12-14_16:38:00-policy_net-256--reward_net-256--reg-0.001-seed-9-lr-0.0005/saved-models/28.pt']
+    #agent_file_list.append('/home/abhisek/Study/Robotics/deepirl/experiments/results/Quadra/RL Runs/Possible_strawman2019-12-16 12:22:05DroneFeatureRisk_speedv2-seed-789-policy_net-256--reward_net-128--total-ep-8000-max-ep-len-500/policy-models/0.pt')
     
+    '''
     for agent_file in agent_file_list:
         
         agent_temp = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
         agent_temp.load(agent_file)
         agent_list.append(agent_temp)
         agent_type_list.append('Policy_network')
-    
+    '''
     start_interval = 50
     reset_int = 30
     reset_lim = 170
@@ -844,6 +858,11 @@ if __name__ == '__main__':
     ped_list = ped_list.astype(int)
 
     ped_list = np.sort(ped_list)
+
+    play_environment(ped_list, path='./PFController', 
+                    max_traj_length=args.max_ep_length)
+    
+    sys.exit()
     #ped_list = np.concatenate((easy, med, hard), axis=0)
     ped_list_name = 'all'
     drift_lists = drift_analysis(agent_list, agent_type_list, ped_list=ped_list, start_interval=start_interval, reset_interval=reset_int, max_interval=reset_lim)
