@@ -162,6 +162,80 @@ def collect_trajectories_and_metrics(
     return metric_results
 
 
+def collect_trajectories_and_metrics_non_NN(
+                                            env,
+                                            agent,
+                                            num_trajectories,
+                                            max_episode_length,
+                                            metric_applicator,
+                                            feature_extractor=None,
+                                            ):
+    """
+    Helper function that collects trajectories and applies metrics from a
+    metric applicator on a per trajectory basis.
+
+    :param env: environment to collect trajectories from.
+    :type env: any gym-like environment.
+
+
+    :param policy: Agent to extract actions from.
+    :type Agent: A non Neural netrowk based controller.
+
+    :param num_trajectories: Number of trajectories to sample.
+    :type num_trajectories: int.
+
+    :param max_episode_length: Maximum length of individual trajectories.
+    :type max_episode_length: int.
+
+    :param metric_applicator: a metric applicator class containing all
+    metrics that need to be applied.
+    :type metric_applicator: Instance, child, or similar to
+    metric_utils.MetricApplicator.
+
+    :param feature_extractor: a feature extractor to translate state
+    dictionary to a feature vector.
+    :type feature_extractor: feature extractor class.
+    
+    
+    :return: dictionary mapping trajectory to metric results from that
+    trajectory.
+    :rtype: dictionary
+    """
+
+    metric_results = {}
+
+    for traj_idx in range(num_trajectories):
+
+
+        state = env.reset()
+        current_pedestrian = env.cur_ped
+        print("Collecting trajectory {}".format(current_pedestrian))
+        done = False
+        t = 0
+        traj = [copy.deepcopy(state)]
+
+        while not done and t < max_episode_length:
+            
+            if feature_extractor is not None:
+                feat = feature_extractor.extract_features(state)
+                feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
+            else:
+                feat = state
+            action = agent.eval_action(feat)
+            state, _, done, _ = env.step(action)
+            traj.append(copy.deepcopy(state))
+
+            t += 1
+
+        # metrics
+        traj_metric_result = metric_applicator.apply([traj])
+        metric_results[current_pedestrian] = traj_metric_result
+
+    return metric_results
+
+
+
+
 def collect_trajectories(
     env,
     feature_extractor,
@@ -260,14 +334,17 @@ def read_files_from_directories(parent_directory, folder_dict=None):
         file_list = []
         if len(files) > 0:
             file_list = files
-            folder_dict = file_list
+            file_list_fullpath = []
+            for file_name in file_list:
+                file_list_fullpath.append(os.path.join(parent_directory, file_name))
+            folder_dict = file_list_fullpath
         for dirname in dirs:
             path = os.path.join(parent_directory, dirname)
             print('Reading directory :', path)
             
             folder_dict[dirname] = {}
             dir_dict = read_files_from_directories(path, folder_dict[dirname])
-            folder_dict[dir] = dir_dict
+            folder_dict[dirname] = dir_dict
         break
         
     return folder_dict
