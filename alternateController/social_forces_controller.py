@@ -70,7 +70,6 @@ class SocialForcesController():
         rot_matrix_list = [get_rot_matrix(deg_to_rad(deg)) for deg in deg_array]
         self.orientation_array = [np.matmul(rot_matrix, unit_v) for rot_matrix in rot_matrix_list]
         #self.orientation_array = deg_array
-        pdb.set_trace()
 
     def calculate_attractive_force(self, agent_state, goal_state):
         '''
@@ -97,13 +96,23 @@ class SocialForcesController():
         '''
         agent_pos = agent_state['position']
         obs_pos = obstacle['position']
-        diff_pos = agent_pos - obs_pos
-        obs_step = obstacle['speed']*obstacle['orientation']
+
+        rel_position = obs_pos - agent_pos
+        rel_distance = np.linalg.norm(rel_position)
         
-        r_ij = 10 #sum of agent and obstacle radius
-        d_ij = np.linalg.norm(diff_pos)
-        
-        return 
+        agent_velocity = agent_state['speed']*agent_state['orientation']
+        # angle_between produces only positive angles
+        angle = angle_between(rel_position, agent_velocity)
+        agent_radius = 5
+        normalized_rel_positions = rel_position / rel_distance
+        exp_multiplier = np.exp(2 * agent_radius - rel_distance)
+        anisotropic_term = (2.0 - 0.5 * (1.0 + np.cos(angle)))
+        social_forces = (
+        exp_multiplier * normalized_rel_positions * anisotropic_term
+        )
+
+
+        return social_forces
 
 
     def calculate_repulsive_forces(self, agent_state, obstacle_list):
