@@ -146,8 +146,6 @@ def collect_trajectories_and_metrics(
 
         while not done and t < max_episode_length:
 
-            print("playing timestep {}".format(t), end="\r")
-
             feat = feature_extractor.extract_features(state)
             feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
 
@@ -164,6 +162,63 @@ def collect_trajectories_and_metrics(
     return metric_results
 
 
+def collect_trajectories(
+    env,
+    feature_extractor,
+    policy,
+    num_trajectories,
+    max_episode_length,
+):
+    """
+    Helper function that collects trajectories and applies metrics from a
+    metric applicator on a per trajectory basis.
+
+    :param env: environment to collect trajectories from.
+    :type env: any gym-like environment.
+
+    :param feature_extractor: a feature extractor to translate state
+    dictionary to a feature vector.
+    :type feature_extractor: feature extractor class.
+
+    :param policy: Policy to extract actions from.
+    :type policy: standard policy child of BasePolicy.
+
+    :param num_trajectories: Number of trajectories to sample.
+    :type num_trajectories: int.
+
+    :param max_episode_length: Maximum length of individual trajectories.
+    :type max_episode_length: int.
+
+    :return: dictionary mapping trajectory to metric results from that
+    trajectory.
+    :rtype: dictionary
+    """
+
+    all_trajectories = []
+
+    for traj_idx in range(num_trajectories):
+
+        print("Collecting trajectory {}".format(traj_idx), end="\r")
+
+        state = env.reset()
+        done = False
+        t = 0
+        traj = [copy.deepcopy(state)]
+
+        while not done and t < max_episode_length:
+
+            feat = feature_extractor.extract_features(state)
+            feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
+
+            action = policy.eval_action(feat)
+            state, _, done, _ = env.step(action)
+            traj.append(copy.deepcopy(state))
+
+            t += 1
+
+        all_trajectories.append(traj)
+
+    return all_trajectories
 
 def read_files_from_directories(parent_directory, folder_dict=None):
     
