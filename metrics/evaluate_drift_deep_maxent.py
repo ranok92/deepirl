@@ -69,7 +69,7 @@ parser.add_argument('--agent-type', type=str, nargs="*", default=['Potential_fie
 #arguments for a network based agent
 
 parser.add_argument('--policy-path', type=str, nargs="*", default=None)
-parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[128])
+parser.add_argument('--policy-net-hidden-dims', nargs="*", type=int, default=[256])
 
 
 #*************************************************************************#
@@ -343,6 +343,7 @@ def run_analysis(args):
     agent_list = []
     agent_type_list = []
 
+    policy_network_counter = 0
     for i in range(len(args.agent_type)):
 
         if args.agent_type[i] == 'Policy_network':
@@ -350,7 +351,8 @@ def run_analysis(args):
             agent = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
 
             if args.policy_path:
-                agent.load(args.policy_path[i])
+                agent.load(args.policy_path[policy_network_counter])
+                policy_network_counter += 1
             else:
                 print('Provide a policy path')
 
