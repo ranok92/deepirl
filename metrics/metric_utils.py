@@ -210,9 +210,8 @@ def read_files_from_directories(parent_directory, folder_dict=None):
             path = os.path.join(parent_directory, dirname)
             print('Reading directory :', path)
             
-            folder_dict[dir] = {}
-            file_list_from_sub_dir, dir_dict = read_files_from_directories(path, folder_dict[dirname])
-            file_list.append(file_list_from_sub_dir)
+            folder_dict[dirname] = {}
+            dir_dict = read_files_from_directories(path, folder_dict[dirname])
             folder_dict[dir] = dir_dict
         break
         

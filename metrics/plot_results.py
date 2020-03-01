@@ -6,10 +6,12 @@ import numpy as np
 sys.path.insert(0,"..")
 from matplotlib import pyplot as plt 
 
+
+from metric_utils import read_files_from_directories
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--dict-files', nargs="*", type=str, help="List of filenames \
-                    of the dictionaries to be read.")
+parser.add_argument('--parent-directory', type=str, help="Name of the \
+    parent directory containing the metric dictionaries.")
 
 parser.add_argument('--agent-names', nargs="*", help='List of agent names.')
 
@@ -280,6 +282,9 @@ if __name__=='__main__':
 
     args = parser.parse_args()
 
+
+    metric_info_dict = read_files_from_directories(args.parent_directory)
+    pdb.set_trace()
     '''
     dict_files = [
                  ['./results/Fahad/Fahad_seed2_highest_score_2020-02-28-15:07'], 
