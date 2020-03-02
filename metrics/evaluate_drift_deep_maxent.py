@@ -27,7 +27,12 @@ from tqdm import tqdm
 from envs.drone_data_utils import classify_pedestrians
 from envs.drone_data_utils import get_pedestrians_in_viscinity
 from featureExtractor.drone_feature_extractor import dist_2d
-
+from featureExtractor.drone_feature_extractor import (
+    VasquezF1,
+    VasquezF2,
+    VasquezF3,
+    Fahad,
+    GoalConditionedFahad,
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
@@ -337,7 +342,7 @@ def run_analysis(args):
                             step_size=step_size,
                             grid_size=grid_size,
                             thresh1=18, thresh2=30)
-                            
+
     if args.feat_extractor == "VasquezF1":
         feat_ext = VasquezF1(agent_width * 6, 0.5, 1.0)
 
