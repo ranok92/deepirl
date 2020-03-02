@@ -337,6 +337,21 @@ def run_analysis(args):
                             step_size=step_size,
                             grid_size=grid_size,
                             thresh1=18, thresh2=30)
+                            
+    if args.feat_extractor == "VasquezF1":
+        feat_ext = VasquezF1(agent_width * 6, 0.5, 1.0)
+
+    if args.feat_extractor == "VasquezF2":
+        feat_ext = VasquezF1(agent_width * 6, 0.5, 1.0)
+
+    if args.feat_extractor == "VasquezF3":
+        feat_ext = VasquezF3(agent_width)
+
+    if args.feat_extractor == "Fahad":
+        feat_ext = Fahad(36, 60, 0.5, 1.0)
+
+    if args.feat_extractor == "GoalConditionedFahad":
+        feat_ext = GoalConditionedFahad(36, 60, 0.5, 1.0)
 
     #*************************************************
     #initialize the agent
