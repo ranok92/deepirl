@@ -33,6 +33,9 @@ from featureExtractor.drone_feature_extractor import (
     VasquezF3,
     Fahad,
     GoalConditionedFahad,
+)
+
+from metric_utils import read_files_from_directories
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
@@ -93,6 +96,8 @@ parser.add_argument('--end-interval', type=int, default=60, help='The final numb
 parser.add_argument('--increment-interval', type=int, default=30, help='The number of \
                     frames by which the interval should increase.')
 
+
+parser.add_argument('--parent-folder', type=str, default=None)
 
 
 #************************************************************************#
@@ -257,7 +262,7 @@ def drift_analysis(agent_list,
     return drift_lists
     
 
-def plot_drift_results(drift_lists):
+def plot_drift_results(parent_folder, ped_list=None):
     """
     Plots the dirft results.
         input: 
@@ -271,6 +276,20 @@ def plot_drift_results(drift_lists):
         output : plot of the result.
 
     """
+    file_list = read_files_from_directories(parent_folder)
+
+    print('reading from file :', file_list[0])
+    master_drift_array = np.load(file_list[0])
+
+    for i in range(1, len(file_list)):
+        print('reading from file :', file_list[i])
+        master_drift_array = np.concatenate((master_drift_array, np.load(file_list[i])), axis=0)
+
+        
+    if ped_list is not None:
+        master_drift_array = master_drift_array[:, :, ped_list]
+
+    pdb.set_trace()
     start_interval = args.start_interval
     reset_int = args.increment_interval
     reset_lim = args.end_interval
@@ -280,11 +299,11 @@ def plot_drift_results(drift_lists):
     #get the mean and std deviation of pedestrians from drift_lists
 
     _, ax = plt.subplots()
-    for i in range(len(drift_lists)):
-        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in drift_lists[i]]
-        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in drift_lists[i]]
+    for i in range(master_drift_array.shape[0]):
+        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in master_drift_array[i]]
+        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in master_drift_array[i]]
         
-        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i]+str(i),
+        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i],
                     capsize=5, capthick=3, alpha=0.5)
     ax.set_xticks(x_axis)
     ax.set_xticklabels(start_interval+x_axis*reset_int)
@@ -457,11 +476,13 @@ def run_analysis(args):
 
 if __name__ == '__main__':
 
+    
     args = parser.parse_args()
+    '''
     #****************************************************
     run_analysis(args)
     #****************************************************
-    '''
+    
     data = np.genfromtxt('./Pedestrian_info/all150.csv', delimiter=' ')
     pdb.set_trace()
     ped_list = data[:,1]
@@ -469,3 +490,12 @@ if __name__ == '__main__':
 
     play_environment(ped_list.tolist())
     '''
+    ped_list = np.zeros(1)
+    for list_name in args.ped_list:
+        ped_list = np.concatenate((ped_list, np.load(list_name)), axis=0)
+   
+    ped_list = ped_list[1:].astype(int)
+
+    ped_list = np.sort(ped_list)
+
+    plot_drift_results('./drift_results')
