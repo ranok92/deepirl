@@ -28,7 +28,8 @@ parser.add_argument('--ped-file-list', nargs="*", type=str,
                     help='List of the files containing the pedestrian ids to be \
                         used in the current metric plot.')
 
-
+parser.add_argument('--x-axis', type=str, default=None)
+parser.add_argument('--y-axis', type=str, default=None)
 
 
 def read_data(list_of_files, ped_file_list):
@@ -58,7 +59,7 @@ def read_data(list_of_files, ped_file_list):
 
 def plot_histogram(list_of_dictionary, list_of_agent_names, 
                    metric_name, fig_title, metric_info=None, 
-                   ped_list=None):
+                   ped_list=None, x_axis=None, y_axis=None):
     """
     given a list of dictionary containing run information of different agents
     will return a histogram plot featuring the agent groups and the metrics provided
@@ -130,7 +131,12 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
                  bins=bins,
                  label=list_of_agent_names[i],
                  alpha=alpha)
-    
+
+    if x_axis is not None:
+        plt.xlabel(x_axis)
+    if y_axis is not None:
+        plt.ylabel(y_axis)
+
     plt.title(fig_title)
     plt.legend()
     plt.show()
@@ -138,7 +144,7 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
 
 def barplots_with_errorbars(list_of_dictionary, list_of_agent_names, 
                             metric_name, fig_title, metric_info=None,
-                            ped_list=None):
+                            ped_list=None, x_axis=None, y_axis=None):
     """
     given a list of dictionary containing run information of different agents
     will return a histogram plot featuring the agent groups and the metrics provided
@@ -229,6 +235,11 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         
         ax.bar(x_axis, mean_list, yerr=std_list, 
             alpha=alpha, capsize=capsize, align='center')
+
+ 
+        if y_axis is not None:
+            ax.set_ylabel(y_axis)
+
         ax.set_xticks(x_axis)
         ax.set_xticklabels(list_of_agent_names)
         ax.yaxis.grid(True)
@@ -248,7 +259,7 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
 
 def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names, 
                                     metric_name, fig_title, metric_info=None,
-                                    ped_list=None):
+                                    ped_list=None, x_label=None, y_axis=None):
     """
     Generates a plot of the metric against time for the given pedestrians 
     in the pedestrian list
@@ -304,6 +315,7 @@ def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names,
 
 
     x_axis = np.arange(max_traj_len)
+    x_ticks = np.arange(max_traj_len, step=int(max_traj_len/10))
     for ped in ped_list:
         agent_counter = 0
         fig, ax = plt.subplots()
@@ -324,8 +336,12 @@ def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names,
 
             ax.plot(mean_arr, label=list_of_agent_names[agent_counter], alpha=0.8)
             ax.fill_between(x_axis, mean_arr-std_arr, mean_arr+std_arr, alpha=0.3)
-            ax.set_xticks(x_axis)
+            ax.set_xticks(x_ticks)
             ax.yaxis.grid(True)
+            if x_axis is not None:
+                ax.set_xlabel(x_label)
+            if y_axis is not None:
+                ax.set_ylabel(y_axis)
             ax.legend()
             title = fig_title
             ax.set_title(title)
@@ -349,7 +365,9 @@ if __name__=='__main__':
             file_list.append(metric_info_dict[key])
 
 
+
     master_dictionary_list, ped_list = read_data(file_list, args.ped_file_list)
+        
     #################################################
     #uncomment this function to get historgram plots.
     """
@@ -358,10 +376,13 @@ if __name__=='__main__':
                                --fig-title 'Distance displacement ratio'
                                --metric-name 'compute_distance_displacement_ratio'
 
-    """
+     
     plot_histogram(master_dictionary_list, agent_names, 
-                   args.metric_name, args.fig_title, ped_list=ped_list)
-    
+                   args.metric_name, args.fig_title, 
+                   ped_list=ped_list, x_axis=args.x_axis,
+                   y_axis=args.y_axis)
+       """
+
     #################################################
     #uncomment this to get barplots with erros
     """
@@ -371,12 +392,13 @@ if __name__=='__main__':
                                 --metric-name 'compute_trajectory_smoothness'
                                 --metric-info 'total' 'average'
     
+        """
 
     barplots_with_errorbars(master_dictionary_list, agent_names, 
                    args.metric_name, args.fig_title,
                    metric_info=args.metric_info,
-                   ped_list=ped_list) 
-    """
+                   ped_list=ped_list, x_axis=args.x_axis,
+                   y_axis=args.y_axis) 
     
     #################################################
     #uncomment this to get line plots over time frames.
@@ -388,11 +410,12 @@ if __name__=='__main__':
         
         **here the ped_list is modified below.
 
-    
-    ped_list = [11, 12, 13]
+ 
+    ped_list = [11, 13, 36, 91 ,10, 77]
     plot_information_per_time_frame(master_dictionary_list, 
                                     agent_names, 
                                     args.metric_name, args.fig_title,
                                     metric_info=args.metric_info,
-                                    ped_list=ped_list) 
-    """
+                                    ped_list=ped_list, x_label=args.x_axis,
+                                    y_axis=args.y_axis) 
+       """
