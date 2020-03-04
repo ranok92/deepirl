@@ -14,7 +14,7 @@ sys.path.insert(0, "../..")  # NOQA: E402
 import pickle
 
 from rlmethods.b_actor_critic import Policy
-
+from alternateController.potential_field_controller import PotentialFieldController as PFController
 
 import metrics
 import metric_utils
@@ -114,6 +114,9 @@ def main(args):
         GoalConditionedFahad,
         )
 
+
+    feat_ext_args = {}
+    feat_ext = None
     if args.feat_extractor == "DroneFeatureRisk_speedv2":
 
         feat_ext_args = {
@@ -186,11 +189,18 @@ def main(args):
     output["feature_extractor"] = feat_ext
 
     # initialize policy
+    '''
     sample_state = env.reset()
     state_size = feat_ext.extract_features(sample_state).shape[0]
     policy = Policy(state_size, env.action_space.n, [256])
     policy.load(args.policy_path)
     policy.to(DEVICE)
+    '''
+    orient_quant = env.orient_quantization
+    orient_div = len(env.orientation_array)
+    speed_div = len(env.speed_array)
+
+    policy = PFController(speed_div, orient_div, orient_quant)
 
     # metric parameters
     metric_applicator = metric_utils.MetricApplicator()
@@ -209,9 +219,8 @@ def main(args):
     output["metrics"] = metric_applicator.get_metrics()
     output["metric_results"] = {}
 
-    metric_results = metric_utils.collect_trajectories_and_metrics(
+    metric_results = metric_utils.collect_trajectories_and_metrics_non_NN(
         env,
-        feat_ext,
         policy,
         num_peds,
         args.max_ep_length,

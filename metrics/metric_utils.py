@@ -4,7 +4,9 @@ from collections import defaultdict
 import copy
 import torch
 import os, sys
-import pdb 
+
+sys.path.insert(0, "..")
+from featureExtractor.drone_feature_extractor import dist_2d
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -101,6 +103,7 @@ def collect_trajectories_and_metrics(
     num_trajectories,
     max_episode_length,
     metric_applicator,
+    disregard_collisions=False,
 ):
     """
     Helper function that collects trajectories and applies metrics from a
@@ -136,7 +139,6 @@ def collect_trajectories_and_metrics(
 
     for traj_idx in range(num_trajectories):
 
-
         state = env.reset()
         current_pedestrian = env.cur_ped
         print("Collecting trajectory {}".format(current_pedestrian))
@@ -151,6 +153,15 @@ def collect_trajectories_and_metrics(
 
             action = policy.eval_action(feat)
             state, _, done, _ = env.step(action)
+
+            if disregard_collisions:
+                done = env.check_overlap(
+                    env.agent_state["position"],
+                    env.goal_state,
+                    env.cellWidth,
+                    0,
+                )
+
             traj.append(copy.deepcopy(state))
 
             t += 1
@@ -163,13 +174,14 @@ def collect_trajectories_and_metrics(
 
 
 def collect_trajectories_and_metrics_non_NN(
-                                            env,
-                                            agent,
-                                            num_trajectories,
-                                            max_episode_length,
-                                            metric_applicator,
-                                            feature_extractor=None,
-                                            ):
+    env,
+    agent,
+    num_trajectories,
+    max_episode_length,
+    metric_applicator,
+    feature_extractor=None,
+    disregard_collisions=False,
+):
     """
     Helper function that collects trajectories and applies metrics from a
     metric applicator on a per trajectory basis.
@@ -206,7 +218,6 @@ def collect_trajectories_and_metrics_non_NN(
 
     for traj_idx in range(num_trajectories):
 
-
         state = env.reset()
         current_pedestrian = env.cur_ped
         print("Collecting trajectory {}".format(current_pedestrian))
@@ -215,14 +226,25 @@ def collect_trajectories_and_metrics_non_NN(
         traj = [copy.deepcopy(state)]
 
         while not done and t < max_episode_length:
-            
+
             if feature_extractor is not None:
                 feat = feature_extractor.extract_features(state)
-                feat = torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
+                feat = (
+                    torch.from_numpy(feat).type(torch.FloatTensor).to(DEVICE)
+                )
             else:
                 feat = state
             action = agent.eval_action(feat)
             state, _, done, _ = env.step(action)
+
+            if disregard_collisions:
+                done = env.check_overlap(
+                    env.agent_state["position"],
+                    env.goal_state,
+                    env.cellWidth,
+                    0,
+                )
+
             traj.append(copy.deepcopy(state))
 
             t += 1
@@ -234,14 +256,8 @@ def collect_trajectories_and_metrics_non_NN(
     return metric_results
 
 
-
-
 def collect_trajectories(
-    env,
-    feature_extractor,
-    policy,
-    num_trajectories,
-    max_episode_length,
+    env, feature_extractor, policy, num_trajectories, max_episode_length,
 ):
     """
     Helper function that collects trajectories and applies metrics from a
@@ -294,8 +310,9 @@ def collect_trajectories(
 
     return all_trajectories
 
+
 def read_files_from_directories(parent_directory, folder_dict=None):
-    
+
     """
     Reads files from a given directory and stores them in the form of a 
     2D list. Only works with 2 layers.
@@ -321,31 +338,32 @@ def read_files_from_directories(parent_directory, folder_dict=None):
        
     """
 
-
-    #check if the directory exists
+    # check if the directory exists
     if not os.path.exists(parent_directory):
         print("Directory does not exist.")
         exit()
-    
+
     if folder_dict is None:
         folder_dict = {}
-        
+
     for root, dirs, files in os.walk(parent_directory):
         file_list = []
         if len(files) > 0:
             file_list = files
             file_list_fullpath = []
             for file_name in file_list:
-                file_list_fullpath.append(os.path.join(parent_directory, file_name))
+                file_list_fullpath.append(
+                    os.path.join(parent_directory, file_name)
+                )
             folder_dict = file_list_fullpath
         for dirname in dirs:
             path = os.path.join(parent_directory, dirname)
-            print('Reading directory :', path)
-            
+            print("Reading directory :", path)
+
             folder_dict[dirname] = {}
             dir_dict = read_files_from_directories(path, folder_dict[dirname])
             folder_dict[dirname] = dir_dict
         break
-        
+
     return folder_dict
-            
+

@@ -18,6 +18,7 @@ parser.add_argument(
 )
 
 parser.add_argument("--identifier-name", type=str, required=True)
+parser.add_argument("--disregard-collisions", action="store_true")
 
 bulk_args = parser.parse_args()
 
@@ -51,6 +52,7 @@ for seed in parent_path.glob("./*"):
             policy_path=str(policy.resolve()),
             output_name=output_name,
             dont_replace_subject=True,
+            disregard_collisions=bulk_args.disregard_collisions,
         )
 
         main(args)
