@@ -56,6 +56,8 @@ parser.add_argument("--policy-path", type=str, required=True)
 
 parser.add_argument("--output-name", type=str, default="deep_maxent_eval")
 
+parser.add_argument("--disregard-collisions", action="store_true")
+
 
 def main(args):
 
@@ -222,7 +224,8 @@ def main(args):
         policy,
         num_peds,
         args.max_ep_length,
-        metric_applicator
+        metric_applicator,
+        disregard_collisions=args.disregard_collisions,
     )
 
     output["metric_results"] = metric_results
