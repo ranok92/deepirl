@@ -4,7 +4,6 @@ from collections import defaultdict
 import copy
 import torch
 import os, sys
-
 sys.path.insert(0, "..")
 from featureExtractor.drone_feature_extractor import dist_2d
 
@@ -154,6 +153,9 @@ def collect_trajectories_and_metrics(
             action = policy.eval_action(feat)
             state, _, done, _ = env.step(action)
 
+            if done:
+                env.release_control = False
+
             if disregard_collisions:
                 done = env.check_overlap(
                     env.agent_state["position"],
@@ -236,6 +238,9 @@ def collect_trajectories_and_metrics_non_NN(
                 feat = state
             action = agent.eval_action(feat)
             state, _, done, _ = env.step(action)
+
+            if done:
+                env.release_control = False
 
             if disregard_collisions:
                 done = env.check_overlap(
