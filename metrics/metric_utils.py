@@ -140,7 +140,7 @@ def collect_trajectories_and_metrics(
 
         state = env.reset()
         current_pedestrian = env.cur_ped
-        print("Collecting trajectory {}".format(current_pedestrian))
+        print("Collecting trajectory {}".format(current_pedestrian), end='\r')
         done = False
         t = 0
         traj = [copy.deepcopy(state)]
