@@ -6,6 +6,7 @@ import torch
 import os, sys
 sys.path.insert(0, "..")
 from featureExtractor.drone_feature_extractor import dist_2d
+from utils import copy_dict
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -143,7 +144,7 @@ def collect_trajectories_and_metrics(
         print("Collecting trajectory {}".format(current_pedestrian), end='\r')
         done = False
         t = 0
-        traj = [copy.deepcopy(state)]
+        traj = [copy_dict(state)]
 
         while not done and t < max_episode_length:
 
@@ -164,7 +165,7 @@ def collect_trajectories_and_metrics(
                     0,
                 )
 
-            traj.append(copy.deepcopy(state))
+            traj.append(copy_dict(state))
 
             t += 1
 
@@ -225,7 +226,7 @@ def collect_trajectories_and_metrics_non_NN(
         print("Collecting trajectory {}".format(current_pedestrian))
         done = False
         t = 0
-        traj = [copy.deepcopy(state)]
+        traj = [copy_dict(state)]
 
         while not done and t < max_episode_length:
 
@@ -250,7 +251,7 @@ def collect_trajectories_and_metrics_non_NN(
                     0,
                 )
 
-            traj.append(copy.deepcopy(state))
+            traj.append(copy_dict(state))
 
             t += 1
 
@@ -298,7 +299,7 @@ def collect_trajectories(
         state = env.reset()
         done = False
         t = 0
-        traj = [copy.deepcopy(state)]
+        traj = [copy_dict(state)]
 
         while not done and t < max_episode_length:
 
@@ -307,7 +308,7 @@ def collect_trajectories(
 
             action = policy.eval_action(feat)
             state, _, done, _ = env.step(action)
-            traj.append(copy.deepcopy(state))
+            traj.append(copy_dict(state))
 
             t += 1
 
