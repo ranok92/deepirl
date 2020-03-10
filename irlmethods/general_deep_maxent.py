@@ -3,6 +3,7 @@ Implements deep maxent IRL (Wulfmeier et. all) in a general, feature-type
 agnostic way.
 """
 import sys
+import random
 from pathlib import Path
 import torch
 import torch.nn as nn
@@ -179,17 +180,106 @@ class GeneralDeepMaxent:
     def discounted_rewards(self, rewards, gamma, account_for_terminal_state):
         discounted_sum = 0
         t = 0
+        gamma_t = 1
         for t, reward in enumerate(rewards[:-1]):
-            discounted_sum += gamma ** t * reward
+            discounted_sum += gamma_t * reward
+            gamma_t *= gamma
 
         if account_for_terminal_state:
             discounted_sum += (
                 (gamma / (1 - gamma)) * gamma ** (t + 1) * rewards[-1]
             )
         else:
-            discounted_sum += gamma ** (t + 1) * rewards[-1]
+            discounted_sum += gamma_t * rewards[-1]
 
         return discounted_sum
+
+    def pre_train_episode(
+        self, num_trajectory_samples, account_for_terminal_state, gamma,
+    ):
+        """
+        perform IRL training.
+
+        :param num_rl_episodes: Number of RL iterations for this IRL iteration.
+        :type num_rl_episodes: int.
+
+        :param max_rl_episode_length: maximum number of environment steps to
+        take when doing rollouts using learned RL agent.
+        :type max_rl_episode_length: int
+
+        :param num_trajectory_samples: Number of trajectories to sample using
+        learned RL agent.
+        :type num_trajectory_samples: int
+
+        :param max_env_steps: maximum number of environment steps to take,
+        both when training RL agent and when generating rollouts.
+        :type max_env_steps: int
+
+        :param reset_training: Whether to reset RL training every iteration
+        or not.
+        :type reset_training: Boolean.
+
+        :param account_for_terminal_state: Whether to account for a state
+        being terminal or not. If true, (gamma/1-gamma)*R will be immitated
+        by padding the trajectory with its ending state until max_env_steps
+        length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
+        s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
+        :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+
+        :param stochastic_sampling: Sample trajectories using stochastic
+        policy instead of deterministic 'best action policy'
+        :type stochastic_sampling: Boolean.
+        """
+
+        # expert loss
+        expert_loss = 0
+        for traj in self.expert_trajectories:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
+
+        # policy loss
+        trajectories = random.sample(
+            self.expert_trajectories, num_trajectory_samples
+        )
+
+        generator_loss = 0
+        for traj in trajectories:
+            policy_rewards = self.reward_net(traj)
+            generator_loss += self.discounted_rewards(
+                policy_rewards, gamma, account_for_terminal_state
+            )
+
+        generator_loss = (
+            len(self.expert_trajectories) / num_trajectory_samples
+        ) * generator_loss
+
+        # Backpropagate IRL loss
+        loss = generator_loss - expert_loss
+
+        self.reward_optim.zero_grad()
+        loss.backward()
+        self.reward_optim.step()
+
+        # logging
+        self.tbx_writer.add_scalar(
+            "IRL/generator_loss", generator_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            "IRL/expert_loss", expert_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+
+        # save policy and reward network
+        self.reward_net.save(str(self.save_path / "reward_net"))
+
+        # increment training counter
+        self.training_i += 1
 
     def train_episode(
         self,
@@ -297,6 +387,24 @@ class GeneralDeepMaxent:
 
         # increment training counter
         self.training_i += 1
+
+    def pre_train(
+        self,
+        num_pretrain_episodes,
+        num_trajectory_samples,
+        account_for_terminal_state=False,
+        gamma=0.99,
+    ):
+        """
+        Runs the train_episode() function for 'num_irl_episodes' times. Other
+        parameters are identical to the aforementioned function, with the same
+        description and requirements.
+        """
+        for _ in range(num_pretrain_episodes):
+            print("IRL pre-training episode {}".format(self.training_i), end="\r")
+            self.pre_train_episode(
+                num_trajectory_samples, account_for_terminal_state, gamma
+            )
 
     def train(
         self,

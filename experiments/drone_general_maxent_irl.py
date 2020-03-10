@@ -464,17 +464,32 @@ def main():
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
 
-    irl_method.train(
+    # irl_method.train(
+    #     args.irl_iterations,
+    #     args.rl_episodes,
+    #     args.rl_ep_length,
+    #     args.num_trajectory_samples,
+    #     args.rl_ep_length,
+    #     reset_training=args.reset_training,
+    #     account_for_terminal_state=args.account_for_terminal_state,
+    #     gamma=args.gamma,
+    #     stochastic_sampling=args.stochastic_sampling,
+    # )
+
+    irl_method.pre_train(
         args.irl_iterations,
+        args.num_trajectory_samples,
+        args.account_for_terminal_state,
+        gamma=args.gamma,
+    )
+
+    rl_method.train(
         args.rl_episodes,
         args.rl_ep_length,
-        args.num_trajectory_samples,
-        args.rl_ep_length,
-        reset_training=args.reset_training,
-        account_for_terminal_state=args.account_for_terminal_state,
-        gamma=args.gamma,
-        stochastic_sampling=args.stochastic_sampling,
+        reward_network=irl_method.reward_net,
     )
+
+    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
