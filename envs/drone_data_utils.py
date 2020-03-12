@@ -1,7 +1,7 @@
 import numpy as np 
 import torch
 import glob
-
+import math
 import sys
 sys.path.insert(0, '..')
 
@@ -15,6 +15,7 @@ from featureExtractor.drone_feature_extractor import VasquezF1, VasquezF2, Vasqu
 from featureExtractor.drone_feature_extractor import Fahad, GoalConditionedFahad
 from scipy.interpolate import splev, splprep
 
+from envs.drone_env_utils import angle_between
 
 from matplotlib import pyplot as plt
 import os
@@ -38,6 +39,7 @@ UNIVERSITY STUDENTS:
 
 
 '''
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames):
     #given the control points returns a dense array of all the in between points
@@ -179,7 +181,6 @@ def preprocess_data_from_control_points(annotation_file, frame):
     file_n = dir_name + file_name+'_processed_corrected'+'.txt'
 
     extracted_dict = read_data_from_file(annotation_file)
-    pdb.set_trace()
     dense_info_list = []
     for ped in extracted_dict.keys():
             
@@ -201,11 +202,97 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
 
+def extract_expert_speed_orientation(current_state):
+    '''
+    get the angle between the goal and the current orientation and the speed
+    '''
+    ref_vector = np.array([-1, 0])
+    agent_orientation = current_state['agent_state']['orientation']
+    goal_to_agent_vec = current_state['goal_state'] - current_state['agent_state']['position']
+    angle_btwn = (angle_between(goal_to_agent_vec, ref_vector) - \
+                  angle_between(agent_orientation, ref_vector))*180/np.pi
+    if math.isnan(angle_btwn):
+        angle_btwn = 0
+    speed = current_state['agent_state']['speed']
+
+    return np.asarray([angle_btwn, speed])
+
+
+def extract_expert_action(prev_state, current_state, 
+                          orientation_div_size,
+                          orientation_array_len,
+                          speed_div_size,
+                          speed_array_len):
+    """
+    Given the previous and the current state dictionary of the agent/expert,
+    this function calculates the action taken by the expert( in accordance with
+    the action space of the agent in the environment.)
+    input:
+        prev_state    : A state dictionary containing the information of the
+                        previous state.
+        current_state : A state dictionary containing the information of the
+                        current state.
+        orientation_array_len : Length of the orientation array of the environ-
+                        ment denoting the number of action choices available for
+                        the change in orientation.
+        speed_array_len : Length of the speed array of the environment denoting
+                          the number of action choices available for the 
+                          change in speed.
+
+    output:
+        action : a single integer corresponding to the action that best matches
+                 with the action that would have caused the agent to move
+                from state prev to state current.
+    """
+
+    ref_vector = np.array([-1, 0])
+    current_orientation = current_state['agent_state']['orientation']
+    prev_orientation = prev_state['agent_state']['orientation']
+
+    angle_btwn = (angle_between(current_orientation, ref_vector)- \
+                 angle_between(prev_orientation, ref_vector))*180/np.pi
+
+
+    angle_btwn_div = int(angle_btwn/orientation_div_size)
+
+    orient_action = min(max(angle_btwn_div, 
+                        -int(orientation_array_len/2)),
+                        int(orientation_array_len/2)) + int(orientation_array_len/2)
+    '''
+    print('Current orientation :', current_orientation)
+    print('Previous orientation :', prev_orientation)
+    print('Angle between :', angle_btwn)
+    '''
+
+    change_in_speed = current_state['agent_state']['speed'] - \
+                      prev_state['agent_state']['speed']
+
+    change_in_speed_div = int(change_in_speed/speed_div_size)
+
+    speed_action = min(max(int(change_in_speed/speed_div_size), 
+                        -int(speed_array_len/2)),
+                        int(speed_array_len/2)) + int(speed_array_len/2)
+
+    '''
+    print('Change in orientation  :{}, change in speed : {}'.format(angle_btwn,
+                                                                        change_in_speed))
+
+    print('Change in orientation division  :{}, change in speed division: {}'.format(angle_btwn_div,
+                                                                        change_in_speed_div))
+
+    print('Orientation action  :{}, speed : {}'.format(orient_action,
+                                                      speed_action))
+    '''
+
+    return (speed_action*orientation_array_len)+orient_action
+
+
 
 def extract_trajectory(annotation_file, 
                        folder_to_save, 
                        feature_extractor=None, 
                        display=False, 
+                       extract_action=False,
                        show_states=False, subject=None, 
                        trajectory_length_limit=None):
 
@@ -213,7 +300,9 @@ def extract_trajectory(annotation_file,
     if not os.path.exists(folder_to_save):
         os.makedirs(folder_to_save)
 
-    tick_speed = 30
+    lag_val = 0
+    
+    tick_speed = 60
     subject_list = extract_subjects_from_file(annotation_file)
     print(subject_list)
     disp = display
@@ -236,17 +325,25 @@ def extract_trajectory(annotation_file,
                         tick_speed=tick_speed,                  
                         rows=576, cols=720,
                         width=10)
+    default_action = int(len(world.speed_array)/2)*int(len(world.orientation_array))+int(len(world.orientation_array)/2)
+    
+    
+    default_action = torch.tensor(default_action)
 
     if subject is not None:
         subject_list = subject
     for sub in subject_list:
         print('Starting for subject :',sub)
         trajectory_info = []
+
+        if extract_action:
+            action_info = []
         step_counter_segment = 0
 
         segment_counter = 1
         world.subject = sub
-        world.reset()
+        old_state = world.reset()
+        cur_lag = 0
         print('Path lenghth :',world.final_frame - world.current_frame)
         path_len = world.final_frame - world.current_frame
         cur_subject_final_frame = world.final_frame
@@ -268,6 +365,25 @@ def extract_trajectory(annotation_file,
             if disp:
                 feature_extractor.overlay_bins(state)
 
+            if extract_action:
+                
+                if cur_lag==lag_val:
+                    '''
+                    action = extract_expert_action(old_state, state, 
+                                            world.orient_quantization,
+                                            len(world.orientation_array),
+                                            world.speed_quantization,
+                                                len(world.speed_array))
+                    '''
+                    action = extract_expert_speed_orientation(state)
+                    old_state = copy.deepcopy(state)
+                    action = torch.tensor(action)
+                    action_info.append(action)
+                    for i in range(cur_lag):
+                        action_info.append(default_action)
+                    cur_lag = 0
+                else:
+                    cur_lag += 1
             if feature_extractor is not None:
                 state = feature_extractor.extract_features(state)
                 state = torch.tensor(state)
@@ -289,12 +405,21 @@ def extract_trajectory(annotation_file,
 
                     if feature_extractor is not None:
                         state_tensors = torch.stack(trajectory_info)
-                        torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+                        torch.save(state_tensors, 
+                                os.path.join(folder_to_save, 
+                                        'traj_of_sub_{}_segment{}.states'.format(str(sub), 
+                                        str(segment_counter))))
                     else:
                         with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
                                   str(segment_counter)), 'w') as fout:
                             json.dump(trajectory_info, fout)
-                    
+                    if extract_action:
+
+                        acton_tensors = torch.stack(action_info)
+                        torch.save(action_tensors,
+                                os.path.join(folder_to_save, 
+                                        'action_of_sub_{}_segment{}.actions'.format(str(sub),
+                                        str(segment_counter))))
                     segment_counter += 1 
                     #pdb.set_trace()
                     step_counter_segment = 0 
@@ -302,13 +427,23 @@ def extract_trajectory(annotation_file,
                     print('Segment {}: Start frame : {}'.format(segment_counter, 
                                                                 world.current_frame))    
 
+        #add the last bunch of actions
 
-
+        for i in range(cur_lag):
+            action_info.append(default_action)
 
         if trajectory_length_limit is None:
             if feature_extractor is not None:
                 state_tensors = torch.stack(trajectory_info)
                 torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
+            
+            if extract_action:
+                #pdb.set_trace()
+                action_tensors = torch.stack(action_info)
+                torch.save(action_tensors,
+                        os.path.join(folder_to_save, 
+                                'action_of_sub_{}_segment{}.actions'.format(str(sub),
+                                str(segment_counter))))
             else:
                 '''
                 with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
@@ -318,6 +453,14 @@ def extract_trajectory(annotation_file,
                 '''
                 np.save('traj_of_sub_{}_segment{}.states'.format(str(sub), 
                             str(segment_counter)), trajectory_info)
+                
+                if extract_action:
+
+                    action_tensors = torch.stack(action_info)
+                    torch.save(action_tensors,
+                            os.path.join(folder_to_save, 
+                                    'action_of_sub_{}_segment{}.actions'.format(str(sub),
+                                    str(segment_counter))))
         
     #if feature_extractor.debug_mode:
     #    feature_extractor.print_info()
@@ -527,11 +670,63 @@ def classify_pedestrians(annotation_file, viscinity):
 
 
 
+def read_training_data(parent_folder):
+
+    '''
+    Function that reads data from a folder and creates a combined tensor containing
+    the x and y of a dataset for supervised learning.
+    input:
+        parent_folder : path to the parent folder.
+    
+    output:
+        output_tensor : a tensor of size m x n, where m is the 
+                        number of samples, which, in this case is the
+                        total number of states in all the trajectories 
+                        in the parent folder and 
+                            n is the sum of the size of the
+                            state vector + the size of the action vector.
+
+    '''
+    actions_list = glob.glob(os.path.join(parent_folder, '*.actions'))
+    trajectory_list = glob.glob(os.path.join(parent_folder, '*.states'))
+    
+    actions_list.sort()
+    trajectory_list.sort()
+
+    output_tensor =  None
+
+    for i in range(len(actions_list)):
+        trajectory = trajectory_list[i]
+        trajectory_actions = actions_list[i]
+
+        torch_traj = torch.load(trajectory, map_location=DEVICE)
+        traj_np = torch_traj.cpu().numpy()
+
+        torch_actions = torch.load(trajectory_actions, map_location=DEVICE)
+        torch_actions = torch_actions.type(torch.DoubleTensor).to(DEVICE)
+
+        if len(torch_actions.shape)==1:
+            torch_actions = torch_actions.unsqueeze(1)
+        action_np = torch_actions.cpu().numpy()
+        joint_info = torch.cat((torch_traj, torch_actions), 1)
+        if output_tensor is None:
+            output_tensor = joint_info
+        else:
+
+            output_tensor = torch.cat((output_tensor, joint_info), 0)
+
+    return output_tensor
+
+
+
 
 if __name__=='__main__':
 
-
-    
+    '''
+    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions'
+    output_tensor = read_training_data(parent_folder)
+    pdb.set_trace()
+    '''
     #********* section to extract trajectories **********
     
     folder_name = './expert_datasets/'
@@ -541,7 +736,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'DroneFeatureRisk_speedv2'
+    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_raw_actions'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -583,6 +778,7 @@ if __name__=='__main__':
                        folder_to_save, 
                        feature_extractor=feature_extractor, 
                        show_states=False,
+                       extract_action=True,
                        display=False, trajectory_length_limit=None)
     
     
