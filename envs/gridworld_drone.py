@@ -810,7 +810,7 @@ class GridWorldDrone(GridWorld):
         self.agent_state['speed'] = 0  #zero speed
         self.cur_heading_dir = 0
         self.agent_state['orientation'] = np.matmul(get_rot_matrix(deg_to_rad(self.cur_heading_dir)),
-                                                                            np.array([self.agent_state['speed'], 0]))
+                                                                            np.array([-1, 0]))
 
         self.release_control = False
 
