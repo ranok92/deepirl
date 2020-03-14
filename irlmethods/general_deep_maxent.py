@@ -236,7 +236,10 @@ class GeneralDeepMaxent:
 
         # expert loss
         expert_loss = 0
-        for traj in self.expert_trajectories:
+        expert_sample = random.sample(
+            self.expert_trajectories, num_trajectory_samples
+        )
+        for traj in expert_sample:
             expert_rewards = self.reward_net(traj)
 
             expert_loss += self.discounted_rewards(
@@ -401,7 +404,9 @@ class GeneralDeepMaxent:
         description and requirements.
         """
         for _ in range(num_pretrain_episodes):
-            print("IRL pre-training episode {}".format(self.training_i), end="\r")
+            print(
+                "IRL pre-training episode {}".format(self.training_i), end="\r"
+            )
             self.pre_train_episode(
                 num_trajectory_samples, account_for_terminal_state, gamma
             )
