@@ -148,11 +148,11 @@ class SupervisedPolicy:
 
         return x_train, x_test, y_train, y_test
     
-    def train(self, num_epochs):
+    def train(self, num_epochs, data_folder):
         '''
         trains a policy network
         '''
-        x_train, x_test, y_train, y_test = self.arrange_data('/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions')
+        x_train, x_test, y_train, y_test = self.arrange_data(data_folder)
         data_loader = DataLoader(torch.cat((x_train, y_train), 1),
                                 batch_size=self.mini_batch_size)
         action_counter = 0
@@ -201,5 +201,6 @@ class SupervisedPolicy:
 if __name__=='__main__':
 
     s_policy = SupervisedPolicy(80, 2, categorical=False, hidden_dims=[1024, 4096, 1024], mini_batch_size=2000, save_folder='./Supervised_learning_test')
-    s_policy.train(200)
+    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
+    s_policy.train(5000, data_folder)
 
