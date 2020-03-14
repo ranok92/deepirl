@@ -209,13 +209,23 @@ def extract_expert_speed_orientation(current_state):
     ref_vector = np.array([-1, 0])
     agent_orientation = current_state['agent_state']['orientation']
     goal_to_agent_vec = current_state['goal_state'] - current_state['agent_state']['position']
-    angle_btwn = (angle_between(goal_to_agent_vec, ref_vector) - \
-                  angle_between(agent_orientation, ref_vector))*180/np.pi
-    if math.isnan(angle_btwn):
-        angle_btwn = 0
+    
+    signed_angle_between = (np.arctan2(agent_orientation[0],
+                                      agent_orientation[1]) -
+                            np.arctan2(goal_to_agent_vec[0],
+                                    goal_to_agent_vec[1]))*180/np.pi 
+
+    if signed_angle_between > 180:
+        signed_angle_between = signed_angle_between - 360
+    elif signed_angle_between < -180:
+        signed_angle_between = 360 + signed_angle_between
+
+    if math.isnan(signed_angle_between):
+        signed_angle_between = 0
+
     speed = current_state['agent_state']['speed']
 
-    return np.asarray([angle_btwn, speed])
+    return np.asarray([signed_angle_between, speed])
 
 
 def extract_expert_action(prev_state, current_state, 
@@ -723,7 +733,7 @@ def read_training_data(parent_folder):
 if __name__=='__main__':
 
     '''
-    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions'
+    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     output_tensor = read_training_data(parent_folder)
     pdb.set_trace()
     '''
@@ -736,7 +746,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_raw_actions'
+    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_raw_actions_rectified'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
