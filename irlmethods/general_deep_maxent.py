@@ -198,26 +198,11 @@ class GeneralDeepMaxent:
         self, num_trajectory_samples, account_for_terminal_state, gamma,
     ):
         """
-        perform IRL training.
-
-        :param num_rl_episodes: Number of RL iterations for this IRL iteration.
-        :type num_rl_episodes: int.
-
-        :param max_rl_episode_length: maximum number of environment steps to
-        take when doing rollouts using learned RL agent.
-        :type max_rl_episode_length: int
+        perform IRL pre-training by using only expert samples.
 
         :param num_trajectory_samples: Number of trajectories to sample using
         learned RL agent.
         :type num_trajectory_samples: int
-
-        :param max_env_steps: maximum number of environment steps to take,
-        both when training RL agent and when generating rollouts.
-        :type max_env_steps: int
-
-        :param reset_training: Whether to reset RL training every iteration
-        or not.
-        :type reset_training: Boolean.
 
         :param account_for_terminal_state: Whether to account for a state
         being terminal or not. If true, (gamma/1-gamma)*R will be immitated
@@ -228,10 +213,6 @@ class GeneralDeepMaxent:
 
         :param gamma: The discounting factor.
         :type gamma: float.
-
-        :param stochastic_sampling: Sample trajectories using stochastic
-        policy instead of deterministic 'best action policy'
-        :type stochastic_sampling: Boolean.
         """
 
         # expert loss
@@ -429,7 +410,7 @@ class GeneralDeepMaxent:
         description and requirements.
         """
         for _ in range(num_irl_episodes):
-            print("IRL episode {}".format(self.training_i))
+            print("IRL episode {}".format(self.training_i), end='\r')
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,
@@ -440,3 +421,118 @@ class GeneralDeepMaxent:
                 gamma,
                 stochastic_sampling,
             )
+
+
+class MixingDeepMaxent(GeneralDeepMaxent):
+    def train_episode(
+        self,
+        num_rl_episodes,
+        max_rl_episode_length,
+        max_env_steps,
+        reset_training,
+        account_for_terminal_state,
+        gamma,
+        stochastic_sampling,
+        num_expert_samples=64,
+        num_policy_samples=64,
+    ):
+        """
+        perform IRL with mix-in of expert samples.
+
+        :param num_rl_episodes: Number of RL iterations for this IRL iteration.
+        :type num_rl_episodes: int.
+
+        :param max_rl_episode_length: maximum number of environment steps to
+        take when doing rollouts using learned RL agent.
+        :type max_rl_episode_length: int
+
+        :param num_trajectory_samples: Number of trajectories to sample using
+        learned RL agent.
+        :type num_trajectory_samples: int
+
+        :param max_env_steps: maximum number of environment steps to take,
+        both when training RL agent and when generating rollouts.
+        :type max_env_steps: int
+
+        :param reset_training: Whether to reset RL training every iteration
+        or not.
+        :type reset_training: Boolean.
+
+        :param account_for_terminal_state: Whether to account for a state
+        being terminal or not. If true, (gamma/1-gamma)*R will be immitated
+        by padding the trajectory with its ending state until max_env_steps
+        length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
+        s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
+        :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+
+        :param stochastic_sampling: Sample trajectories using stochastic
+        policy instead of deterministic 'best action policy'
+        :type stochastic_sampling: Boolean.
+        """
+
+        # expert loss
+        expert_loss = 0
+        expert_samples = random.sample(
+            self.expert_trajectories, num_expert_samples
+        )
+        for traj in expert_samples:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
+
+        # policy loss
+        trajectories = self.generate_trajectories(
+            num_expert_samples // 2, max_env_steps, stochastic_sampling
+        )
+        # mix in expert samples.
+        trajectories.extend(
+            random.sample(self.expert_trajectories, num_policy_samples // 2)
+        )
+
+        policy_loss = 0
+        for traj in trajectories:
+            policy_rewards = self.reward_net(traj)
+            policy_loss += self.discounted_rewards(
+                policy_rewards, gamma, account_for_terminal_state
+            )
+
+        policy_loss = (num_expert_samples / num_policy_samples) * policy_loss
+
+        # Backpropagate IRL loss
+        loss = policy_loss - expert_loss
+
+        self.reward_optim.zero_grad()
+        loss.backward()
+        self.reward_optim.step()
+
+        # train RL agent
+        if reset_training:
+            self.rl.reset_training()
+
+        self.rl.train(
+            num_rl_episodes,
+            max_rl_episode_length,
+            reward_network=self.reward_net,
+        )
+
+        # logging
+        self.tbx_writer.add_scalar(
+            "IRL/policy_loss", policy_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            "IRL/expert_loss", expert_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+
+        # save policy and reward network
+        # TODO: make a uniform dumping function for all agents.
+        self.rl.policy.save(str(self.save_path / "policy"))
+        self.reward_net.save(str(self.save_path / "reward_net"))
+
+        # increment training counter
+        self.training_i += 1

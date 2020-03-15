@@ -11,7 +11,7 @@ import glob
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from irlmethods.irlUtils import read_expert_trajectories
-from irlmethods.general_deep_maxent import GeneralDeepMaxent
+from irlmethods.general_deep_maxent import GeneralDeepMaxent, MixingDeepMaxent
 from logger.logger import Logger
 import utils
 
@@ -449,7 +449,7 @@ def main():
 
     expert_trajectories = read_expert_trajectories(args.exp_trajectory_path)
 
-    irl_method = GeneralDeepMaxent(
+    irl_method = MixingDeepMaxent(
         rl=rl_method,
         env=env,
         expert_trajectories=expert_trajectories,
@@ -464,32 +464,17 @@ def main():
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
 
-    # irl_method.train(
-    #     args.irl_iterations,
-    #     args.rl_episodes,
-    #     args.rl_ep_length,
-    #     args.num_trajectory_samples,
-    #     args.rl_ep_length,
-    #     reset_training=args.reset_training,
-    #     account_for_terminal_state=args.account_for_terminal_state,
-    #     gamma=args.gamma,
-    #     stochastic_sampling=args.stochastic_sampling,
-    # )
-
-    irl_method.pre_train(
+    irl_method.train(
         args.irl_iterations,
-        args.num_trajectory_samples,
-        args.account_for_terminal_state,
-        gamma=args.gamma,
-    )
-
-    rl_method.train(
         args.rl_episodes,
         args.rl_ep_length,
-        reward_network=irl_method.reward_net,
+        args.num_trajectory_samples,
+        args.rl_ep_length,
+        reset_training=args.reset_training,
+        account_for_terminal_state=args.account_for_terminal_state,
+        gamma=args.gamma,
+        stochastic_sampling=args.stochastic_sampling,
     )
-
-    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":

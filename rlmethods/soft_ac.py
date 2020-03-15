@@ -723,10 +723,15 @@ class QSoftActorCritic:
         :param play_interval: trainig episodes between each play session.
         """
 
-        print("Training RL . . .")
+        if num_episodes > 100:
+            for _ in tqdm(range(num_episodes)):
+                self.train_episode(max_env_steps, reward_network)
 
-        for _ in tqdm(range(num_episodes)):
-            self.train_episode(max_env_steps, reward_network)
+                if self.training_i % self.play_interval == 0:
+                    self.play(max_env_steps, reward_network=reward_network)
+        else:
+            for _ in range(num_episodes):
+                self.train_episode(max_env_steps, reward_network)
 
-            if self.training_i % self.play_interval == 0:
-                self.play(max_env_steps, reward_network=reward_network)
+                if self.training_i % self.play_interval == 0:
+                    self.play(max_env_steps, reward_network=reward_network)
