@@ -468,12 +468,13 @@ def main():
         args.irl_iterations,
         args.rl_episodes,
         args.rl_ep_length,
-        args.num_trajectory_samples,
         args.rl_ep_length,
         reset_training=args.reset_training,
         account_for_terminal_state=args.account_for_terminal_state,
         gamma=args.gamma,
         stochastic_sampling=args.stochastic_sampling,
+        num_expert_samples=32,
+        num_policy_samples=32,
     )
 
 

@@ -410,7 +410,7 @@ class GeneralDeepMaxent:
         description and requirements.
         """
         for _ in range(num_irl_episodes):
-            print("IRL episode {}".format(self.training_i), end='\r')
+            print("IRL episode {}".format(self.training_i), end="\r")
             self.train_episode(
                 num_rl_episodes,
                 max_rl_episode_length,
@@ -433,8 +433,8 @@ class MixingDeepMaxent(GeneralDeepMaxent):
         account_for_terminal_state,
         gamma,
         stochastic_sampling,
-        num_expert_samples=64,
-        num_policy_samples=64,
+        num_expert_samples,
+        num_policy_samples,
     ):
         """
         perform IRL with mix-in of expert samples.
@@ -531,8 +531,41 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        self.rl.policy.save(str(self.save_path / "policy"))
-        self.reward_net.save(str(self.save_path / "reward_net"))
+        if self.training_i % 50 == 0:
+            self.rl.policy.save(str(self.save_path / "policy"))
+            self.reward_net.save(str(self.save_path / "reward_net"))
 
         # increment training counter
         self.training_i += 1
+
+    def train(
+        self,
+        num_irl_episodes,
+        num_rl_episodes,
+        max_rl_episode_length,
+        max_env_steps,
+        reset_training=False,
+        account_for_terminal_state=False,
+        gamma=0.99,
+        stochastic_sampling=False,
+        num_expert_samples=64,
+        num_policy_samples=64,
+    ):
+        """
+        Runs the train_episode() function for 'num_irl_episodes' times. Other
+        parameters are identical to the aforementioned function, with the same
+        description and requirements.
+        """
+        for _ in range(num_irl_episodes):
+            print("IRL episode {}".format(self.training_i), end="\r")
+            self.train_episode(
+                num_rl_episodes,
+                max_rl_episode_length,
+                max_env_steps,
+                reset_training,
+                account_for_terminal_state,
+                gamma,
+                stochastic_sampling,
+                num_expert_samples,
+                num_policy_samples,
+            )
