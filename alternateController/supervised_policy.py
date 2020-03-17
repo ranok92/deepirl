@@ -295,8 +295,12 @@ class SupervisedPolicy:
         self.input_dims = input_dims
         self.hidden_dims = hidden_dims
         self.output_layer = output_dims
-        self.policy = SupervisedNetworkRegression(input_dims, output_dims, hidden_dims=self.hidden_dims)
-        
+
+        if not categorical:
+            self.policy = SupervisedNetworkRegression(input_dims, output_dims, hidden_dims=self.hidden_dims)
+        else:
+            self.policy = SupervisedNetwork(input_dims, output_dims, hidden_dims=self.hidden_dims)
+
         if policy_path is not None:
             self.policy.load(policy_path)
         
@@ -374,7 +378,7 @@ class SupervisedPolicy:
                     y_mini_batch = sample[:, -label_size:].type(torch.float)
 
                 y_pred= self.policy(x_mini_batch.type(torch.float))
-                
+                #pdb.set_trace() 
                 loss = self.loss(y_pred, y_mini_batch.squeeze())
                 batch_loss += loss
                 counter += 1
@@ -385,8 +389,6 @@ class SupervisedPolicy:
             print(batch_loss)
             if self.save_folder:
                 self.tensorboard_writer.add_scalar('Log_info/loss', batch_loss, i)
-                self.tensorboard_writer.add_scalar('Log_info/speed_loss', batch_loss_speed, i)
-                self.tensorboard_writer.add_scalar('Log_info/orient_loss', batch_loss_orient, i)
         
         if self.save_folder:
             self.tensorboard_writer.close()
@@ -425,7 +427,7 @@ class SupervisedPolicy:
                 #
                 loss_orient = self.loss(orient_pred, y_mini_batch.squeeze()[:, 0])
                 loss_speed = self.loss(speed_pred, y_mini_batch.squeeze()[:, 1])
-                pdb.set_trace()
+                #pdb.set_trace()
                 loss = loss_orient + loss_speed
 
                 batch_loss_speed += loss_speed
@@ -531,9 +533,9 @@ class SupervisedPolicy:
 
 if __name__=='__main__':
 
-    s_policy = SupervisedPolicy(80, 2, categorical=False, hidden_dims=[1024, 4096, 1024], mini_batch_size=2000, save_folder='./Supervised_learning_test')
-    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
-    s_policy.train_regression(20, data_folder)
+    s_policy = SupervisedPolicy(80, 35, categorical=True, hidden_dims=[1024, 4096, 1024], mini_batch_size=2000, save_folder='./Supervised_learning_test_categorical')
+    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
+    s_policy.train(5000, data_folder)
     #s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
 
 
