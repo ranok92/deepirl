@@ -155,6 +155,10 @@ def copy_dict(in_dict):
     :return: (deep) copy of input dictionary.
     :rtype: dict.
     """
+
+    if in_dict is None:
+        return None
+
     out_dict = {}
 
     for key, val in in_dict.items():
