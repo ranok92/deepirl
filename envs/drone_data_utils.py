@@ -13,9 +13,12 @@ from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeat
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 from featureExtractor.drone_feature_extractor import VasquezF1, VasquezF2, VasquezF3
 from featureExtractor.drone_feature_extractor import Fahad, GoalConditionedFahad
+from featureExtractor.drone_feature_extractor import total_angle_between
+
 from scipy.interpolate import splev, splprep
 
 from envs.drone_env_utils import angle_between
+
 
 from matplotlib import pyplot as plt
 import os
@@ -228,7 +231,7 @@ def extract_expert_speed_orientation(current_state):
     return np.asarray([signed_angle_between, speed])
 
 
-def extract_expert_action(prev_state, current_state, 
+def extract_expert_action(next_state, current_state, 
                           orientation_div_size,
                           orientation_array_len,
                           speed_div_size,
@@ -238,8 +241,8 @@ def extract_expert_action(prev_state, current_state,
     this function calculates the action taken by the expert( in accordance with
     the action space of the agent in the environment.)
     input:
-        prev_state    : A state dictionary containing the information of the
-                        previous state.
+        next_state    : A state dictionary containing the information of the
+                        next state.
         current_state : A state dictionary containing the information of the
                         current state.
         orientation_array_len : Length of the orientation array of the environ-
@@ -257,25 +260,30 @@ def extract_expert_action(prev_state, current_state,
 
     ref_vector = np.array([-1, 0])
     current_orientation = current_state['agent_state']['orientation']
-    prev_orientation = prev_state['agent_state']['orientation']
+    next_orientation = next_state['agent_state']['orientation']
 
-    angle_btwn = (angle_between(current_orientation, ref_vector)- \
-                 angle_between(prev_orientation, ref_vector))*180/np.pi
+    signed_angle_between = total_angle_between(next_orientation,
+                                                 current_orientation)*180/np.pi
+
+    if signed_angle_between > 0:
+        angle_btwn_div = int(signed_angle_between/orientation_div_size)
+    else:
+        angle_btwn_div = math.ceil(signed_angle_between/orientation_div_size)
 
 
-    angle_btwn_div = int(angle_btwn/orientation_div_size)
 
     orient_action = min(max(angle_btwn_div, 
                         -int(orientation_array_len/2)),
                         int(orientation_array_len/2)) + int(orientation_array_len/2)
     '''
     print('Current orientation :', current_orientation)
-    print('Previous orientation :', prev_orientation)
-    print('Angle between :', angle_btwn)
+    print('Next orientation :', next_orientation)
+    print('Angle between :', signed_angle_between)
     '''
-
-    change_in_speed = current_state['agent_state']['speed'] - \
-                      prev_state['agent_state']['speed']
+    #pdb.set_trace()
+    
+    change_in_speed = next_state['agent_state']['speed'] - \
+                      current_state['agent_state']['speed']
 
     change_in_speed_div = int(change_in_speed/speed_div_size)
 
@@ -310,7 +318,7 @@ def extract_trajectory(annotation_file,
     if not os.path.exists(folder_to_save):
         os.makedirs(folder_to_save)
 
-    lag_val = 0
+    lag_val = 8
     
     tick_speed = 60
     subject_list = extract_subjects_from_file(annotation_file)
@@ -335,6 +343,8 @@ def extract_trajectory(annotation_file,
                         tick_speed=tick_speed,                  
                         rows=576, cols=720,
                         width=10)
+
+
     default_action = int(len(world.speed_array)/2)*int(len(world.orientation_array))+int(len(world.orientation_array)/2)
     
     
@@ -343,7 +353,7 @@ def extract_trajectory(annotation_file,
     if subject is not None:
         subject_list = subject
     for sub in subject_list:
-        print('Starting for subject :',sub)
+        print('Starting for subject :', sub)
         trajectory_info = []
 
         if extract_action:
@@ -378,20 +388,23 @@ def extract_trajectory(annotation_file,
             if extract_action:
                 
                 if cur_lag==lag_val:
-                    '''
-                    action = extract_expert_action(old_state, state, 
+                    
+                    action = extract_expert_action(state, old_state, 
                                             world.orient_quantization,
                                             len(world.orientation_array),
                                             world.speed_quantization,
                                                 len(world.speed_array))
                     '''
                     action = extract_expert_speed_orientation(state)
+                    '''
                     old_state = copy.deepcopy(state)
                     action = torch.tensor(action)
                     action_info.append(action)
                     for i in range(cur_lag):
                         action_info.append(default_action)
                     cur_lag = 0
+                    #pdb.set_trace()
+
                 else:
                     cur_lag += 1
             if feature_extractor is not None:
@@ -732,13 +745,13 @@ def read_training_data(parent_folder):
 
 if __name__=='__main__':
 
-    '''
-    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
+    
+    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
     output_tensor = read_training_data(parent_folder)
     pdb.set_trace()
-    '''
-    #********* section to extract trajectories **********
     
+    #********* section to extract trajectories **********
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -746,7 +759,7 @@ if __name__=='__main__':
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_raw_actions_rectified'
+    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_actions_lag8'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -791,7 +804,7 @@ if __name__=='__main__':
                        extract_action=True,
                        display=False, trajectory_length_limit=None)
     
-    
+    '''
     #****************************************************
     #******** section to record trajectories
     '''
