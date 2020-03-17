@@ -1,6 +1,4 @@
 import torch
-
-
 import torch.nn as nn
 import numpy as np 
 from torch.nn import MSELoss
@@ -13,7 +11,10 @@ sys.path.insert(0, '..')
 from neural_nets.base_network import BasePolicy 
 from envs.drone_data_utils import read_training_data
 
-from sklearn.model_selection import train_test_split 
+from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import RandomOverSampler
+from collections import Counter
+
 from envs.drone_env_utils import angle_between
 
 from tensorboardX import SummaryWriter
@@ -47,26 +48,26 @@ class SupervisedNetworkRegression(BasePolicy):
         self.hidden = []
         self.input_layer = nn.Sequential(
                     nn.Linear(input_size, hidden_dims[0]),
-                    nn.ReLU()
+                    nn.ELU()
                     )
         for i in range(1, len(hidden_dims)):
 
             self.hidden.append(nn.Sequential(
                                nn.Linear(hidden_dims[i-1], hidden_dims[i]),
-                               nn.ReLU()
+                               nn.ELU()
                                 ))
                     
         self.hidden_layer = nn.ModuleList(self.hidden)
         
         self.orientation_layer = nn.Sequential(
                                             nn.Linear(hidden_dims[-1], hidden_dims[-1]),
-                                            nn.ReLU(),
+                                            nn.ELU(),
                                             nn.Linear(hidden_dims[-1], 1)
                                             )
                                               
         self.speed_layer = nn.Sequential(
                                         nn.Linear(hidden_dims[-1], hidden_dims[-1]),
-                                        nn.ReLU(),
+                                        nn.ELU(),
                                         nn.Linear(hidden_dims[-1], 1)
                                         )
 
@@ -331,12 +332,25 @@ class SupervisedPolicy:
         loads the data
         '''
         training_data_tensor = read_training_data(parent_folder)
+        
         if self.categorical:
             y_label_size = 1
         else:
             y_label_size = self.output_layer
         x_data = training_data_tensor[:, 0:-y_label_size]
         y_data = training_data_tensor[:, -y_label_size:]
+        x_data = x_data.cpu().numpy()
+        y_data = y_data.cpu().numpy().squeeze()
+        pdb.set_trace()
+        #remove imbalances from the data in case of categorical data
+        if self.categorical:
+            print("The class distribution before upsampling :", Counter(y_data))
+
+            ros = RandomOverSampler(random_state=100)
+            x_data, y_data = ros.fit_resample(x_data, y_data)
+
+            print('The class distribution after upsampling :', Counter(y_data))
+
         '''
         if self.categorical:
             y_data_onehot = torch.zeros((y_data.shape[0], self.output_layer)).to(self.device)
@@ -344,6 +358,7 @@ class SupervisedPolicy:
             y_data_onehot.scatter_(1, y_data, 1)
             y_data = y_data_onehot.type(torch.double)
         '''
+
         x_train, x_test, y_train, y_test = train_test_split(x_data,
                                                             y_data,
                                                             test_size=test_data_percent)
@@ -377,8 +392,8 @@ class SupervisedPolicy:
                 else:
                     y_mini_batch = sample[:, -label_size:].type(torch.float)
 
-                y_pred= self.policy(x_mini_batch.type(torch.float))
-                #pdb.set_trace() 
+                y_pred = self.policy(x_mini_batch.type(torch.float))
+                
                 loss = self.loss(y_pred, y_mini_batch.squeeze())
                 batch_loss += loss
                 counter += 1
@@ -393,6 +408,7 @@ class SupervisedPolicy:
         if self.save_folder:
             self.tensorboard_writer.close()
             self.policy.save(self.save_folder)
+
 
     def train_regression(self, num_epochs, data_folder):
         '''
@@ -435,6 +451,7 @@ class SupervisedPolicy:
                 batch_loss += loss
 
                 counter += 1
+                print(loss)
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -442,7 +459,11 @@ class SupervisedPolicy:
             print('Loss from speed :{} , loss from orientation :{} ,batch_loss :{}'.format(batch_loss_speed,
                                                                                            batch_loss_orient,
                                                                                            batch_loss))
-            self.tensorboard_writer.add_scalar('Log_info/loss', batch_loss, i)
+            if self.save_folder:
+                self.tensorboard_writer.add_scalar('Log_info/loss', batch_loss, i)
+                self.tensorboard_writer.add_scalar('Log_info/speed_loss', batch_loss_speed, i)
+                self.tensorboard_writer.add_scalar('Log_info/orient_loss', batch_loss_orient, i)
+        
 
         self.tensorboard_writer.close()
         
@@ -513,7 +534,7 @@ class SupervisedPolicy:
         #play the environment 
 
         for i in range(num_runs):
-
+ 
             state = env.reset()
             state_features = feat_ext.extract_features(state)
             state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(self.device)
@@ -533,9 +554,17 @@ class SupervisedPolicy:
 
 if __name__=='__main__':
 
-    s_policy = SupervisedPolicy(80, 35, categorical=True, hidden_dims=[1024, 4096, 1024], mini_batch_size=2000, save_folder='./Supervised_learning_test_categorical')
+    s_policy = SupervisedPolicy(80, 2, 
+                                categorical=True, 
+                                hidden_dims=[1024, 4096, 1024], 
+                                mini_batch_size=2000,
+                                #policy_path='./Supervised_learning_test/from_quadra_1.pt',
+                                save_folder='./test_new_model')
+
+
     data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
     s_policy.train(5000, data_folder)
+    #s_policy.train_regression(20)
     #s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
 
 
