@@ -29,33 +29,51 @@ from imblearn.over_sampling import RandomOverSampler
 
 def remove_samples(dataset, label_to_remove, no_of_samples):
     '''
-    removes samples with label: label_to_remove so that the number of
-    samples in the dataset are equal to the value provided in no_of_samples
+    Given a dataset for categorical classification, reduces a particular label as provided to the 
+    number of samples entered. 
+        input:
+            dataset - a dataset in numpy
+            label_to_remove - the value of the label to adjust
+            no_of_samples - number of samples of that label to retain.
+
+        output:
+            truncated_dataset - dataset with number of tuples adjusted as required
+            excess_data - the tuples that were removed from the original dataset
     '''
     label_counter = Counter(dataset[:, -1])
-    total_data = 0
+    total_tuples_to_retain = 0
     for val in label_counter:
         if val != label_to_remove:
-            total_data += label_counter[val]
-    total_data += no_of_samples
-    print('Total data :', total_data)
-    new_dataset_shape = np.asarray(dataset.shape)
-    new_dataset_shape[0] = total_data
-    new_dataset_array = np.zeros(new_dataset_shape)
+            total_tuples_to_retain += label_counter[val]
+    total_tuples_to_retain += no_of_samples
+    print('Total data :', total_tuples_to_retain)
+    truncated_dataset_shape = np.asarray(dataset.shape)
+    
+    truncated_dataset_shape[0] = total_tuples_to_retain
+    truncated_dataset_array = np.zeros(truncated_dataset_shape)
+
+    excess_data_shape = truncated_dataset_shape
+    excess_data_shape[0] = dataset.shape[0] - total_tuples_to_retain
+    excess_data_array = np.zeros(excess_data_shape)
+
     label_counter = 0
-    old_array_counter = 0
-    new_array_counter = 0
+    excess_data_counter = 0
+    truncated_array_counter = 0
+
     for i in range(dataset.shape[0]):
         if dataset[i, -1] == label_to_remove:
             if label_counter < no_of_samples:
-                new_dataset_array[new_array_counter, :] = dataset[i, :]
-                new_array_counter += 1
+                truncated_dataset_array[truncated_array_counter, :] = dataset[i, :]
+                truncated_array_counter += 1
                 label_counter += 1
-                
+            else:
+                excess_data_array[excess_data_counter, :] = dataset[i, :]
+                excess_data_counter += 1
         else:
-            new_dataset_array[new_array_counter, :] = dataset[i, :]
-            new_array_counter += 1
-    return new_dataset_array
+            truncated_dataset_array[truncated_array_counter, :] = dataset[i, :]
+            truncated_array_counter += 1
+
+    return truncated_dataset_array, excess_data_array
 
 
 def get_quantization_division(raw_value, quantization_value, num_of_divisions):
@@ -247,7 +265,7 @@ class SupervisedNetwork(BasePolicy):
 
 
         signed_angle_between = (np.arctan2(state_raw['agent_state']['orientation'][0],
-                                           state_raw['agent_state']['orientation'][1]) - 
+                                           state_raw['agent_state']['orientation'][1]) -
                                np.arctan2(goal_to_agent_vector[0],
                                           goal_to_agent_vector[1]))*180/np.pi 
 
@@ -316,7 +334,15 @@ peed{}'.format(env.state['agent_head_dir'], env.state['agent_state']['speed']))
 
 
 class SupervisedPolicy:
+    '''
+    Class to train supervised policies. There are two types of supervised policies, classification based 
+    and regression based. 
 
+    Training classification based policies:
+        1. set categorical = True
+        2. output dims = Number of classes
+        3. 
+    '''
     def __init__(self, input_dims, output_dims,
                  hidden_dims=[256],
                  learning_rate=0.001,
@@ -362,9 +388,52 @@ class SupervisedPolicy:
             self.save_folder = save_folder
             self.tensorboard_writer = SummaryWriter(self.save_folder)
 
+
+    def remove_imbalances_from_data(self, training_data_tensor, majority_ratio):
+        """
+        Takes in a dataset with imbalances in the labels and returns a dataset with relative balance
+        in the labels
+        input: 
+            training_data_tensor : a tensor of shape (no.of samples x size of each sample(including output))
+            majority_ratio : a float between 0-1 that denotes how much the non major labels need to be upsampled
+                             wrt to the label with the majority.
+        
+        output:
+            x_data : x values of the dataset after balancing as per specifications provided.
+            y_data : y values of the dataset after balancing as per specifications provided. 
+        """
+        majority_label = None
+        majority_counts = 0
+        training_data_numpy = training_data_tensor.cpu().numpy()
+        print('Statistics of labels in the original dataset :', Counter(training_data_numpy[:, -1]))
+        original_label_counter = Counter(training_data_numpy[:, -1])
+        for val in original_label_counter:
+            majority_label = val 
+            majority_counts = original_label_counter[val]
+            break
+        samples_to_retain = int(majority_counts*majority_ratio)
+        truncated_training_data, truncated_majority_samples = remove_samples(training_data_numpy, majority_label, samples_to_retain)
+
+        x_data = truncated_training_data[:, 0:-1]
+        y_data = truncated_training_data[:, -1:]
+        print('Statistics of labels after removing extra :', Counter(y_data.squeeze()))
+        #remove imbalances from the data in case of categorical data
+        ros = RandomOverSampler(random_state=100)
+        x_data, y_data = ros.fit_resample(x_data, y_data)
+        x_data = np.concatenate((x_data, truncated_majority_samples[:, 0:-1]), axis=0)
+        y_data = np.concatenate((y_data, truncated_majority_samples[:, -1]), axis=0)
+        print('The class distribution after upsampling :', Counter(y_data.squeeze()))
+        pdb.set_trace()
+        
+        return x_data, y_data
+
+
     def arrange_data(self, parent_folder, test_data_percent=0.2):
         '''
-        loads the data
+        loads the data and arranges it in train test format
+            for classification network it handles imbalances in the labels 
+            data
+            for regression network it scales the output values
         '''
         training_data_tensor = read_training_data(parent_folder)
         
@@ -373,26 +442,18 @@ class SupervisedPolicy:
         else:
             y_label_size = self.output_layer
 
-        training_data_numpy = training_data_tensor.cpu().numpy()
-        print('Statistics of labels in the original dataset :', Counter(training_data_numpy[:, -1]))
-
-        truncated_training_data = remove_samples(training_data_numpy, 17.0, 1000)
-        
-        x_data = truncated_training_data[:, 0:-y_label_size]
-        y_data = truncated_training_data[:, -y_label_size:]
-
-        print('Statistics of labels after removing extra :', Counter(y_data.squeeze()))
-
-
-        #remove imbalances from the data in case of categorical data
         if self.categorical:
-
-            ros = RandomOverSampler(random_state=100)
-            x_data, y_data = ros.fit_resample(x_data, y_data)
-            pdb.set_trace()
-
-            print('The class distribution after upsampling :', Counter(y_data.squeeze()))
-                        
+ 
+            majority_ratio = .2
+            x_data, y_data = self.remove_imbalances_from_data(training_data_tensor,
+                                               majority_ratio)
+            
+        
+        else:
+            scale_info = [(-180, 180), (0, 2)]
+            x_data, y_data = scale_regression_output(training_data_tensor, 
+                                                     scale_info)
+        
         x_data = torch.from_numpy(x_data).to(self.device)
         y_data = torch.from_numpy(np.expand_dims(y_data, axis=1)).to(self.device)
 
@@ -437,7 +498,8 @@ class SupervisedPolicy:
                     y_mini_batch = sample[:, -label_size:].type(torch.long)
                 else:
                     y_mini_batch = sample[:, -label_size:].type(torch.float)
-
+                
+                pdb.set_trace()
                 y_pred = self.policy(x_mini_batch.type(torch.float))
                 
                 loss = self.loss(y_pred, y_mini_batch.squeeze())
@@ -600,7 +662,8 @@ class SupervisedPolicy:
 
 if __name__=='__main__':
 
-    s_policy = SupervisedPolicy(80, 2, 
+
+    s_policy = SupervisedPolicy(80, 35, 
                                 categorical=True, 
                                 hidden_dims=[1024, 4096, 1024], 
                                 mini_batch_size=2000,
