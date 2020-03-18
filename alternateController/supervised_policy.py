@@ -23,6 +23,41 @@ import math
 
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speedv2
 
+from collections import Counter
+from imblearn.over_sampling import RandomOverSampler
+
+
+def remove_samples(dataset, label_to_remove, no_of_samples):
+    '''
+    removes samples with label: label_to_remove so that the number of
+    samples in the dataset are equal to the value provided in no_of_samples
+    '''
+    label_counter = Counter(dataset[:, -1])
+    total_data = 0
+    for val in label_counter:
+        if val != label_to_remove:
+            total_data += label_counter[val]
+    total_data += no_of_samples
+    print('Total data :', total_data)
+    new_dataset_shape = np.asarray(dataset.shape)
+    new_dataset_shape[0] = total_data
+    new_dataset_array = np.zeros(new_dataset_shape)
+    label_counter = 0
+    old_array_counter = 0
+    new_array_counter = 0
+    for i in range(dataset.shape[0]):
+        if dataset[i, -1] == label_to_remove:
+            if label_counter < no_of_samples:
+                new_dataset_array[new_array_counter, :] = dataset[i, :]
+                new_array_counter += 1
+                label_counter += 1
+                
+        else:
+            new_dataset_array[new_array_counter, :] = dataset[i, :]
+            new_array_counter += 1
+    return new_dataset_array
+
+
 def get_quantization_division(raw_value, quantization_value, num_of_divisions):
 
     print('raw value :',raw_value)
@@ -117,7 +152,7 @@ class SupervisedNetworkRegression(BasePolicy):
         
         orient_action = min(max(-env.max_orient_change, change_in_angle), 
                             env.max_orient_change)
-        change_in_speed =  output_speed - state_raw['agent_state']['speed']
+        change_in_speed = output_speed - state_raw['agent_state']['speed']
         
         speed_action = min(max(-.8, change_in_speed), .8)
 
@@ -337,19 +372,30 @@ class SupervisedPolicy:
             y_label_size = 1
         else:
             y_label_size = self.output_layer
-        x_data = training_data_tensor[:, 0:-y_label_size]
-        y_data = training_data_tensor[:, -y_label_size:]
-        x_data = x_data.cpu().numpy()
-        y_data = y_data.cpu().numpy().squeeze()
-        pdb.set_trace()
+
+        training_data_numpy = training_data_tensor.cpu().numpy()
+        print('Statistics of labels in the original dataset :', Counter(training_data_numpy[:, -1]))
+
+        truncated_training_data = remove_samples(training_data_numpy, 17.0, 1000)
+        
+        x_data = truncated_training_data[:, 0:-y_label_size]
+        y_data = truncated_training_data[:, -y_label_size:]
+
+        print('Statistics of labels after removing extra :', Counter(y_data.squeeze()))
+
+
         #remove imbalances from the data in case of categorical data
         if self.categorical:
-            print("The class distribution before upsampling :", Counter(y_data))
 
             ros = RandomOverSampler(random_state=100)
             x_data, y_data = ros.fit_resample(x_data, y_data)
+            pdb.set_trace()
 
-            print('The class distribution after upsampling :', Counter(y_data))
+            print('The class distribution after upsampling :', Counter(y_data.squeeze()))
+                        
+        x_data = torch.from_numpy(x_data).to(self.device)
+        y_data = torch.from_numpy(np.expand_dims(y_data, axis=1)).to(self.device)
+
 
         '''
         if self.categorical:
@@ -563,7 +609,7 @@ if __name__=='__main__':
 
 
     data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
-    s_policy.train(5000, data_folder)
+    s_policy.train(10, data_folder)
     #s_policy.train_regression(20)
     #s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
 
