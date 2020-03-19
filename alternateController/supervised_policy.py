@@ -423,9 +423,57 @@ class SupervisedPolicy:
         x_data = np.concatenate((x_data, truncated_majority_samples[:, 0:-1]), axis=0)
         y_data = np.concatenate((y_data, truncated_majority_samples[:, -1]), axis=0)
         print('The class distribution after upsampling :', Counter(y_data.squeeze()))
-        pdb.set_trace()
+        #pdb.set_trace()
         
-        return x_data, y_data
+        return x_data, np.expand_dims(y_data, axis=1)
+
+
+    def scale_regression_output(self, training_dataset, output_limits):
+        '''
+        Given the training data, this method scales the data of the output columns
+        to be standardized i.e. mean 0 std dev 1.
+        input:
+            training_dataset: a tensor of shape nxm, where n is the number of tuples in the 
+                             dataset and m is the shape of a single tuple including the input and 
+                             output
+            output_limits : a list of length equal to the number columns in the output which contains
+                            tuples denoting the range for values in each of the columns
+        
+        output:
+            scaled_training_dataset: a tensor of shape mxn, where the values in the output columns are 
+                                     scaled accordingly.
+                    
+        '''
+        no_of_output_columns = len(output_limits)
+    
+        output_tensor = training_dataset[:, -no_of_output_columns:]
+        input_tensor = training_dataset[:, 0:-no_of_output_columns]
+        for i in range(1, no_of_output_columns+1):
+            mean_val = output_tensor[:, -i].mean()
+            std_val = output_tensor[:, -i].std()
+            print("For column: {} \nMean :{}, Std deviation:{}".format(i, 
+                                                                       mean_val,
+                                                                       std_val))
+            min_val = output_limits[-i][0]
+            max_val = output_limits[-i][1]
+            range_val = max_val - min_val
+            output_tensor[:, -i]  = (output_tensor[:, -i] - min_val)/range_val
+
+            mean_val = output_tensor[:, -i].mean()
+            std_val = output_tensor[:, -i].std()
+            print("After normalization:\n For column: {} \nMean :{}, Std deviation:{}".format(i, 
+                                                                mean_val,
+                                                                std_val))
+
+        training_dataset[:,-no_of_output_columns:] = output_tensor
+        scaled_training_dataset = training_dataset
+        #pdb.set_trace()
+
+        return input_tensor.cpu().numpy(), output_tensor.cpu().numpy()
+
+
+
+
 
 
     def arrange_data(self, parent_folder, test_data_percent=0.2):
@@ -451,11 +499,11 @@ class SupervisedPolicy:
         
         else:
             scale_info = [(-180, 180), (0, 2)]
-            x_data, y_data = scale_regression_output(training_data_tensor, 
+            x_data, y_data = self.scale_regression_output(training_data_tensor, 
                                                      scale_info)
         
         x_data = torch.from_numpy(x_data).to(self.device)
-        y_data = torch.from_numpy(np.expand_dims(y_data, axis=1)).to(self.device)
+        y_data = torch.from_numpy(y_data).to(self.device)
 
 
         '''
@@ -499,7 +547,7 @@ class SupervisedPolicy:
                 else:
                     y_mini_batch = sample[:, -label_size:].type(torch.float)
                 
-                pdb.set_trace()
+                #pdb.set_trace()
                 y_pred = self.policy(x_mini_batch.type(torch.float))
                 
                 loss = self.loss(y_pred, y_mini_batch.squeeze())
@@ -559,7 +607,7 @@ class SupervisedPolicy:
                 batch_loss += loss
 
                 counter += 1
-                print(loss)
+                #print(loss)
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -667,14 +715,20 @@ if __name__=='__main__':
                                 categorical=True, 
                                 hidden_dims=[1024, 4096, 1024], 
                                 mini_batch_size=2000,
-                                #policy_path='./Supervised_learning_test/from_quadra_1.pt',
-                                save_folder='./test_new_model')
+                                #policy_path='./test_new_model_quadra/1.pt',
+                                save_folder='./delete_this')
 
-
-    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
+    
+    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/\
+students003/DroneFeatureRisk_speedv2_with_actions_lag8'
     s_policy.train(10, data_folder)
-    #s_policy.train_regression(20)
-    #s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
 
+    '''
+    data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/\
+students003/DroneFeatureRisk_speedv2_with_raw_actions'
+    s_policy.train_regression(20, data_folder)
+   
+    s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
+    '''
 
 
