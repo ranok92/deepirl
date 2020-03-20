@@ -1,30 +1,30 @@
-import torch
-import torch.nn as nn
-import numpy as np 
-from torch.nn import MSELoss
-from torch.utils.data import DataLoader
-import torch.optim as optim
 import sys
 import pdb
 from tqdm import tqdm
-sys.path.insert(0, '..')
-from neural_nets.base_network import BasePolicy 
-from envs.drone_data_utils import read_training_data
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn import MSELoss
+from torch.utils.data import DataLoader
+import torch.optim as optim
+
+import numpy as np 
+import math
+from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 from collections import Counter
 
+sys.path.insert(0, '..')
+from neural_nets.base_network import BasePolicy 
+from envs.drone_data_utils import read_training_data
 from envs.drone_env_utils import angle_between
-
-from tensorboardX import SummaryWriter
 from envs.gridworld_drone import GridWorldDrone
-import math
 
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speedv2
 
-from collections import Counter
-from imblearn.over_sampling import RandomOverSampler
 
 
 def remove_samples(dataset, label_to_remove, no_of_samples):
@@ -219,6 +219,8 @@ peed{}'.format(env.state['agent_head_dir'], env.state['agent_state']['speed']))
         #pdb.set_trace()
         return (speed_action*num_orient_divs)+orient_action
 
+
+
 class SupervisedNetwork(BasePolicy):
 
     def __init__(self, input_size, output_size, hidden_dims=[256]):
@@ -237,9 +239,15 @@ class SupervisedNetwork(BasePolicy):
                                 ))
                     
         self.hidden_layer = nn.ModuleList(self.hidden)
-
+        self.output_layer = nn.Sequential(
+                            nn.Linear(hidden_dims[-1], output_size),
+                            nn.LogSoftmax()
+                            )
+        '''
         self.output_layer = nn.Linear(hidden_dims[-1], output_size)
-    
+        '''
+
+
     def forward(self, x):
 
         x = self.input_layer(x)
@@ -257,78 +265,14 @@ class SupervisedNetwork(BasePolicy):
         x = self.forward(state)
         
         return x
-    
-    
-    def eval_action_continuous(self, state, state_raw, env):
-
-        goal_to_agent_vector = state_raw['goal_state'] - state_raw['agent_state']['position']
 
 
-        signed_angle_between = (np.arctan2(state_raw['agent_state']['orientation'][0],
-                                           state_raw['agent_state']['orientation'][1]) -
-                               np.arctan2(goal_to_agent_vector[0],
-                                          goal_to_agent_vector[1]))*180/np.pi 
+    def eval_action(self, state_vector):
 
-        if signed_angle_between > 180:
-            signed_angle_between = signed_angle_between - 360
-        elif signed_angle_between < -180:
-            signed_angle_between = 360 + signed_angle_between
-
-        output = self.forward(state)
+        output = self.forward(state_vector)
         #pdb.set_trace()
-        output = output.detach().cpu().numpy()
-
-        change_in_angle = output[0] - signed_angle_between
-        
-        orient_action = min(max(-env.max_orient_change, change_in_angle), 
-                            env.max_orient_change)
-        change_in_speed =  output[1] - state_raw['agent_state']['speed']
-        
-        speed_action = min(max(-.8, change_in_speed), .8)
-        return np.asarray([speed_action, int(orient_action)])
-
-
-
-
-    def eval_action(self, state, state_raw, env):
-
-        orient_div = env.orient_quantization
-        num_orient_divs = len(env.orientation_array)
-        speed_div = env.speed_quantization
-        num_speed_divs = len(env.speed_array)
-        ref_vector = np.asarray([-1, 0])
-
-        goal_to_agent_vector = state_raw['goal_state'] - state_raw['agent_state']['position']
-
-        signed_angle_between = (np.arctan2(state_raw['agent_state']['orientation'][0],
-                                           state_raw['agent_state']['orientation'][1]) - 
-                               np.arctan2(goal_to_agent_vector[0],
-                                          goal_to_agent_vector[1]))*180/np.pi 
-
-        if signed_angle_between > 180:
-            signed_angle_between = signed_angle_between - 360
-        elif signed_angle_between < -180:
-            signed_angle_between = 360 + signed_angle_between
-
-        output = self.forward(state)
-        output = output.detach().cpu().numpy()
-        change_in_angle = output[0] - signed_angle_between
-        
-
-        orient_action = get_quantization_division(change_in_angle, orient_div, num_orient_divs)
-        change_in_speed =  output[1] - state_raw['agent_state']['speed']
-        
-        print('The change needed in orientation :{}, change in speed :{}'.format(change_in_angle,
-                                                                    change_in_speed))
-        speed_action = get_quantization_division(change_in_speed, speed_div, num_speed_divs)
-        print('CUrrent heading direction :{}, current s\
-peed{}'.format(env.state['agent_head_dir'], env.state['agent_state']['speed']))
-
-        print('The output :', output)
-        print('The speed action {}, the orient action {}'.format(speed_action,
-                                                                 orient_action))
-        #pdb.set_trace()
-        return (speed_action*num_orient_divs)+orient_action
+        _, index = torch.max(output, 0)
+        return index
 
 
 
@@ -628,7 +572,7 @@ class SupervisedPolicy:
 
 
 
-    def play_policy(self,
+    def play_categorical_policy(self,
                     num_runs,
                     max_episode_length,
                     feat_extractor):
@@ -665,7 +609,7 @@ class SupervisedPolicy:
                             show_comparison=True,
                             consider_heading=True,
                             show_orientation=True,
-                            continuous_action=True,
+                            continuous_action=False,
                             # rows=200, cols=200, width=grid_size)
                             rows=576,
                             cols=720,
@@ -698,7 +642,7 @@ class SupervisedPolicy:
             t = 0
             while t < max_episode_length:
 
-                action = self.policy.eval_action_continuous(state_features, state, env)
+                action = self.policy.eval_action(state_features)
                 state, _, done, _ = env.step(action)
                 state_features = feat_ext.extract_features(state)
                 state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(self.device)
@@ -715,7 +659,7 @@ if __name__=='__main__':
                                 categorical=True, 
                                 hidden_dims=[1024, 4096, 1024], 
                                 mini_batch_size=2000,
-                                #policy_path='./test_new_model_quadra/1.pt',
+                                #policy_path='./test_balanced_data_categorical/0.pt',
                                 save_folder='./delete_this')
 
     
@@ -727,8 +671,8 @@ students003/DroneFeatureRisk_speedv2_with_actions_lag8'
     data_folder = '../envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/\
 students003/DroneFeatureRisk_speedv2_with_raw_actions'
     s_policy.train_regression(20, data_folder)
-   
-    s_policy.play_policy(100, 200, 'DroneFeatureRisk_speedv2')
+     
+    s_policy.play_categorical_policy(100, 200, 'DroneFeatureRisk_speedv2')
+  
+
     '''
-
-
