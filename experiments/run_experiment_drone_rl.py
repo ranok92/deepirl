@@ -8,7 +8,7 @@ import argparse
 import torch.multiprocessing as mp
 import os
 
-
+import git
 import gym
 import glob
 from logger.logger import Logger
@@ -118,6 +118,13 @@ parser.add_argument(
         of raw state dictionary. "
 )
 
+parser.add_argument(
+    '--entropy-coeff',
+    type=int,
+    default=0.001,
+    help='Coefficient value for the entropy term for policy update.'     
+)
+
 parser.add_argument("--play-interval", type=int, default=100)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
@@ -209,6 +216,9 @@ def main():
 
         experiment_logger = Logger(save_folder, "experiment_info.txt")
         experiment_logger.log_header("Arguments for the experiment :")
+        repo = git.Repo(search_parent_directories=True)
+        experiment_logger.log_info({'From branch : ' : repo.active_branch.name})
+        experiment_logger.log_info({'Commit number : ' : repo.head.object.hexsha})
         experiment_logger.log_info(vars(args))
 
     window_size = 9
@@ -390,6 +400,7 @@ def main():
             hidden_dims=args.policy_net_hidden_dims,
             save_folder=save_folder,
             lr=args.lr,
+            entropy_coeff=args.entropy_coeff,
             max_episodes=args.total_episodes,
         )
 
