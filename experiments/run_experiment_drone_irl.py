@@ -10,6 +10,8 @@ from envs.gridworld_drone import GridWorldDrone as GridWorld
 from logger.logger import Logger
 import utils
 import gym
+import git
+
 
 from featureExtractor.drone_feature_extractor import (
     DroneFeatureSAM1,
@@ -170,6 +172,12 @@ parser.add_argument(
     default="ActorCritic",
     help="The RL trainer to be used.",
 )
+
+parser.add_argument(
+    '--svf-smoothing',
+    action='store_true',
+    help='Set true to perform smoothing of the state visitation frequency.'
+)
 parser.add_argument("--play-interval", type=int, default=10)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
@@ -231,6 +239,9 @@ def main():
 
     experiment_logger = Logger(to_save, log_file)
     experiment_logger.log_header("Arguments for the experiment :")
+    repo = git.Repo(search_parent_directories=True)
+    experiment_logger.log_info({'From branch : ' : repo.active_branch.name})
+    experiment_logger.log_info({'Commit number : ' : repo.head.object.hexsha})
     experiment_logger.log_info(vars(args))
 
     # from rlmethods.rlutils import LossBasedTermination
@@ -508,7 +519,12 @@ def main():
 
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
-    rewardNetwork = irl_method.train()
+
+    smoothing_flag = False
+    if args.smoothing:
+        smoothing_flag = True
+    
+    irl_method.train(smoothing=smoothing_flag)
 
     if not args.dont_save:
         pass
