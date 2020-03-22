@@ -23,6 +23,7 @@ def timestamp():
 
 
 def reset_parameters(layer):
+    """Helper function to reset parameters of layer"""
     if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
         layer.reset_parameters()
 
@@ -246,3 +247,10 @@ class Checkpointer:
         checkpointer.checkpoint_counter = state["checkpoint_counter"]
 
         return checkpointer
+    def action_log_probs(self, state):
+        """Returns action and action log_probability.
+
+        :param state: State to evaluate actions in.
+        """
+
+        raise NotImplementedError

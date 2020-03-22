@@ -25,6 +25,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FLOAT = torch.finfo(torch.float32).max
 FEPS = torch.finfo(torch.float32).eps
 
+NN_HIDDEN_WIDTH = 256
+
 
 def copy_params(source, target):
     """Copies parameters from source network to target network.
@@ -202,6 +204,27 @@ class PolicyNetwork(BasePolicy):
 
         return dist
 
+    def action_log_probs(self, state):
+        """Generate an action based on state vector using current policy.
+
+        :param state: Current state vector. must be Torch 32 bit float tensor.
+        """
+        dist = self.action_distribution(state)
+        raw_action = dist.rsample()  # reparametrization trick
+
+        # enforcing action bounds
+        tanh_action = torch.tanh(raw_action)  # prevent recomputation later.
+        action = tanh_action * self.action_scale + self.action_bias
+
+        # change of variables for log prob
+        raw_log_prob = dist.log_prob(raw_action)
+        log_prob = raw_log_prob - torch.log(
+            self.action_scale * (1 - tanh_action.pow(2)) + FEPS
+        )
+        log_prob = log_prob.sum(1, keepdim=True)
+
+        return action, log_prob
+
 
 class SoftActorCritic(BaseRL):
     """Implementation of soft actor critic."""
@@ -211,7 +234,7 @@ class SoftActorCritic(BaseRL):
         env,
         replay_buffer,
         feature_extractor,
-        buffer_sample_size=10 ** 4,
+        buffer_sample_size,
         gamma=0.99,
         learning_rate=3e-4,
         tbx_writer=None,
@@ -261,12 +284,15 @@ class SoftActorCritic(BaseRL):
                 self.alpha_optim = checkpointer.models["alpha"].optimizer
 
             except KeyError:
-                import pdb;pdb.set_trace()
                 raise KeyError("Models not found in checkpointer!")
 
         else:
-            self.policy = PolicyNetwork(feature_size, env.action_space, 256)
-            self.q_net = QNetwork(feature_size, env.action_space, 256)
+            self.policy = PolicyNetwork(
+                feature_size, env.action_space, NN_HIDDEN_WIDTH
+            )
+            self.q_net = QNetwork(
+                feature_size, env.action_space, NN_HIDDEN_WIDTH
+            )
 
             # optimizers
             self.policy_optim = Adam(
@@ -296,7 +322,6 @@ class SoftActorCritic(BaseRL):
         self.training_i = self.checkpointer.checkpoint_counter
         self.play_i = 0
         self.entropy_tuning = entropy_tuning
-
 
         # tensorboardX settings
         if not tbx_writer:
@@ -341,20 +366,14 @@ class SoftActorCritic(BaseRL):
         for tag, value in log_dict.items():
             self.tbx_writer.add_scalar(tag, value, training_i)
 
-
     def reset_training(self):
         """
         Resets the optimizers used in the training
         """
-        self.policy_optim = Adam(
-                self.policy.parameters(), lr=self.lr
-            )
+        self.policy_optim = Adam(self.policy.parameters(), lr=self.lr)
         self.q_optim = Adam(self.q_net.parameters(), lr=self.lr)
 
         self.alpha_optim = Adam([self.log_alpha], lr=1e-2)
-
-
-
 
 
     def train_episode(self, max_episode_length):
@@ -474,14 +493,19 @@ class SoftActorCritic(BaseRL):
             torch_state = torch.from_numpy(state).type(torch.float32)
             torch_state = torch_state.to(DEVICE).unsqueeze(0)
 
-            action, _, _ = self.policy.sample(torch_state)
-            action = action.detach().cpu().numpy()
+            torch_action, _, _ = self.policy.sample(torch_state)
+            action = torch_action.detach().cpu().numpy()
             action = action.reshape(self.env.action_space.shape)
 
             next_state, reward, done, _ = self.env_step(action)
 
             if reward_network:
-                reward = reward_network(torch_state)
+                # reward networks can be either r(s) or r(s,a)
+                try:
+                    reward = reward_network(torch_state)
+                except TypeError:
+                    reward = reward_network(torch_state, torch_action)
+
                 reward = float(reward.cpu().detach().item())
 
             episode_length += 1
