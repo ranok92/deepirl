@@ -544,7 +544,7 @@ class DeepMaxEnt():
 
 
 
-    def train(self):
+    def train(self,smoothing=False):
         '''
         Contains the code for the main training loop of the irl method.
         Includes calling the RL and environment from within
@@ -572,7 +572,7 @@ class DeepMaxEnt():
         prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
                                               self.rl.feature_extractor,
-                                              smoothing=True,
+                                              smoothing=smoothing,
                                               gamma=1)
         print('Done reading expert-svf.')
 
@@ -622,7 +622,7 @@ class DeepMaxEnt():
                                                              scale_svf=self.scale_svf,
                                                              feature_extractor=self.rl.feature_extractor,
                                                              episode_length=self.rl_max_episode_len,
-                                                             smoothing=True,
+                                                             smoothing=smoothing,
                                                              enumerate_all=self.enumerate_all)
 
             model_performance_list.append(true_reward)
