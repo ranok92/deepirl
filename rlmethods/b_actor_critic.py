@@ -94,6 +94,7 @@ class Policy(BasePolicy):
         self.action_head = nn.Linear(hidden_dims[-1], action_dims)
         self.value_head = nn.Linear(hidden_dims[-1], 1)
         self.saved_actions = []
+        self.saved_entropy = []
         self.rewards = []
 
     def forward(self, x):
@@ -135,11 +136,14 @@ class Policy(BasePolicy):
         :param state: Current state in environment.
         """
         probs, state_value = self.__call__(state)
-        #print('The probs :', probs)
         m = Categorical(probs)
         action = m.sample()
         self.saved_actions.append(SavedAction(m.log_prob(action),
                                                      state_value))
+
+        #calculating the entropy term for the policy
+        entropy = -torch.sum(probs.mean() * torch.log(probs))
+        self.saved_entropy.append(entropy)
 
         return action.item()
 
@@ -150,13 +154,9 @@ class Policy(BasePolicy):
         when evaluating.
         '''
 
-        probs, state_value = self.__call__(state)
-        #print(probs)
-        #m = Categorical(probs)
-        #action = m.sample()
-        val, ind = torch.max(probs,0)
-        #print(ind.item())
-        #pdb.set_trace()
+        probs, _ = self.__call__(state)
+        _, ind = torch.max(probs, 0)
+
         return ind.item()
 
 
@@ -165,9 +165,12 @@ class Policy(BasePolicy):
 class ActorCritic:
     """Actor-Critic method of reinforcement learning."""
 
-    def __init__(self, env, feat_extractor= None, policy=None, termination = None, gamma=0.99, render=False,
-                 log_interval=100, max_episodes=0, max_episode_length=200, hidden_dims=[128], lr=0.001,
-                 reward_threshold_ratio=0.99 , plot_loss = False, save_folder=None):
+    def __init__(self, env, feat_extractor= None, policy=None, 
+                 termination=None, gamma=0.99, render=False,
+                 log_interval=100, max_episodes=0, max_episode_length=200, 
+                 hidden_dims=[128], lr=0.001,
+                 reward_threshold_ratio=0.99, plot_loss=False, 
+                 save_folder=None, entropy_coeff=0.001):
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
@@ -193,7 +196,7 @@ class ActorCritic:
         '''
         state_size = self.feature_extractor.extract_features(env.reset()).shape[0]
 
-        print("Actor Critic initialized with state size ",state_size)
+        print("Actor Critic initialized with state size ", state_size)
         # initialize a policy if none is passed.
         self.hidden_dims = hidden_dims
         if policy is None:
@@ -211,7 +214,7 @@ class ActorCritic:
         self.lr = lr
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         self.EPS = np.finfo(np.float32).eps.item()
-
+        self.entropy_coeff = entropy_coeff
         #for plotting loss
         self.plot_loss = plot_loss
         #stores two things, the plot for loss at the end of each RL iteration 
@@ -272,6 +275,9 @@ class ActorCritic:
 
             torch.save(states_tensor,
                        os.path.join(path, 'traj%s.states' % str(traj_i)))
+
+
+
 
     def generate_trajectory(self, num_trajs, render, store_raw=False, path=None, expert_svf=None):
 
@@ -372,11 +378,15 @@ class ActorCritic:
             
         return reward_across_trajs, frac_unknown_states_enc, subject_list
 
+
+
+
     def reset_training(self):
         """
         Resets the optimizers for the RL 
         """
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+
 
 
 
@@ -386,8 +396,11 @@ class ActorCritic:
         episode ends."""
         R = 0
         saved_actions = self.policy.saved_actions
+        saved_entropy_list = self.policy.saved_entropy
+
         policy_losses = []
         value_losses = []
+        entropy_losses = []
         rewards = []
 
         for r in self.policy.rewards[::-1]:
@@ -398,10 +411,10 @@ class ActorCritic:
         if len(rewards) > 1:
             rewards = (rewards - rewards.mean()) / (rewards.std() + self.EPS)
 
-        for (log_prob, value), r in zip(saved_actions, rewards):
-            reward = r - value.item()
-            policy_losses.append(-log_prob * reward)
-
+        for (log_prob, value), r, entropy_val in zip(saved_actions, rewards, saved_entropy_list):
+            advantage = r - value.item()
+            policy_losses.append(-log_prob * advantage)
+            entropy_losses.append(entropy_val)
             r_tensor = torch.tensor([r]).type(torch.float)
 
             if torch.cuda.is_available():
@@ -413,7 +426,8 @@ class ActorCritic:
 
         self.optimizer.zero_grad()
         loss = torch.stack(policy_losses).sum() + \
-            torch.stack(value_losses).sum()
+            torch.stack(value_losses).sum() - \
+                self.entropy_coeff * torch.stack(entropy_losses).sum()
 
         #additional lines for loss based termination
         if self.termination is not None:
@@ -433,6 +447,9 @@ class ActorCritic:
 
         del self.policy.rewards[:]
         del self.policy.saved_actions[:]
+        del self.policy.saved_entropy[:]
+
+
 
     def train(self, max_episodes=None, max_episode_length=None, reward_network=None):
         """Train actor critic method on given gym environment."""
