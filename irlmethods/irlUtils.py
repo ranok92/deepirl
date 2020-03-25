@@ -906,6 +906,65 @@ def read_expert_trajectories(folder_path):
 
     return list_of_trajectories
 
+
+def play_features(
+    env, policy, feature_extractor, max_env_steps, stochastic, render=False,
+):
+    """
+    Plays the environment using actions from supplied policy. Returns list of
+    features encountered.
+
+    :param env: gym-like environment (supporting step() and reset() functions.)
+
+    :param policy: policy generating actions given features.
+    :type policy: neural_nets.base_network.BaseRL
+
+    :param feature_extractor: feature extractor which translates state
+    dictionary to feature vector.
+    :type feature_extractor: anything supporting
+    extract_features(state_dictionary) function.
+
+    :param max_env_steps: maximum allowed environment steps in each
+    playthough (max length of rollout)
+    :type max_env_steps: int
+
+    :param render: Render the environment. Defaults to False.
+    :type render: Boolean.
+
+    :return: list of features encountered in playthrough.
+    :rtype: list of 0D numpy arrays.
+    """
+
+    done = False
+    steps_counter = 0
+    features = []
+
+    feature = feature_extractor.extract_features(env.reset())
+    torch_feature = torch.from_numpy(feature).to(torch.float).to(DEVICE)
+    features.append(torch_feature)
+
+    while not done and steps_counter < max_env_steps:
+        if stochastic:
+            action, _, _ = policy.sample_action(torch_feature)
+        else:
+            action = policy.eval_action(torch_feature)
+
+        # TODO: Fix misalignmnet in implementations of eval_action.
+        # action = action.cpu().numpy()
+
+        state, _, done, _ = env.step(action)
+
+        if render:
+            env.render()
+
+        feature = feature_extractor.extract_features(state)
+        torch_feature = torch.from_numpy(feature).to(torch.float).to(DEVICE)
+        features.append(torch_feature)
+
+        steps_counter += 1
+
+    return torch.stack(features, dim=0)
+
 if __name__ == '__main__':
 
     
