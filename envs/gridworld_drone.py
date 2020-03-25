@@ -68,7 +68,7 @@ class GridWorldDrone(GridWorld):
             step_wrapper=utils.identity_wrapper,
             reset_wrapper=utils.identity_wrapper,
             show_trail=False,
-            show_orientation=False,
+            show_orientation=True,
             annotation_file=None,
             subject=None,
             obs_width=10,
@@ -80,7 +80,7 @@ class GridWorldDrone(GridWorld):
             #by the expert Not an ideal thing to train on. Introduced as a debugging measure.
             segment_size=None,
             external_control=True,
-            consider_heading=False,
+            consider_heading=True,
             continuous_action=False
     ):
         super().__init__(seed=seed,

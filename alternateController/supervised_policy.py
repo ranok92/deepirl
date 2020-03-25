@@ -277,7 +277,7 @@ class SupervisedNetwork(BasePolicy):
 
 
 
-class SupervisedPolicy:
+class SupervisedPolicyController:
     '''
     Class to train supervised policies. There are two types of supervised policies, classification based 
     and regression based. 
@@ -655,7 +655,7 @@ class SupervisedPolicy:
 if __name__=='__main__':
 
 
-    s_policy = SupervisedPolicy(80, 35, 
+    s_policy = SupervisedPolicyController(80, 35, 
                                 categorical=True, 
                                 hidden_dims=[1024, 4096, 1024], 
                                 mini_batch_size=2000,
