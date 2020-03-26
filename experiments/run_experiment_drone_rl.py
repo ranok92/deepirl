@@ -120,7 +120,7 @@ parser.add_argument(
 
 parser.add_argument(
     '--entropy-coeff',
-    type=int,
+    type=float,
     default=0.001,
     help='Coefficient value for the entropy term for policy update.'     
 )
