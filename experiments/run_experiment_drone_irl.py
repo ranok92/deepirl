@@ -121,7 +121,9 @@ parser.add_argument(
 parser.add_argument(
     "--annotation-file",
     type=str,
-    default=None,
+    default='/home/abhisek/Study/Robotics/deepirl/envs/\
+expert_datasets/university_students/annotation/processed/\
+frame_skip_1/students003_processed_corrected.txt',
     help="The location of the annotation file to \
                     be used to run the environment.",
 )
@@ -521,7 +523,7 @@ def main():
     experiment_logger.log_info(irl_method.__dict__)
 
     smoothing_flag = False
-    if args.smoothing:
+    if args.svf_smoothing:
         smoothing_flag = True
     
     irl_method.train(smoothing=smoothing_flag)

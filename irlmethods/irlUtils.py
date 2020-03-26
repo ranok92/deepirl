@@ -352,8 +352,10 @@ def calculate_expert_svf(traj_path, max_time_steps=30,
         visitation_array = np.array([sorted_svf_dict[key] for key in sorted_svf_dict.keys()])
         state_numpy_bool = state_numpy.astype(bool)
         key_array = np.asarray([key for key in sorted_svf_dict.keys()])
-        smoothed_state_counts = smooth_svf(state_numpy, visitation_array, smooth_state_array)
-        
+        smoothed_state_counts = smooth_svf(state_numpy, visitation_array, 
+                                           smooth_state_array,
+                                            state_numpy_bool)
+
         counter = 0
         for key in sorted_svf_dict.keys():
             sorted_svf_dict[key] = smoothed_state_counts[counter]
@@ -364,8 +366,9 @@ def calculate_expert_svf(traj_path, max_time_steps=30,
         return collections.OrderedDict(sorted(svf.items()))
 
 
-@njit
-def smooth_svf(state_numpy, visitation_array, smooth_state_array):
+#@njit
+def smooth_svf(state_numpy, visitation_array, smooth_state_array, 
+               state_numpy_bool):
     '''
     takes in a svf dictionary of the format {'state_hash':freqency} and
     the feature extractor corresponding to the state and returns a 
@@ -390,14 +393,16 @@ def smooth_svf(state_numpy, visitation_array, smooth_state_array):
         #weighing = np.zeros(len(svf_dictionary.keys()))
         weighing = np.zeros(visitation_array.shape[0])
         for j in range(weighing.shape[0]):
-
+            '''
             element_mult = np.multiply(smooth_state, state_numpy[j, :])
             non_zero_indices = np.nonzero(element_mult)[0]
             non_zero_elements = element_mult.take(non_zero_indices)
             weighing[j] = np.prod(non_zero_elements)
-            #weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
-        
+            '''
+            weighing[j] = np.prod(smooth_state, where=state_numpy_bool[j, :])
+            #pdb.set_trace()
         #normalize the weights to be 1
+        #pdb.set_trace()
         total_weight = np.sum(weighing)
         weighing = weighing/total_weight
         weighted_svf = weighing * visitation_array[i]
@@ -411,9 +416,11 @@ def smooth_svf(state_numpy, visitation_array, smooth_state_array):
         print('Normalizing the weights :', weighing)
         print('Before reweighing : ', visitation_array[i])
         print('Reweighting the visitation :', weighted_svf)
-        #pdb.set_trace()
+        pdb.set_trace()
         #******************************
         '''
+
+
     return smoothed_state_counts
 
 
