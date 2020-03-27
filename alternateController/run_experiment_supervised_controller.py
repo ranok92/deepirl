@@ -47,6 +47,7 @@ parser.add_argument(
     "--feat-extractor",
     type=str,
     default=None,
+    required=True,
     help="The name of the \
                      feature extractor to be used in the experiment.",
 )
@@ -156,7 +157,6 @@ def main():
         for dim in args.reward_net_hidden_dims:
             reward_net_dims += str(dim)
             reward_net_dims += "-"
-
         save_folder = (
             "./results/"
             + args.save_folder
@@ -264,6 +264,7 @@ def main():
                                         hidden_dims=args.policy_net_hidden_dims,
                                         policy_path=args.policy_path,
                                         mini_batch_size=2000,
+                                        learning_rate=args.lr,
                                         save_folder=save_folder)
     
     base_data_path = '../envs/expert_datasets/university_students/annotation/traj_info/\
@@ -279,8 +280,8 @@ frame_skip_1/students003/'
     
     if args.play:
 
-        controller.play_categorical_policy(args.num_trajs, 
-                                          args.max_episode_length,
+        controller.play_policy(args.num_trajs, 
+                                          args.max_ep_length,
                                           args.feat_extractor)
     
 
