@@ -214,6 +214,7 @@ def main():
 
     #initialize the environment
 
+    replace_subject = False
     if args.replace_subject:
         replace_subject = True
     else:
@@ -237,6 +238,7 @@ def main():
         external_control=True,
         step_reward=0.001,
         show_comparison=True,
+        replace_subject=replace_subject,
         continuous_action=continuous_action_flag,         
         # rows=200, cols=200, width=grid_size)
         rows=576,
@@ -267,6 +269,10 @@ def main():
                                         learning_rate=args.lr,
                                         save_folder=save_folder)
     
+    if not args.dont_save and not args.play:
+        experiment_logger.log_header("Environment details :")
+        experiment_logger.log_info(controller.__dict__)
+
     base_data_path = '../envs/expert_datasets/university_students/annotation/traj_info/\
 frame_skip_1/students003/'
     folder_name = args.training_data_folder
@@ -281,9 +287,10 @@ frame_skip_1/students003/'
     if args.play:
 
         controller.play_policy(args.num_trajs, 
-                                          args.max_ep_length,
-                                          args.feat_extractor)
-    
+                                env,
+                                args.max_ep_length,
+                                feat_ext)
+
 
 
 

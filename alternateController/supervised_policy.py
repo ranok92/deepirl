@@ -46,7 +46,7 @@ def remove_samples(dataset, label_to_remove, no_of_samples):
         if val != label_to_remove:
             total_tuples_to_retain += label_counter[val]
     total_tuples_to_retain += no_of_samples
-    print('Total data :', total_tuples_to_retain)
+    #print('Total data :', total_tuples_to_retain)
     truncated_dataset_shape = np.asarray(dataset.shape)
     
     truncated_dataset_shape[0] = total_tuples_to_retain
@@ -78,18 +78,36 @@ def remove_samples(dataset, label_to_remove, no_of_samples):
 
 def get_quantization_division(raw_value, quantization_value, num_of_divisions):
 
+    '''
     print('raw value :',raw_value)
     print('quantization_value :', quantization_value)
     print('num_of_divisions :', num_of_divisions)
+    '''
     base_division = int(num_of_divisions/2)
     if raw_value > 0:
         raw_value_to_div = int(raw_value/quantization_value) + base_division
     else:
         raw_value_to_div = math.ceil(raw_value/quantization_value) + base_division
     clipped_value = min(max(0, raw_value_to_div), num_of_divisions-1)
-    print ('clipped value :', clipped_value)
+    #print ('clipped value :', clipped_value)
     return clipped_value
 
+
+def rescale_value(value, current_limits, new_limits):
+    """
+    Given a value and the limits, rescales the value to the new limits
+        input:
+            value : float variable containing the value
+            current_limits : a tuple containing the lower and upper limits 
+                             of the value
+            new_limits : a tuple containing the desired lower and upper 
+                             limits.
+    """
+    old_range = current_limits[1] - current_limits[0]
+    new_range = new_limits[1] - new_limits[0]
+
+    return (value-current_limits[0]) / old_range * new_range \
+            + new_limits[0]
 
 
 
@@ -114,13 +132,13 @@ class SupervisedNetworkRegression(BasePolicy):
         
         self.orientation_layer = nn.Sequential(
                                             nn.Linear(hidden_dims[-1], hidden_dims[-1]),
-                                            nn.ELU(),
+                                            nn.Sigmoid(),
                                             nn.Linear(hidden_dims[-1], 1)
                                             )
                                               
         self.speed_layer = nn.Sequential(
                                         nn.Linear(hidden_dims[-1], hidden_dims[-1]),
-                                        nn.ELU(),
+                                        nn.Sigmoid(),
                                         nn.Linear(hidden_dims[-1], 1)
                                         )
 
@@ -187,6 +205,9 @@ class SupervisedNetworkRegression(BasePolicy):
         num_speed_divs = len(env.speed_array)
         ref_vector = np.asarray([-1, 0])
 
+        orient_limits = (-30.0, +30.0)
+        old_limit = (-1, +1)
+
         goal_to_agent_vector = state_raw['goal_state'] - state_raw['agent_state']['position']
 
         signed_angle_between = (np.arctan2(state_raw['agent_state']['orientation'][0],
@@ -199,33 +220,43 @@ class SupervisedNetworkRegression(BasePolicy):
         elif signed_angle_between < -180:
             signed_angle_between = 360 + signed_angle_between
 
-        output = self.forward(state)
-        output = output.detach().cpu().numpy()
-        change_in_angle = output[0] - signed_angle_between
+        orient, speed = self.forward(state)
+
+        orient = orient.detach().cpu().numpy()
+        orient_rescale = rescale_value(orient, (0.0, 1.0), (-30, 30))
+
+        speed = speed.detach().cpu().numpy()  
+        speed_rescale = rescale_value(speed, (0.0, 1.0), (0.0, 2.0))
+
+        change_in_angle = orient_rescale - signed_angle_between
         
 
         orient_action = get_quantization_division(change_in_angle, orient_div, num_orient_divs)
-        change_in_speed =  output[1] - state_raw['agent_state']['speed']
-        
-        print('The change needed in orientation :{}, change in speed :{}'.format(change_in_angle,
-                                                                    change_in_speed))
+        change_in_speed = speed_rescale - state_raw['agent_state']['speed']
         speed_action = get_quantization_division(change_in_speed, speed_div, num_speed_divs)
+        '''
+        print('The change needed in orientation :{}, change in speed :{}'.format(change_in_angle,
+                                                                          change_in_speed))
+
         print('CUrrent heading direction :{}, current s\
-peed{}'.format(env.state['agent_head_dir'], env.state['agent_state']['speed']))
+        #peed{}'.format(env.state['agent_head_dir'], env.state['agent_state']['speed']))
 
         print('The output :', output)
         print('The speed action {}, the orient action {}'.format(speed_action,
                                                                  orient_action))
-        #pdb.set_trace()
-        return (speed_action*num_orient_divs)+orient_action
+        pdb.set_trace()
+        '''
+        return (speed_action * num_orient_divs) + orient_action, \
+                np.asarray([orient, speed]), \
+                np.asarray([orient_rescale, speed_rescale])
 
 
 
-class SupervisedNetwork(BasePolicy):
+class SupervisedNetworkClassification(BasePolicy):
 
     def __init__(self, input_size, output_size, hidden_dims=[256]):
 
-        super(SupervisedNetwork, self).__init__()
+        super(SupervisedNetworkClassification, self).__init__()
         self.hidden = []
         self.input_layer = nn.Sequential(
                     nn.Linear(input_size, hidden_dims[0]),
@@ -305,7 +336,7 @@ class SupervisedPolicyController:
         if not categorical:
             self.policy = SupervisedNetworkRegression(input_dims, output_dims, hidden_dims=self.hidden_dims)
         else:
-            self.policy = SupervisedNetwork(input_dims, output_dims, hidden_dims=self.hidden_dims)
+            self.policy = SupervisedNetworkClassification(input_dims, output_dims, hidden_dims=self.hidden_dims)
 
         if policy_path is not None:
             self.policy.load(policy_path)
@@ -375,7 +406,7 @@ class SupervisedPolicyController:
     def scale_regression_output(self, training_dataset, output_limits):
         '''
         Given the training data, this method scales the data of the output columns
-        to be standardized i.e. mean 0 std dev 1.
+        to be standardized i.e. in a range between 0 and 1.
         input:
             training_dataset: a tensor of shape nxm, where n is the number of tuples in the 
                              dataset and m is the shape of a single tuple including the input and 
@@ -409,9 +440,8 @@ class SupervisedPolicyController:
                                                                 mean_val,
                                                                 std_val))
 
-        training_dataset[:,-no_of_output_columns:] = output_tensor
+        training_dataset[:, -no_of_output_columns:] = output_tensor
         scaled_training_dataset = training_dataset
-        #pdb.set_trace()
 
         return input_tensor.cpu().numpy(), output_tensor.cpu().numpy()
 
@@ -442,6 +472,7 @@ class SupervisedPolicyController:
             
         
         else:
+
             scale_info = [(-180, 180), (0, 2)]
             x_data, y_data = self.scale_regression_output(training_data_tensor, 
                                                      scale_info)
@@ -572,7 +603,60 @@ class SupervisedPolicyController:
 
 
 
-    def play_categorical_policy(self,
+    def play_policy(self,
+                    num_runs,
+                    env,
+                    max_episode_length,
+                    feat_ext):
+        '''
+        Loads up an environment and checks the performance of the agent.
+        '''
+        #initialize variables needed for the run 
+
+        agent_width = 10
+        obs_width = 10
+        step_size = 2
+        grid_size = 10
+        
+        #load up the environment
+
+        #initialize the feature extractor
+
+        #container to store the actions for analysis
+
+        action_raw_list = []
+        action_scaled_list = []
+        #play the environment 
+
+        for i in range(num_runs):
+ 
+            state = env.reset()
+            print("Replacing pedestrian :", env.cur_ped)
+            state_features = feat_ext.extract_features(state)
+            state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(self.device)
+            done = False
+            t = 0
+            while t < max_episode_length:
+                
+                if self.categorical:
+                    action = self.policy.eval_action(state_features)
+                else:
+                    action, raw_action, scaled_action = self.policy.eval_action(state_features, state, env)
+                
+                action_raw_list.append(raw_action)
+                action_scaled_list.append(scaled_action)
+                #pdb.set_trace()
+                state, _, done, _ = env.step(action)
+                state_features = feat_ext.extract_features(state)
+                state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(self.device)
+                t+=1
+                if done:
+                    break
+        
+        pdb.set_trace()
+
+
+    def play_regression_policy(self,
                     num_runs,
                     max_episode_length,
                     feat_extractor):
@@ -643,6 +727,7 @@ class SupervisedPolicyController:
             while t < max_episode_length:
 
                 action = self.policy.eval_action(state_features)
+
                 state, _, done, _ = env.step(action)
                 state_features = feat_ext.extract_features(state)
                 state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(self.device)

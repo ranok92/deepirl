@@ -379,7 +379,7 @@ def extract_trajectory(annotation_file,
     
         print('Segment 1: Start frame :', world.current_frame)    
         while world.current_frame < cur_subject_final_frame:
-            state,_,_,_ = world.step()
+            state, _, _, _ = world.step()
             step_counter_segment += 1
             #step_counter_trajectory += 1 
             if disp:
@@ -387,7 +387,7 @@ def extract_trajectory(annotation_file,
 
             if extract_action:
                 
-                if cur_lag==lag_val:
+                if cur_lag == lag_val:
                     
                     action = extract_expert_action(state, old_state, 
                                             world.orient_quantization,
@@ -710,6 +710,12 @@ def read_training_data(parent_folder):
                             state vector + the size of the action vector.
 
     '''
+    if os.path.isdir(parent_folder):
+        print("folder")
+    else:
+        print("Folder does not exist.")
+        sys.exit()
+
     actions_list = glob.glob(os.path.join(parent_folder, '*.actions'))
     trajectory_list = glob.glob(os.path.join(parent_folder, '*.states'))
     
@@ -746,7 +752,8 @@ def read_training_data(parent_folder):
 if __name__=='__main__':
 
     
-    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_actions_lag8'
+    parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/\
+traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     output_tensor = read_training_data(parent_folder)
     pdb.set_trace()
     
