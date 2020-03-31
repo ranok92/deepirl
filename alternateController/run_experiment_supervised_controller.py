@@ -121,8 +121,9 @@ agent."
 
 parser.add_argument(
     "--training-data-folder",
+    required=True,
     type=str,
-    default="DroneFeatureRisk_speedv2_with_actions_lag8",
+    default=None,
     help="Name of the folder containing the data."
 )
 
@@ -265,7 +266,7 @@ def main():
                                         categorical=categorical_flag,
                                         hidden_dims=args.policy_net_hidden_dims,
                                         policy_path=args.policy_path,
-                                        mini_batch_size=2000,
+                                        mini_batch_size=args.batch_size,
                                         learning_rate=args.lr,
                                         save_folder=save_folder)
     

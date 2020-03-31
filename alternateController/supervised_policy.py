@@ -14,6 +14,7 @@ import math
 from tensorboardX import SummaryWriter
 
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 from imblearn.over_sampling import RandomOverSampler
 from collections import Counter
 
@@ -357,6 +358,7 @@ class SupervisedPolicyController:
         self.mini_batch_size = mini_batch_size 
 
         #saving the data
+        self.test_interval = 3
         self.save_folder = None
         if save_folder:
 
@@ -501,6 +503,7 @@ class SupervisedPolicyController:
         '''
         x_train, x_test, y_train, y_test = self.arrange_data(data_folder)
         data_loader = DataLoader(torch.cat((x_train, y_train), 1),
+                                 shuffle=True,
                                 batch_size=self.mini_batch_size)
         action_counter = 0
         '''
@@ -514,7 +517,7 @@ class SupervisedPolicyController:
         else:
             label_size = self.output_layer
         for i in tqdm(range(num_epochs)):
-            batch_loss = 0
+
             for batch, sample in enumerate(data_loader):
                 x_mini_batch = sample[:, 0:-label_size]
                 if self.categorical:
@@ -524,17 +527,35 @@ class SupervisedPolicyController:
                 
                 #pdb.set_trace()
                 y_pred = self.policy(x_mini_batch.type(torch.float))
-                
                 loss = self.loss(y_pred, y_mini_batch.squeeze())
-                batch_loss += loss
+
                 counter += 1
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-            
-            print(batch_loss)
-            if self.save_folder:
-                self.tensorboard_writer.add_scalar('Log_info/loss', batch_loss, i)
+
+                if self.save_folder:
+                    self.tensorboard_writer.add_scalar('Log_info/loss', loss, i)
+
+
+            if (i+1)%self.test_interval == 0:
+
+                y_pred_train = self.policy(x_train.type(torch.float))
+                y_pred_test = self.policy(x_test.type(torch.float))
+                train_accuracy = accuracy_score(y_train, y_pred_train, normalize=True)
+                test_accuracy = accuracy_score(y_test, y_pred_test, normalize=True)
+                
+                print("For epoch: {} \n Train accuracy :{} | Test accuracy :{}\n=========".format(i,
+                                                                                        train_accuracy,
+                                                                                    test_accuracy))
+                if self.save_folder:
+
+                    self.tensorboard_writer.add_scalar('Log_info/training_accuracy', 
+                                                        train_accuracy, i)
+                    self.tensorboard_writer.add_scalar('Log_info/testing_accuracy',
+                                                        test_accuracy, i)
+
+
         
         if self.save_folder:
             self.tensorboard_writer.close()
@@ -546,8 +567,21 @@ class SupervisedPolicyController:
         trains a policy network
         '''
         x_train, x_test, y_train, y_test = self.arrange_data(data_folder)
+
+
         data_loader = DataLoader(torch.cat((x_train, y_train), 1),
+                                shuffle=True,
                                 batch_size=self.mini_batch_size)
+
+
+        if self.categorical:
+            y_train = y_train.type(torch.long)
+            y_test = y_test.type(torch.long)
+            
+        else:
+            y_train = y_train.type(torch.float)
+            y_test = y_test.type(torch.float)
+
         action_counter = 0
         '''
         for i in y_train:
@@ -560,9 +594,7 @@ class SupervisedPolicyController:
         else:
             label_size = self.output_layer
         for i in tqdm(range(num_epochs)):
-            batch_loss = 0
-            batch_loss_speed = 0
-            batch_loss_orient = 0
+
             for batch, sample in enumerate(data_loader):
                 x_mini_batch = sample[:, 0:-label_size]
                 if self.categorical:
@@ -577,23 +609,45 @@ class SupervisedPolicyController:
                 #pdb.set_trace()
                 loss = loss_orient + loss_speed
 
-                batch_loss_speed += loss_speed
-                batch_loss_orient += loss_orient
-                batch_loss += loss
-
                 counter += 1
                 #print(loss)
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+
+                if self.save_folder:
+                    self.tensorboard_writer.add_scalar('Log_info/loss', loss, i)
+                    self.tensorboard_writer.add_scalar('Log_info/speed_loss', loss_speed, i)
+                    self.tensorboard_writer.add_scalar('Log_info/orient_loss', loss_orient, i)
+
+            if (i+1)%self.test_interval == 0:
+                orient_train, speed_train = self.policy(x_train.type(torch.float))
+                orient_test, speed_test = self.policy(x_test.type(torch.float))
+                
+                train_loss = self.loss(orient_train.detach(), y_train.squeeze()[:, 0]) + \
+                             self.loss(speed_train.detach(), y_train.squeeze()[:, 1])
+
+                test_loss = self.loss(orient_test.detach(), y_test.squeeze()[:, 0]) + \
+                              self.loss(speed_test.detach(), y_test.squeeze()[:, 1])
+
+                print("For epoch: {} \n Training loss :{} | Testing loss :{}\n=========".format(i,
+                                                                                        train_loss,
+                                                                                        test_loss))
+
+                if self.save_folder:
+                    
+                    self.tensorboard_writer.add_scalar('Log_info/training_loss', 
+                                                        train_loss, i)
+                    self.tensorboard_writer.add_scalar('Log_info/testing_loss',
+                                                        test_loss.type(torch.float), i)
+
+                
             
-            print('Loss from speed :{} , loss from orientation :{} ,batch_loss :{}'.format(batch_loss_speed,
-                                                                                           batch_loss_orient,
-                                                                                           batch_loss))
-            if self.save_folder:
-                self.tensorboard_writer.add_scalar('Log_info/loss', batch_loss, i)
-                self.tensorboard_writer.add_scalar('Log_info/speed_loss', batch_loss_speed, i)
-                self.tensorboard_writer.add_scalar('Log_info/orient_loss', batch_loss_orient, i)
+            #print('Loss from speed :{} , loss from orientation :{} ,batch_loss :{}'.format(batch_loss_speed,
+            #                                                                               batch_loss_orient,
+            #                                                                               batch_loss))
+            
+
         
 
         self.tensorboard_writer.close()
