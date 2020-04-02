@@ -18,7 +18,6 @@ from irlmethods.irlUtils import play_features as play
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-
 class RewardNet(BaseNN):
     """Reward network"""
 
@@ -511,4 +510,163 @@ class MixingDeepMaxent(GeneralDeepMaxent):
                 stochastic_sampling,
                 num_expert_samples,
                 num_policy_samples,
+            )
+
+
+class ExpertOnlyMaxent:
+    """
+    Implements expert only deep maxent, using only expert demonstrations and
+    no environment interaction.
+    """
+
+    def __init__(
+        self,
+        state_size,
+        expert_trajectories,
+        learning_rate=1e-3,
+        l2_regularization=1e-5,
+        save_folder="./",
+    ):
+
+        # reward net
+        self.reward_net = RewardNet(state_size, hidden_dims=256)
+        self.reward_net = self.reward_net.to(DEVICE)
+        self.reward_optim = Adam(
+            self.reward_net.parameters(),
+            lr=learning_rate,
+            weight_decay=l2_regularization,
+        )
+
+        # expert and training datasets
+        self.all_trajectories = random.sample(
+            expert_trajectories, len(expert_trajectories)
+        )
+        self.expert_trajectories = [
+            traj.to(torch.float).to(DEVICE)
+            for traj in self.all_trajectories[
+                : len(self.all_trajectories) // 2
+            ]
+        ]
+        self.training_trajectories = [
+            traj.to(torch.float).to(DEVICE)
+            for traj in self.all_trajectories[
+                len(self.all_trajectories) // 2 :
+            ]
+        ]
+
+        # logging and saving
+        self.save_path = Path(save_folder)
+        self.tbx_writer = SummaryWriter(
+            str(self.save_path / "tensorboard_logs")
+        )
+
+        # training meta
+        self.training_i = 0
+
+    def discounted_rewards(self, rewards, gamma, account_for_terminal_state):
+        discounted_sum = 0
+        t = 0
+        gamma_t = 1
+        for t, reward in enumerate(rewards[:-1]):
+            discounted_sum += gamma_t * reward
+            gamma_t *= gamma
+
+        if account_for_terminal_state:
+            discounted_sum += (
+                (gamma / (1 - gamma)) * gamma ** (t + 1) * rewards[-1]
+            )
+        else:
+            discounted_sum += gamma_t * rewards[-1]
+
+        return discounted_sum
+
+    def train_episode(
+        self, num_trajectory_samples, account_for_terminal_state, gamma,
+    ):
+        """
+        perform IRL pre-training by using only expert samples.
+
+        :param num_trajectory_samples: Number of trajectories to sample using
+        learned RL agent.
+        :type num_trajectory_samples: int
+
+        :param account_for_terminal_state: Whether to account for a state
+        being terminal or not. If true, (gamma/1-gamma)*R will be immitated
+        by padding the trajectory with its ending state until max_env_steps
+        length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
+        s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
+        :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+        """
+
+        # expert loss
+        expert_loss = 0
+        expert_sample = random.sample(
+            self.expert_trajectories, num_trajectory_samples
+        )
+        for traj in expert_sample:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
+
+        # policy loss
+        trajectories = random.sample(
+            self.training_trajectories, num_trajectory_samples
+        )
+
+        generator_loss = 0
+        for traj in trajectories:
+            policy_rewards = self.reward_net(traj)
+            generator_loss += self.discounted_rewards(
+                policy_rewards, gamma, account_for_terminal_state
+            )
+
+        generator_loss = (
+            len(self.expert_trajectories) / num_trajectory_samples
+        ) * generator_loss
+
+        # Backpropagate IRL loss
+        loss = generator_loss - expert_loss
+
+        self.reward_optim.zero_grad()
+        loss.backward()
+        self.reward_optim.step()
+
+        # logging
+        self.tbx_writer.add_scalar(
+            "IRL/generator_loss", generator_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            "IRL/expert_loss", expert_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+
+        # save policy and reward network
+        self.reward_net.save(str(self.save_path / "reward_net"))
+
+        # increment training counter
+        self.training_i += 1
+
+    def train(
+        self,
+        num_episodes,
+        num_trajectory_samples,
+        account_for_terminal_state=False,
+        gamma=0.99,
+    ):
+        """
+        Runs the train_episode() function for 'num_irl_episodes' times. Other
+        parameters are identical to the aforementioned function, with the same
+        description and requirements.
+        """
+        for _ in range(num_episodes):
+            print(
+                "IRL pre-training episode {}".format(self.training_i), end="\r"
+            )
+            self.train_episode(
+                num_trajectory_samples, account_for_terminal_state, gamma
             )
