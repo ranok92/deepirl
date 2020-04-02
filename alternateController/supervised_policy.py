@@ -141,8 +141,8 @@ class SupervisedNetworkRegression(BasePolicy):
                                         nn.Linear(hidden_dims[-1], hidden_dims[-1]),
                                         nn.Sigmoid(),
                                         nn.Linear(hidden_dims[-1], 1)
-                                        )
-
+                                         )
+        
     
     def forward(self, x):
 
@@ -273,11 +273,8 @@ class SupervisedNetworkClassification(BasePolicy):
         self.hidden_layer = nn.ModuleList(self.hidden)
         self.output_layer = nn.Sequential(
                             nn.Linear(hidden_dims[-1], output_size),
-                            nn.LogSoftmax()
                             )
-        '''
-        self.output_layer = nn.Linear(hidden_dims[-1], output_size)
-        '''
+ 
 
 
     def forward(self, x):
@@ -302,9 +299,8 @@ class SupervisedNetworkClassification(BasePolicy):
     def eval_action(self, state_vector):
 
         output = self.forward(state_vector)
-        #pdb.set_trace()
-        _, index = torch.max(output, 0)
-        return index
+        _, index = torch.max(output, 1)
+        return index.unsqueeze(1)
 
 
 
@@ -349,7 +345,7 @@ class SupervisedPolicyController:
         self.categorical = categorical
         #parameters for the optimizer
         self.lr = learning_rate
-        self.optimizer = optim.SGD(self.policy.parameters(), lr=self.lr)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         if self.categorical:
             self.loss = torch.nn.CrossEntropyLoss()
         else:
@@ -358,7 +354,7 @@ class SupervisedPolicyController:
         self.mini_batch_size = mini_batch_size 
 
         #saving the data
-        self.test_interval = 3
+        self.test_interval = 1
         self.save_folder = None
         if save_folder:
 
@@ -502,9 +498,13 @@ class SupervisedPolicyController:
         trains a policy network
         '''
         x_train, x_test, y_train, y_test = self.arrange_data(data_folder)
-        data_loader = DataLoader(torch.cat((x_train, y_train), 1),
+        data_loader_train = DataLoader(torch.cat((x_train, y_train), 1),
                                  shuffle=True,
                                 batch_size=self.mini_batch_size)
+
+        data_loader_test = DataLoader(torch.cat((x_test, y_test), 1),
+                                      shuffle=True,
+                                      batch_size=self.mini_batch_size)
         action_counter = 0
         '''
         for i in y_train:
@@ -516,34 +516,56 @@ class SupervisedPolicyController:
             label_size = 1
         else:
             label_size = self.output_layer
-        for i in tqdm(range(num_epochs)):
 
-            for batch, sample in enumerate(data_loader):
+        for i in tqdm(range(num_epochs)):
+            epoch_loss = []
+            y_train_pred = torch.zeros(y_train.shape)
+    
+            for batch, sample in enumerate(data_loader_train):
                 x_mini_batch = sample[:, 0:-label_size]
                 if self.categorical:
                     y_mini_batch = sample[:, -label_size:].type(torch.long)
                 else:
                     y_mini_batch = sample[:, -label_size:].type(torch.float)
                 
-                #pdb.set_trace()
-                y_pred = self.policy(x_mini_batch.type(torch.float))
-                loss = self.loss(y_pred, y_mini_batch.squeeze())
+                y_pred_mini_batch = self.policy(x_mini_batch.type(torch.float))
+                if (i+1)%self.test_interval == 0:
+                    #if the iteration is for eavluation, store the prediction values
+                    #pdb.set_trace()
 
+                    y_pred_classes = self.policy.eval_action(x_mini_batch.type(torch.float))
+                    y_train_pred[batch*self.mini_batch_size:
+                                 batch*self.mini_batch_size+sample.shape[0], :] = y_pred_classes.clone().detach()
+
+                loss = self.loss(y_pred_mini_batch, y_mini_batch.squeeze())
                 counter += 1
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+                epoch_loss.append(loss.detach())
 
                 if self.save_folder:
                     self.tensorboard_writer.add_scalar('Log_info/loss', loss, i)
 
 
             if (i+1)%self.test_interval == 0:
+                y_test_pred = torch.zeros(y_test.shape)
+                #collecting prediction for test tuples
+                for batch, sample in enumerate(data_loader_test):
+                    x_mini_batch = sample[:, 0:-label_size]
 
-                y_pred_train = self.policy(x_train.type(torch.float))
-                y_pred_test = self.policy(x_test.type(torch.float))
-                train_accuracy = accuracy_score(y_train, y_pred_train, normalize=True)
-                test_accuracy = accuracy_score(y_test, y_pred_test, normalize=True)
+                    if self.categorical:
+                        y_mini_batch = sample[:, -label_size:].type(torch.long)
+                    else:
+                        y_mini_batch = sample[:, -label_size:].type(torch.float)
+
+                    y_pred_mini_batch = self.policy.eval_action(x_mini_batch.type(torch.float))
+                    y_test_pred[batch*self.mini_batch_size:
+                                batch*self.mini_batch_size+sample.shape[0], :] = y_pred_mini_batch.clone().detach()
+
+                #pdb.set_trace()
+                train_accuracy = accuracy_score(y_train, y_train_pred, normalize=True)
+                test_accuracy = accuracy_score(y_test, y_test_pred, normalize=True)
                 
                 print("For epoch: {} \n Train accuracy :{} | Test accuracy :{}\n=========".format(i,
                                                                                         train_accuracy,
