@@ -14,28 +14,7 @@ from irlmethods.irlUtils import read_expert_trajectories
 from irlmethods.general_deep_maxent import GeneralDeepMaxent, MixingDeepMaxent
 from logger.logger import Logger
 import utils
-
-from featureExtractor.drone_feature_extractor import (
-    DroneFeatureSAM1,
-    DroneFeatureRisk,
-    DroneFeatureRisk_v2,
-)
-from featureExtractor.gridworld_featureExtractor import (
-    LocalGlobal,
-    OneHot,
-    SocialNav,
-    FrontBackSideSimple,
-)
-from featureExtractor.drone_feature_extractor import (
-    DroneFeatureRisk_speed,
-    DroneFeatureRisk_speedv2,
-    VasquezF1,
-    VasquezF2,
-    VasquezF3,
-    Fahad,
-    GoalConditionedFahad,
-)
-
+from featureExtractor import fe_utils
 from rlmethods.b_actor_critic import ActorCritic
 from rlmethods.soft_ac_pi import SoftActorCritic
 from rlmethods.soft_ac import QSoftActorCritic as QSAC
@@ -245,101 +224,7 @@ def main():
     obs_width = 10
     grid_size = 10
 
-    # check for the feature extractor being used
-    # initialize feature extractor
-    if args.feat_extractor == "Onehot":
-        feat_ext = OneHot(grid_rows=10, grid_cols=10)
-    if args.feat_extractor == "SocialNav":
-        feat_ext = SocialNav()
-    if args.feat_extractor == "FrontBackSideSimple":
-        feat_ext = FrontBackSideSimple(
-            thresh1=1,
-            thresh2=2,
-            thresh3=3,
-            thresh4=4,
-            step_size=step_size,
-            agent_width=agent_width,
-            obs_width=obs_width,
-        )
-
-    if args.feat_extractor == "LocalGlobal":
-        feat_ext = LocalGlobal(
-            window_size=5,
-            grid_size=grid_size,
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-        )
-
-    if args.feat_extractor == "DroneFeatureSAM1":
-
-        feat_ext = DroneFeatureSAM1(
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-            grid_size=grid_size,
-            thresh1=5,
-            thresh2=10,
-        )
-
-    if args.feat_extractor == "DroneFeatureRisk":
-
-        feat_ext = DroneFeatureRisk(
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-            grid_size=grid_size,
-            thresh1=15,
-            thresh2=30,
-        )
-
-    if args.feat_extractor == "DroneFeatureRisk_v2":
-
-        feat_ext = DroneFeatureRisk_v2(
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-            grid_size=grid_size,
-            thresh1=15,
-            thresh2=30,
-        )
-
-    if args.feat_extractor == "DroneFeatureRisk_speed":
-
-        feat_ext = DroneFeatureRisk_speed(
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-            grid_size=grid_size,
-            thresh1=10,
-            thresh2=15,
-        )
-
-    if args.feat_extractor == "DroneFeatureRisk_speedv2":
-
-        feat_ext = DroneFeatureRisk_speedv2(
-            agent_width=agent_width,
-            obs_width=obs_width,
-            step_size=step_size,
-            grid_size=grid_size,
-            thresh1=18,
-            thresh2=30,
-        )
-
-    if args.feat_extractor == "VasquezF1":
-        feat_ext = VasquezF1(6 * agent_width, 18, 30)
-
-    if args.feat_extractor == "VasquezF2":
-        feat_ext = VasquezF2(6 * agent_width, 18, 30)
-
-    if args.feat_extractor == "VasquezF3":
-        feat_ext = VasquezF3(agent_width)
-
-    if args.feat_extractor == "Fahad":
-        feat_ext = Fahad(36, 60, 0.5, 1.0)
-
-    if args.feat_extractor == "GoalConditionedFahad":
-        feat_ext = GoalConditionedFahad(36, 60, 0.5, 1.0)
+    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)

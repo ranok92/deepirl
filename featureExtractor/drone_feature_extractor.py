@@ -12,9 +12,6 @@ import pygame
 from numba import njit, jit
 from collections import deque
 
-##################################################
-# *********** feature extracting functions********#
-
 
 @njit
 def angle_between(v1, v2):
