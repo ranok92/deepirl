@@ -219,11 +219,6 @@ def main():
     experiment_logger.log_header("Arguments for the experiment :")
     experiment_logger.log_info(vars(args))
 
-    agent_width = 10
-    step_size = 2
-    obs_width = 10
-    grid_size = 10
-
     feat_ext = fe_utils.load_feature_extractor(args.feat_extractor)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
@@ -239,10 +234,10 @@ def main():
         is_random=False,
         rows=576,
         cols=720,
-        agent_width=agent_width,
-        step_size=step_size,
-        obs_width=obs_width,
-        width=grid_size,
+        agent_width=10,
+        step_size=2,
+        obs_width=10,
+        width=10,
         subject=args.subject,
         annotation_file=args.annotation_file,
         goal_state=None,
