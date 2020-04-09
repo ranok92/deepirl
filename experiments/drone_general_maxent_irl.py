@@ -7,6 +7,8 @@ import argparse
 import matplotlib
 import gym
 import glob
+import pathlib
+import csv
 
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
@@ -20,6 +22,7 @@ from rlmethods.soft_ac_pi import SoftActorCritic
 from rlmethods.soft_ac import QSoftActorCritic as QSAC
 from rlmethods.soft_ac import SoftActorCritic as DiscreteSAC
 from rlmethods.rlutils import ReplayBuffer
+from metrics.metric_utils import LTHMP2020
 
 
 parser = argparse.ArgumentParser()
@@ -175,6 +178,8 @@ parser.add_argument(
 
 parser.add_argument("--num-expert-samples", type=int, default=32)
 parser.add_argument("--num-policy-samples", type=int, default=32)
+parser.add_argument("--save-dir", type=str, default="./results")
+parser.add_argument("--pre-train-iterations", type=int, default=0)
 
 
 def main():
@@ -184,39 +189,13 @@ def main():
 
     utils.seed_all(args.seed)
 
-    if args.on_server:
-        # matplotlib without monitor
-        matplotlib.use("Agg")
-
-        # pygame without monitor
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
-
     ts = time.time()
     st = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d_%H:%M:%S")
 
-    policy_net_dims = "-policy_net-"
-    for dim in args.policy_net_hidden_dims:
-        policy_net_dims += str(dim)
-        policy_net_dims += "-"
-
-    reward_net_dims = "-reward_net-"
-    for dim in args.reward_net_hidden_dims:
-        reward_net_dims += str(dim)
-        reward_net_dims += "-"
-
-    to_save = (
-        "./results/"
-        + str(args.save_folder)
-        + st
-        + policy_net_dims
-        + reward_net_dims
-        + "-reg-"
-        + str(args.regularizer)
-        + "-seed-"
-        + str(args.seed)
-        + "-lr-"
-        + str(args.lr_irl)
-    )
+    to_save = pathlib.Path(args.save_dir)
+    dir_name = args.save_folder + "_" + st
+    to_save = to_save / dir_name
+    to_save = to_save.resolve()
 
     log_file = "Experiment_info.txt"
 
@@ -356,6 +335,13 @@ def main():
 
     experiment_logger.log_header("Details of the IRL method :")
     experiment_logger.log_info(irl_method.__dict__)
+
+    irl_method.pre_train(
+        args.pre_train_iterations,
+        args.num_expert_samples,
+        account_for_terminal_state=args.account_for_terminal_state,
+        gamma=args.gamma,
+    )
 
     irl_method.train(
         args.irl_iterations,
