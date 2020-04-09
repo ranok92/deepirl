@@ -1,12 +1,13 @@
 """ Utilities for generating results from metrics """
 
 from collections import defaultdict
-import copy
 import torch
 import os, sys
+
 sys.path.insert(0, "..")
 from featureExtractor.drone_feature_extractor import dist_2d
 from utils import copy_dict
+import metrics
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -96,6 +97,20 @@ class MetricApplicator:
         return self.metrics_dict
 
 
+class LTHMP2020(MetricApplicator):
+    """ Collection of metrics applied for the LTHMP 2020 workshop. """
+
+    def __init__(self):
+        super().__init__()
+        self.add_metric(metrics.compute_trajectory_smoothness)
+        self.add_metric(metrics.compute_distance_displacement_ratio)
+        self.add_metric(metrics.proxemic_intrusions, [3])
+        self.add_metric(metrics.anisotropic_intrusions, [20])
+        self.add_metric(metrics.count_collisions, [20])
+        self.add_metric(metrics.goal_reached, [10, 10])
+        self.add_metric(metrics.trajectory_length)
+
+
 def collect_trajectories_and_metrics(
     env,
     feature_extractor,
@@ -141,7 +156,7 @@ def collect_trajectories_and_metrics(
 
         state = env.reset()
         current_pedestrian = env.cur_ped
-        print("Collecting trajectory {}".format(current_pedestrian), end='\r')
+        print("Collecting trajectory {}".format(current_pedestrian), end="\r")
         done = False
         t = 0
         traj = [copy_dict(state)]
@@ -372,4 +387,3 @@ def read_files_from_directories(parent_directory, folder_dict=None):
         break
 
     return folder_dict
-

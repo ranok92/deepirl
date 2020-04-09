@@ -11,7 +11,7 @@ import glob
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from irlmethods.irlUtils import read_expert_trajectories
-from irlmethods.general_deep_maxent import GeneralDeepMaxent, MixingDeepMaxent
+from irlmethods.general_deep_maxent import MixingDeepMaxent
 from logger.logger import Logger
 import utils
 from featureExtractor import fe_utils
