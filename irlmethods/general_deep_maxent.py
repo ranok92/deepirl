@@ -14,6 +14,7 @@ from tensorboardX import SummaryWriter
 sys.path.insert(0, "..")
 from neural_nets.base_network import BaseNN
 from irlmethods.irlUtils import play_features as play
+import utils
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -85,6 +86,8 @@ class GeneralDeepMaxent:
         self.tbx_writer = SummaryWriter(
             str(self.save_path / "tensorboard_logs")
         )
+
+        self.data_table = utils.DataTable()
 
         # training meta
         self.training_i = 0
@@ -234,6 +237,15 @@ class GeneralDeepMaxent:
             "IRL/expert_loss", expert_loss, self.training_i
         )
         self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+
+        self.data_table.add_row(
+            {
+                "IRL/policy_loss": policy_loss.item(),
+                "IRL/expert_loss": expert_loss.item(),
+                "IRL/total_loss": loss.item(),
+            },
+            self.training_i,
+        )
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
@@ -415,6 +427,15 @@ class MixingDeepMaxent(GeneralDeepMaxent):
         )
         self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
 
+        self.data_table.add_row(
+            {
+                "IRL/policy_loss": policy_loss.item(),
+                "IRL/expert_loss": expert_loss.item(),
+                "IRL/total_loss": loss.item(),
+            },
+            self.training_i,
+        )
+
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
         if self.training_i % 50 == 0:
@@ -482,12 +503,21 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
         # logging
         self.tbx_writer.add_scalar(
-            "IRL/generator_loss", generator_loss, self.training_i
+            "pre_IRL/generator_loss", generator_loss, self.training_i
         )
         self.tbx_writer.add_scalar(
-            "IRL/expert_loss", expert_loss, self.training_i
+            "pre_IRL/expert_loss", expert_loss, self.training_i
         )
-        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+        self.tbx_writer.add_scalar("pre_IRL/total_loss", loss, self.training_i)
+
+        self.data_table.add_row(
+            {
+                "pre_IRL/policy_loss": generator_loss.item(),
+                "pre_IRL/expert_loss": expert_loss.item(),
+                "pre_IRL/total_loss": loss.item(),
+            },
+            self.training_i,
+        )
 
         # save policy and reward network
         self.reward_net.save(str(self.save_path / "reward_net"))
@@ -595,6 +625,8 @@ class ExpertOnlyMaxent:
             str(self.save_path / "tensorboard_logs")
         )
 
+        self.data_table = utils.DataTable()
+
         # training meta
         self.training_i = 0
 
@@ -679,6 +711,15 @@ class ExpertOnlyMaxent:
             "IRL/expert_loss", expert_loss, self.training_i
         )
         self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+
+        self.data_table.add_row(
+            {
+                "IRL/policy_loss": generator_loss.item(),
+                "IRL/expert_loss": expert_loss.item(),
+                "IRL/total_loss": loss.item(),
+            },
+            self.training_i,
+        )
 
         # save policy and reward network
         self.reward_net.save(str(self.save_path / "reward_net"))
