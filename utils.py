@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import random
 import torch
 import sys
 import os
@@ -181,6 +182,12 @@ def copy_dict(in_dict):
 
     return out_dict
 
+def seed_all(seed):
+    """ Use a seed to seed numpy, pytorch, and python random modules. """
+
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
 
 class HiddenPrints:
     def __enter__(self):
