@@ -173,6 +173,9 @@ parser.add_argument(
     help="Whether to use stochastic policy to sample trajectories for IRL.",
 )
 
+parser.add_argument("--num-expert-samples", type=int, default=32)
+parser.add_argument("--num-policy-samples", type=int, default=32)
+
 
 def main():
     """Runs experiment"""
@@ -361,8 +364,8 @@ def main():
         account_for_terminal_state=args.account_for_terminal_state,
         gamma=args.gamma,
         stochastic_sampling=args.stochastic_sampling,
-        num_expert_samples=32,
-        num_policy_samples=32,
+        num_expert_samples=args.num_expert_samples,
+        num_policy_samples=args.num_policy_samples,
     )
 
 
