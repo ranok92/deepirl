@@ -200,6 +200,8 @@ class DataTable:
         for key, val in data_dict.items():
             self.data[key].append(val)
 
+        self.data['step'].append(step)
+
     def write_csv(self, file):
         pd_data = pd.DataFrame(self.data)
         pd_data.to_csv(file)
