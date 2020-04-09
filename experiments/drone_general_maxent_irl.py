@@ -27,37 +27,14 @@ from metrics.metric_utils import LTHMP2020
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--policy-path", type=str, nargs="?", default=None)
-parser.add_argument(
-    "--play", action="store_true", help="play given or latest stored policy."
-)
-parser.add_argument(
-    "--dont-save",
-    action="store_true",
-    help="don't save the policy network weights.",
-)
 parser.add_argument("--render", action="store_true", help="show the env.")
-parser.add_argument(
-    "--on-server",
-    action="store_true",
-    help="True if the code is being run on a server.",
-)
-parser.add_argument(
-    "--store-train-results",
-    action="store_true",
-    help="True if you want to store intermediate results",
-)
-parser.add_argument(
-    "--store-interval",
-    action="store_true",
-    help="Interval of storing the results.",
-)
 parser.add_argument("--rl-episodes", type=int, default=50)
 parser.add_argument("--rl-ep-length", type=int, default=30)
 parser.add_argument("--irl-iterations", type=int, default=100)
 parser.add_argument("--rl-log-intervals", type=int, default=10)
 
 parser.add_argument(
-    "--regularizer", type=float, default=0, help="The regularizer to use."
+    "--regularizer", type=float, default=0, help="The l2 regularizer to use."
 )
 
 parser.add_argument("--seed", type=int, default=7, help="The seed for the run")
@@ -110,7 +87,7 @@ parser.add_argument(
 parser.add_argument(
     "--annotation-file",
     type=str,
-    default=None,
+    default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
     help="The location of the annotation file to \
                     be used to run the environment.",
 )
@@ -129,22 +106,6 @@ parser.add_argument(
     help="The learning rate for the reward network.",
 )
 
-parser.add_argument(
-    "--clipping-value",
-    type=float,
-    default=None,
-    help="For gradient clipping of the \
-                    reward network.",
-)
-
-parser.add_argument(
-    "--scale-svf",
-    action="store_true",
-    default=None,
-    help="If true, will scale the states \
-                    based on the reward the trajectory got.",
-)
-
 parser.add_argument("--replace-subject", action="store_true", default=None)
 parser.add_argument(
     "--segment-size",
@@ -153,7 +114,6 @@ parser.add_argument(
     help="Size of each trajectory segment.",
 )
 parser.add_argument("--subject", type=int, default=None)
-
 
 parser.add_argument(
     "--rl-method",
@@ -195,7 +155,7 @@ def main():
     to_save = pathlib.Path(args.save_dir)
     dir_name = args.save_folder + "_" + st
     to_save = to_save / dir_name
-    to_save = to_save.resolve()
+    to_save = str(to_save.resolve())
 
     log_file = "Experiment_info.txt"
 
@@ -207,11 +167,6 @@ def main():
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
-
-    # initialize the environment
-    if not args.dont_save and args.save_folder is None:
-        print("Specify folder to save the results.")
-        exit()
 
     env = GridWorld(
         display=args.render,
