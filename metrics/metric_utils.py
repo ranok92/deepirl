@@ -7,7 +7,7 @@ import os, sys
 sys.path.insert(0, "..")
 from featureExtractor.drone_feature_extractor import dist_2d
 from utils import copy_dict
-import metrics
+from metrics import metrics
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 

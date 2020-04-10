@@ -9,6 +9,7 @@ import gym
 import glob
 import pathlib
 import csv
+import pandas as pd
 
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
@@ -22,7 +23,7 @@ from rlmethods.soft_ac_pi import SoftActorCritic
 from rlmethods.soft_ac import QSoftActorCritic as QSAC
 from rlmethods.soft_ac import SoftActorCritic as DiscreteSAC
 from rlmethods.rlutils import ReplayBuffer
-from metrics.metric_utils import LTHMP2020
+from metrics import metric_utils
 
 
 parser = argparse.ArgumentParser()
@@ -87,7 +88,7 @@ parser.add_argument(
 parser.add_argument(
     "--annotation-file",
     type=str,
-    default='../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt',
+    default="../envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt",
     help="The location of the annotation file to \
                     be used to run the environment.",
 )
@@ -311,6 +312,18 @@ def main():
         num_policy_samples=args.num_policy_samples,
     )
 
+    metric_applicator = metric_utils.LTHMP2020()
+    metric_results = metric_utils.collect_trajectories_and_metrics(
+        env,
+        feat_ext,
+        rl_method.policy,
+        len(expert_trajectories),
+        args.rl_ep_length,
+        metric_applicator,
+    )
+
+    pd_metrics = pd.DataFrame(metric_results).T
+    pd_metrics.to_pickle(to_save + '/metrics.pkl')
 
 if __name__ == "__main__":
     main()
