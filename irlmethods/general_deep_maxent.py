@@ -322,6 +322,8 @@ class MixingDeepMaxent(GeneralDeepMaxent):
             ]
         ]
 
+        self.pre_data_table = utils.DataTable()
+
     def train_episode(
         self,
         num_rl_episodes,
@@ -510,7 +512,7 @@ class MixingDeepMaxent(GeneralDeepMaxent):
         )
         self.tbx_writer.add_scalar("pre_IRL/total_loss", loss, self.training_i)
 
-        self.data_table.add_row(
+        self.pre_data_table.add_row(
             {
                 "pre_IRL/policy_loss": generator_loss.item(),
                 "pre_IRL/expert_loss": expert_loss.item(),

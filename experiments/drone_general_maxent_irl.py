@@ -325,8 +325,17 @@ def main():
     )
 
     pd_metrics = pd.DataFrame(metric_results).T
+    pd_metrics = pd_metrics.applymap(lambda x: x[0])
     pd_metrics.to_pickle(to_save + "/metrics.pkl")
 
+    with open(to_save + "/rl_data.csv", 'a') as f:
+        rl_method.data_table.write_csv(f)
+
+    with open(to_save + "/irl_data.csv", 'a') as f:
+        irl_method.data_table.write_csv(f)
+
+    with open(to_save + "/pre_irl_data.csv", 'a') as f:
+        irl_method.pre_data_table.write_csv(f)
 
 if __name__ == "__main__":
     main()
