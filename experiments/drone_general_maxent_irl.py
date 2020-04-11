@@ -125,7 +125,6 @@ parser.add_argument(
 parser.add_argument("--play-interval", type=int, default=1)
 parser.add_argument("--replay-buffer-sample-size", type=int, default=1000)
 parser.add_argument("--replay-buffer-size", type=int, default=5000)
-parser.add_argument("--num-trajectory-samples", type=int, default=100)
 parser.add_argument("--entropy-target", type=float, default=0.3)
 parser.add_argument("--tau", type=float, default=0.05)
 parser.add_argument("--reset-training", action="store_true")
@@ -141,6 +140,7 @@ parser.add_argument("--num-expert-samples", type=int, default=32)
 parser.add_argument("--num-policy-samples", type=int, default=32)
 parser.add_argument("--save-dir", type=str, default="./results")
 parser.add_argument("--pre-train-iterations", type=int, default=0)
+parser.add_argument("--pre-train-rl-iterations", type=int, default=8000)
 
 
 def main():
@@ -299,6 +299,8 @@ def main():
         gamma=args.gamma,
     )
 
+    rl_method.train(args.pre_train_rl_iterations, args.rl_ep_length, reward_network=irl_method.reward_net)
+
     irl_method.train(
         args.irl_iterations,
         args.rl_episodes,
@@ -323,7 +325,8 @@ def main():
     )
 
     pd_metrics = pd.DataFrame(metric_results).T
-    pd_metrics.to_pickle(to_save + '/metrics.pkl')
+    pd_metrics.to_pickle(to_save + "/metrics.pkl")
+
 
 if __name__ == "__main__":
     main()
