@@ -301,6 +301,9 @@ def main():
 
     rl_method.train(args.pre_train_rl_iterations, args.rl_ep_length, reward_network=irl_method.reward_net)
 
+    # save intermediate RL result
+    rl_method.policy.save(to_save+'/policy')
+
     irl_method.train(
         args.irl_iterations,
         args.rl_episodes,
