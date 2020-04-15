@@ -216,3 +216,70 @@ if __name__ == '__main__':
         l.plot_avg_loss()
     plt.plot(losslist)
     plt.show()
+
+Transition = collections.namedtuple(
+    "Transition",
+    [
+        "state",
+        "action",
+        "next_state",
+        "reward",
+        "done",
+        "traj_end",
+        "action_log_prob",
+    ],
+)
+Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
+
+
+def play_complete(policy, env, feature_extractor, max_steps):
+    """
+    Plays using policy on environment for a maximum number of episodes.
+
+    :param policy: Policy to use to play.
+    :param env: Environment to play in.
+    :param feature_extractor: feature extractor to use.
+    :param max_episodes: Maximum number of steps to take.
+    :return: Buffer of standard transition named tuples.
+
+    """
+
+    buffer = []
+    done = False
+    ep_length = 0
+
+    state = feature_extractor.extract_features(env.reset())
+
+    while ep_length < max_steps:
+        torch_state = torch.from_numpy(state).to(torch.float).to(DEVICE)
+
+        action, log_prob, _ = policy.sample_action(torch_state)
+        action = action.detach().cpu().numpy()
+
+        log_prob = log_prob.detach().cpu().numpy()
+
+        next_state, reward, done, _ = env.step(action)
+        next_state = feature_extractor.extract_features(next_state)
+
+        ep_length += 1
+        max_steps_elapsed = ep_length >= max_steps
+
+        buffer.append(
+            Transition(
+                state,
+                action,
+                next_state,
+                reward,
+                False if max_steps_elapsed else done,
+                max_steps_elapsed,
+                log_prob,
+            )
+        )
+
+        state = next_state
+
+        if done:
+            break
+
+
+    return buffer
