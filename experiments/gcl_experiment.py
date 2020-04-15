@@ -141,6 +141,12 @@ parser.add_argument("--num-policy-samples", type=int, default=32)
 parser.add_argument("--save-dir", type=str, default="./results")
 parser.add_argument("--pre-train-iterations", type=int, default=0)
 parser.add_argument("--pre-train-rl-iterations", type=int, default=0)
+parser.add_argument(
+    "--saving-interval",
+    type=int,
+    default=10,
+    help="interval at which IRL saves its models.",
+)
 
 
 def main():
@@ -284,6 +290,7 @@ def main():
         learning_rate=args.lr_irl,
         l2_regularization=args.regularizer,
         save_folder=to_save,
+        saving_interval=args.saving_interval,
     )
 
     print("IRL method intialized.")
@@ -299,10 +306,14 @@ def main():
         gamma=args.gamma,
     )
 
-    rl_method.train(args.pre_train_rl_iterations, args.rl_ep_length, reward_network=irl_method.reward_net)
+    rl_method.train(
+        args.pre_train_rl_iterations,
+        args.rl_ep_length,
+        reward_network=irl_method.reward_net,
+    )
 
     # save intermediate RL result
-    rl_method.policy.save(to_save+'/policy')
+    rl_method.policy.save(to_save + "/policy")
 
     irl_method.train(
         args.irl_iterations,
@@ -331,14 +342,15 @@ def main():
     pd_metrics = pd_metrics.applymap(lambda x: x[0])
     pd_metrics.to_pickle(to_save + "/metrics.pkl")
 
-    with open(to_save + "/rl_data.csv", 'a') as f:
+    with open(to_save + "/rl_data.csv", "a") as f:
         rl_method.data_table.write_csv(f)
 
-    with open(to_save + "/irl_data.csv", 'a') as f:
+    with open(to_save + "/irl_data.csv", "a") as f:
         irl_method.data_table.write_csv(f)
 
-    with open(to_save + "/pre_irl_data.csv", 'a') as f:
+    with open(to_save + "/pre_irl_data.csv", "a") as f:
         irl_method.pre_data_table.write_csv(f)
+
 
 if __name__ == "__main__":
     main()

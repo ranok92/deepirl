@@ -57,6 +57,7 @@ class GeneralDeepMaxent:
         learning_rate=1e-3,
         l2_regularization=1e-5,
         save_folder="./",
+        saving_interval=10,
     ):
         # RL related
         self.rl = rl
@@ -87,11 +88,20 @@ class GeneralDeepMaxent:
         self.tbx_writer = SummaryWriter(
             str(self.save_path / "tensorboard_logs")
         )
+        # highjack RL method's tbx_writer
+        self.rl.tbx_writer = self.tbx_writer
 
         self.data_table = utils.DataTable()
 
         # training meta
         self.training_i = 0
+        self.saving_interval = saving_interval
+
+    def save_models(self, filename=None):
+        self.rl.policy.save(str(self.save_path / "policy"), filename=filename)
+        self.reward_net.save(
+            str(self.save_path / "reward_net"), filename=filename
+        )
 
     def generate_trajectories(
         self, num_trajectories, max_env_steps, stochastic,
@@ -250,8 +260,7 @@ class GeneralDeepMaxent:
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        self.rl.policy.save(str(self.save_path / "policy"))
-        self.reward_net.save(str(self.save_path / "reward_net"))
+        self.save_models(filename="{}.pt".format(self.training_i))
 
         # increment training counter
         self.training_i += 1
@@ -296,6 +305,7 @@ class MixingDeepMaxent(GeneralDeepMaxent):
         learning_rate=0.001,
         l2_regularization=1e-05,
         save_folder="./",
+        saving_interval=25,
     ):
         super().__init__(
             rl,
@@ -304,6 +314,7 @@ class MixingDeepMaxent(GeneralDeepMaxent):
             learning_rate=learning_rate,
             l2_regularization=l2_regularization,
             save_folder=save_folder,
+            saving_interval=saving_interval,
         )
 
         # expert and training datasets
@@ -441,9 +452,8 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        if self.training_i % 50 == 0:
-            self.rl.policy.save(str(self.save_path / "policy"))
-            self.reward_net.save(str(self.save_path / "reward_net"))
+        if self.training_i + 1 % self.saving_interval == 0:
+            self.save_models(filename="{}.pt".format(self.training_i))
 
         # increment training counter
         self.training_i += 1
@@ -523,7 +533,10 @@ class MixingDeepMaxent(GeneralDeepMaxent):
         )
 
         # save policy and reward network
-        self.reward_net.save(str(self.save_path / "reward_net"))
+        self.reward_net.save(
+            str(self.save_path / "reward_net"),
+            filename="pre_{}.pt".format(self.training_i),
+        )
 
         # increment training counter
         self.training_i += 1
@@ -706,7 +719,9 @@ class GCL(MixingDeepMaxent):
             rewards = self.discounted_rewards(rewards, gamma, traj[-1].done)
 
             pi_log_probs = [
-                torch.from_numpy(tran.action_log_prob).to(torch.float).to(DEVICE)
+                torch.from_numpy(tran.action_log_prob)
+                .to(torch.float)
+                .to(DEVICE)
                 for tran in traj
             ]
 
@@ -758,16 +773,15 @@ class GCL(MixingDeepMaxent):
                 "IRL/policy_loss": policy_loss.item(),
                 "IRL/expert_loss": expert_loss.item(),
                 "IRL/total_loss": loss.item(),
-                "IRL/log_Z": log_Z.item()
+                "IRL/log_Z": log_Z.item(),
             },
             self.training_i,
         )
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        if self.training_i % 50 == 0:
-            self.rl.policy.save(str(self.save_path / "policy"))
-            self.reward_net.save(str(self.save_path / "reward_net"))
+        if self.training_i + 1 % self.saving_interval == 0:
+            self.save_models(filename="{}.pt".format(self.training_i))
 
         # increment training counter
         self.training_i += 1

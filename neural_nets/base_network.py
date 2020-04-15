@@ -39,21 +39,25 @@ class BaseNN(nn.Module):
             "cuda" if torch.cuda.is_available() else "cpu"
         )
 
-    def save(self, path):
+    def save(self, path, filename=None):
         """Save the model.
 
         :param path: path in which to save the model.
         """
-        model_i = 0
 
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-        while os.path.exists(os.path.join(path, "%s.pt" % model_i)):
-            model_i += 1
+        if not filename:
+            model_i = 0
 
-        filename = os.path.join(path, "%s.pt" % model_i)
+            while os.path.exists(os.path.join(path, "%s.pt" % model_i)):
+                model_i += 1
 
-        torch.save(self.state_dict(), filename)
+            filename = "{}.pt".format(model_i)
+
+        path = os.path.join(path, filename)
+
+        torch.save(self.state_dict(), path)
 
     def load(self, path):
         """load the model.
@@ -247,6 +251,7 @@ class Checkpointer:
         checkpointer.checkpoint_counter = state["checkpoint_counter"]
 
         return checkpointer
+
     def action_log_probs(self, state):
         """Returns action and action log_probability.
 
