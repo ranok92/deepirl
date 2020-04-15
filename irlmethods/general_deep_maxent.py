@@ -336,6 +336,9 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
         self.pre_data_table = utils.DataTable()
 
+        # initial model save
+        self.save_models(filename="initial_save.pt")
+
     def train_episode(
         self,
         num_rl_episodes,
@@ -452,7 +455,7 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        if self.training_i + 1 % self.saving_interval == 0:
+        if (self.training_i + 1) % self.saving_interval == 0:
             self.save_models(filename="{}.pt".format(self.training_i))
 
         # increment training counter
@@ -592,6 +595,9 @@ class MixingDeepMaxent(GeneralDeepMaxent):
                 num_expert_samples,
                 num_policy_samples,
             )
+
+        # final model save
+        self.save_models(filename="final.pt")
 
 
 class GCL(MixingDeepMaxent):
@@ -780,7 +786,7 @@ class GCL(MixingDeepMaxent):
 
         # save policy and reward network
         # TODO: make a uniform dumping function for all agents.
-        if self.training_i + 1 % self.saving_interval == 0:
+        if (self.training_i + 1) % self.saving_interval == 0:
             self.save_models(filename="{}.pt".format(self.training_i))
 
         # increment training counter
