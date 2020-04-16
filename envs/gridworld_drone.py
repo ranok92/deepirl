@@ -458,7 +458,7 @@ class GridWorldDrone(GridWorld):
 
 
                 self.ghost_state = self.pedestrian_dict[element[1]][str(self.current_frame)]
-                self.ghost_state_history.append(self.ghost_state)
+                self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
 
         self.state['obstacles'] = self.obstacles
 
@@ -518,10 +518,10 @@ class GridWorldDrone(GridWorld):
 
         if self.show_trail:
 
-            self.draw_trajectory(self.pos_history, self.black)
+            self.draw_trajectory(self.pos_history, self.black, show_frames=False)
 
             if self.ghost:
-                self.draw_trajectory(self.ghost_state_history, self.ghost_color)
+                self.draw_trajectory(self.ghost_state_history, self.ghost_color, show_frames=False)
 
 
         pygame.display.update()
@@ -579,10 +579,10 @@ class GridWorldDrone(GridWorld):
 
             self.heading_dir_history.append(self.cur_heading_dir)
 
-            self.pos_history.append(copy.deepcopy(self.agent_state))
+            self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
 
             if self.ghost:
-                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
+                self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
 
         #calculate the reward and completion condition
         reward, done = self.calculate_reward(action)
@@ -731,9 +731,9 @@ class GridWorldDrone(GridWorld):
             #if self.obstacles is not None:
             self.state['obstacles'] = self.obstacles
 
-            self.pos_history.append(copy.deepcopy(self.agent_state))
+            self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
             if self.ghost:
-                self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
+                self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
 
             self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
             self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
@@ -825,16 +825,16 @@ class GridWorldDrone(GridWorld):
         self.state['obstacles'] = self.obstacles
 
         self.pos_history = []
-        self.pos_history.append(copy.deepcopy(self.agent_state))
+        self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
         if self.ghost:
             self.ghost_state_history = []
             self.ghost_state = copy.deepcopy(self.agent_state)
-            self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
+            self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
 
         if self.ghost:
             self.ghost_state_history = []
             self.ghost_state = copy.deepcopy(self.agent_state)
-            self.ghost_state_history.append(copy.deepcopy(self.ghost_state))
+            self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
 
         self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
@@ -987,30 +987,75 @@ class GridWorldDrone(GridWorld):
                              (arrow_end[1], arrow_end[0]), 2)
 
 
-    def draw_trajectory(self, trajectory=[], color=None):
+    def draw_trajectory(self, trajectory=[], color=None, show_frames=False):
+        """
+        Draws a trajectory on the environment map based on the list of states provided
+        in the trajectory list.
+        input:
+            trajectory : A list of tuples, where each tuple in the list consists of :
+                            (state dictionary, frame_id of that state)
+            color : The color to draw the trajectory.
 
+            show_frames : If none or int to specify the interval at which the trajectory 
+                          will be annotated with the current frame. 
+
+        output: 
+            A line that traces the positions taken by the entity whose state history
+            is provided in the trajectory variable.
+        """
         #pdb.set_trace()
         arrow_length = 1
         arrow_head_width = 1
         arrow_width = .1
+
+        font = pygame.freetype.Font(None, 10)
+
         #denotes the start and end positions of the trajectory
 
         rad = int(self.cellWidth*.4)
-        start_pos=(trajectory[0]['position']+.5)*self.cellWidth
-        end_pos=(trajectory[-1]['position']+0.5)*self.cellWidth
+        start_pos=(trajectory[0][0]['position']+.5)*self.cellWidth
+        end_pos=(trajectory[-1][0]['position']+0.5)*self.cellWidth
 
+        start_frame = trajectory[0][1]
+        end_frame = trajectory[-1][1]
+
+        #draw the start and end of the trajectory
         pygame.draw.circle(self.gameDisplay,(0,255,0),
                             (int(start_pos[1]),int(start_pos[0])),
                             rad)
 
+
         pygame.draw.circle(self.gameDisplay,(0,0,255),
                     (int(end_pos[1]),int(end_pos[0])),
                     rad)
+        
+        #write the start and end frame of the trajectory
+        
+        font.render_to(self.gameDisplay, 
+                              (start_pos[1]-(self.obs_width/2)-10,start_pos[0]-(self.obs_width/2)-5), 
+                              str(start_frame), fgcolor=(0,0,0))
 
+        font.render_to(self.gameDisplay, 
+                              (end_pos[1]-(self.obs_width/2)-10,end_pos[0]-(self.obs_width/2)-5), 
+                              str(end_frame), fgcolor=(0,0,0))
+        current_frame = start_frame
         for count in range(len(trajectory)-1):
-            #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
-            self.draw_arrow(trajectory[count]['position'],trajectory[count+1]['position'], color)
 
+            if show_frames:
+                if count%show_frames == 0:
+                    cur_pos = trajectory[count][0]['position']
+                    
+                    pygame.draw.circle(self.gameDisplay,(0,0,255),
+                                (int(cur_pos[1]),int(cur_pos[0])),
+                                3)
+
+                    font.render_to(self.gameDisplay, 
+                              (trajectory[count][0]['position'][1]-(self.obs_width/2)-10,
+                               trajectory[count][0]['position'][0]-(self.obs_width/2)-5), 
+                               str(current_frame), fgcolor=(0,0,0))
+            #pygame.draw.lines(self.gameDisplay,color[counter],False,trajectory_run)
+            self.draw_arrow(trajectory[count][0]['position'],trajectory[count+1][0]['position'], color)
+            current_frame = trajectory[count][1]
 
 
 class UCYWorld(GridWorldDrone):
