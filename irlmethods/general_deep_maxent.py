@@ -701,51 +701,85 @@ class GCL(MixingDeepMaxent):
             self.expert_trajectories, num_policy_samples // 2
         )
 
-        for traj in expert_mixin_samples:
-            policy_rewards = self.reward_net(traj)
-            policy_loss += self.discounted_rewards(
-                policy_rewards, gamma, account_for_terminal_state
-            )
+        # rewards = []
+        # for traj in expert_mixin_samples:
+        #     policy_rewards = self.reward_net(traj)
+        #     rewards.append(
+        #         self.discounted_rewards(
+        #             policy_rewards, gamma, account_for_terminal_state
+        #         )
+        #     )
+
+        # rewards = torch.cat(rewards)
+        # max_reward = torch.max(rewards)
+        # policy_loss += max_reward + torch.log(torch.exp(rewards - max_reward).sum())
 
         # generator loss
         # approx Z from samples
 
-        exponents = []
-        traj_rewards = []
+        # exponents = []
+        # traj_rewards = []
 
+        # for traj in trajectories:
+        #     traj_states = [
+        #         torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
+        #         for tran in traj
+        #     ]
+        #     traj_states = torch.stack(traj_states)
+
+        #     rewards = self.reward_net(traj_states)
+        #     traj_rewards.append(rewards.sum().clone())
+        #     rewards = self.discounted_rewards(rewards, gamma, traj[-1].done)
+
+        #     pi_log_probs = [
+        #         torch.from_numpy(tran.action_log_prob)
+        #         .to(torch.float)
+        #         .to(DEVICE)
+        #         for tran in traj
+        #     ]
+
+        #     exponent = rewards - torch.stack(pi_log_probs).sum()
+        #     exponents.append(exponent)
+
+        # exponents = torch.cat(exponents)
+        # max_exponent = torch.max(exponents)
+
+        # log_Z = max_exponent + torch.exp(exponents - max_exponent).sum()
+        # print(log_Z)
+
+        # is_weights = torch.zeros(num_policy_samples // 2)
+        # for idx, traj in enumerate(trajectories):
+        #     is_weights[idx] = torch.exp(exponents[idx] - log_Z)
+
+        # policy_loss += (torch.tensor(traj_rewards) * is_weights.detach()).sum()
+
+        rewards = []
+        log_pis = []
         for traj in trajectories:
-            traj_states = [
+            states = [
                 torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
                 for tran in traj
             ]
-            traj_states = torch.stack(traj_states)
+            states = torch.stack(states)
 
-            rewards = self.reward_net(traj_states)
-            traj_rewards.append(rewards.sum().clone())
-            rewards = self.discounted_rewards(rewards, gamma, traj[-1].done)
-
-            pi_log_probs = [
+            reward = self.reward_net(states)
+            reward_sum = self.discounted_rewards(reward, gamma, traj[-1].done)
+            rewards.append(reward_sum)
+            log_pi = [
                 torch.from_numpy(tran.action_log_prob)
                 .to(torch.float)
                 .to(DEVICE)
                 for tran in traj
             ]
+            log_pis.append(torch.tensor(log_pi).sum())
 
-            exponent = rewards - torch.stack(pi_log_probs).sum()
-            exponents.append(exponent)
-
-        exponents = torch.cat(exponents)
+        # log sum exp trick
+        exponents = torch.cat(rewards) - torch.tensor(log_pis).to(DEVICE)
         max_exponent = torch.max(exponents)
+        log_Z = max_exponent + torch.log(torch.exp(exponents - max_exponent).sum())
 
-        log_Z = max_exponent + torch.exp(exponents - max_exponent).sum()
-        print(log_Z)
-
-        is_weights = torch.zeros(num_policy_samples // 2)
-        for idx, traj in enumerate(trajectories):
-            is_weights[idx] = torch.exp(exponents[idx] - log_Z)
-
-        policy_loss += (torch.tensor(traj_rewards) * is_weights.detach()).sum()
-        policy_loss = (num_expert_samples / num_policy_samples) * policy_loss
+        policy_loss += log_Z
+        policy_loss = ( num_expert_samples) * policy_loss
 
         # Backpropagate IRL loss
         loss = policy_loss - expert_loss
