@@ -29,17 +29,27 @@ def compute_trajectory_smoothness(trajectory):
     return change_in_orientation, change_in_orientation / len(trajectory)
 
 
-def compute_distance_displacement_ratio(trajectory, compare_expert=True):
+def compute_distance_displacement_ratio(trajectory, agent_radius, 
+                                        collision_penalty=200):
     """
     Returns the ration between the final displacement achieved by the agent and
     the distance travelled by the agent. Meant as an objective
     measure of the goodness of the path taken by the agent
     The value is in the range of [1 - 0], where values close to
     1 indicate that the path taken by the agent are close to
-    optimal paths that could have been taken
+    optimal paths that could have been taken.
+
+    Penalizes the trajectory length with +100 steps with each collision with 
+    obstacles.
         input : trajectory
+                agent_radius (to calculate the total collisions)
+                collision_penalty
+                
         output : final dispacement/ total distance travelled
     """
+    total_collisions = count_collisions(trajectory, agent_radius)
+
+    penalty_from_collision = total_collisions*collision_penalty
 
     total_displacement = np.linalg.norm(
         trajectory[0]["agent_state"]["position"]
@@ -57,7 +67,9 @@ def compute_distance_displacement_ratio(trajectory, compare_expert=True):
         total_distance += step_distance
         prev_pos = state["agent_state"]["position"]
 
-    return total_displacement / total_distance
+    total_distance_w_collisions = total_distance + penalty_from_collision
+
+    return total_displacement / total_distance_w_collisions
 
 
 def proxemic_intrusions(trajectory, units_to_meters_ratio):
