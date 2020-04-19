@@ -714,44 +714,190 @@ class GCL(MixingDeepMaxent):
         # max_reward = torch.max(rewards)
         # policy_loss += max_reward + torch.log(torch.exp(rewards - max_reward).sum())
 
-        # generator loss
-        # approx Z from samples
+        rewards = []
+        log_pis = []
+        for traj in trajectories:
+            states = [
+                torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
+                for tran in traj
+            ]
+            states = torch.stack(states)
 
-        # exponents = []
-        # traj_rewards = []
+            reward = self.reward_net(states)
+            reward_sum = self.discounted_rewards(reward, gamma, traj[-1].done)
+            rewards.append(reward_sum)
+            log_pi = [
+                torch.from_numpy(tran.action_log_prob)
+                .to(torch.float)
+                .to(DEVICE)
+                for tran in traj
+            ]
+            log_pis.append(torch.tensor(log_pi).sum())
 
-        # for traj in trajectories:
-        #     traj_states = [
-        #         torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
-        #         for tran in traj
-        #     ]
-        #     traj_states = torch.stack(traj_states)
+        # log sum exp trick
+        exponents = torch.cat(rewards) - torch.tensor(log_pis).to(DEVICE)
+        max_exponent = torch.max(exponents)
+        log_Z = max_exponent + torch.log(
+            torch.exp(exponents - max_exponent).sum()
+        )
 
-        #     rewards = self.reward_net(traj_states)
-        #     traj_rewards.append(rewards.sum().clone())
-        #     rewards = self.discounted_rewards(rewards, gamma, traj[-1].done)
+        policy_loss += log_Z
+        policy_loss = (num_expert_samples) * policy_loss
 
-        #     pi_log_probs = [
-        #         torch.from_numpy(tran.action_log_prob)
-        #         .to(torch.float)
-        #         .to(DEVICE)
-        #         for tran in traj
-        #     ]
+        # Backpropagate IRL loss
+        loss = policy_loss - expert_loss
 
-        #     exponent = rewards - torch.stack(pi_log_probs).sum()
-        #     exponents.append(exponent)
+        self.reward_optim.zero_grad()
+        loss.backward()
+        self.reward_optim.step()
 
-        # exponents = torch.cat(exponents)
-        # max_exponent = torch.max(exponents)
+        # train RL agent
+        if reset_training:
+            self.rl.reset_training()
 
-        # log_Z = max_exponent + torch.exp(exponents - max_exponent).sum()
-        # print(log_Z)
+        self.rl.train(
+            num_rl_episodes,
+            max_rl_episode_length,
+            reward_network=self.reward_net,
+        )
 
-        # is_weights = torch.zeros(num_policy_samples // 2)
-        # for idx, traj in enumerate(trajectories):
-        #     is_weights[idx] = torch.exp(exponents[idx] - log_Z)
+        # logging
+        self.tbx_writer.add_scalar(
+            "IRL/policy_loss", policy_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar(
+            "IRL/expert_loss", expert_loss, self.training_i
+        )
+        self.tbx_writer.add_scalar("IRL/total_loss", loss, self.training_i)
+        self.tbx_writer.add_scalar("IRL/log_Z", log_Z.item(), self.training_i)
 
-        # policy_loss += (torch.tensor(traj_rewards) * is_weights.detach()).sum()
+        self.data_table.add_row(
+            {
+                "IRL/policy_loss": policy_loss.item(),
+                "IRL/expert_loss": expert_loss.item(),
+                "IRL/total_loss": loss.item(),
+                "IRL/log_Z": log_Z.item(),
+            },
+            self.training_i,
+        )
+
+        # save policy and reward network
+        # TODO: make a uniform dumping function for all agents.
+        if (self.training_i + 1) % self.saving_interval == 0:
+            self.save_models(filename="{}.pt".format(self.training_i))
+
+        # increment training counter
+        self.training_i += 1
+
+
+class PerTrajGCL(GCL):
+    def generate_trajectories(self, num_trajectories, max_env_steps, ped_id):
+        """
+        Generate trajectories in environemnt using leanred RL policy.
+
+        :param num_trajectories: number of trajectories to generate.
+        :type num_trajectories: int
+
+        :param max_env_steps: max steps to take in environment (rollout length.)
+        :type max_env_steps: int
+
+        :return: list of features encountered in playthrough.
+        :rtype: list of tensors of shape (num_states x feature_length)
+        """
+        buffers = []
+
+        for _ in range(num_trajectories):
+            generated_buffer = play_complete(
+                self.rl.policy,
+                self.env,
+                self.feature_extractor,
+                max_env_steps,
+                ped_id=ped_id,
+            )
+
+            buffers.append(generated_buffer)
+
+        return buffers
+
+    def train_episode(
+        self,
+        num_rl_episodes,
+        max_rl_episode_length,
+        max_env_steps,
+        reset_training,
+        account_for_terminal_state,
+        gamma,
+        stochastic_sampling,
+        num_expert_samples,
+        num_policy_samples,
+    ):
+        """
+        perform IRL with mix-in of expert samples.
+
+        :param num_rl_episodes: Number of RL iterations for this IRL iteration.
+        :type num_rl_episodes: int.
+
+        :param max_rl_episode_length: maximum number of environment steps to
+        take when doing rollouts using learned RL agent.
+        :type max_rl_episode_length: int
+
+        :param num_trajectory_samples: Number of trajectories to sample using
+        learned RL agent.
+        :type num_trajectory_samples: int
+
+        :param max_env_steps: maximum number of environment steps to take,
+        both when training RL agent and when generating rollouts.
+        :type max_env_steps: int
+
+        :param reset_training: Whether to reset RL training every iteration
+        or not.
+        :type reset_training: Boolean.
+
+        :param account_for_terminal_state: Whether to account for a state
+        being terminal or not. If true, (gamma/1-gamma)*R will be immitated
+        by padding the trajectory with its ending state until max_env_steps
+        length is reached. e.g. if max_env_steps is 5, the trajectory [s_0,
+        s_1, s_2] will be padded to [s_0, s_1, s_2, s_2, s_2].
+        :type account_for_terminal_state: Boolean.
+
+        :param gamma: The discounting factor.
+        :type gamma: float.
+
+        :param stochastic_sampling: Sample trajectories using stochastic
+        policy instead of deterministic 'best action policy'
+        :type stochastic_sampling: Boolean.
+        """
+
+        ped_start_idx = self.training_i % len(self.expert_trajectories)
+
+        # expert loss
+        expert_loss = 0
+        expert_samples = random.sample(
+            list(enumerate(self.expert_trajectories)), num_expert_samples
+        )
+
+        for _, traj in expert_samples:
+            expert_rewards = self.reward_net(traj)
+
+            expert_loss += self.discounted_rewards(
+                expert_rewards, gamma, account_for_terminal_state
+            )
+
+        # policy loss
+        trajectories = []
+        for idx, _ in expert_samples:
+            trajectories.extend(
+                self.generate_trajectories(
+                    num_expert_samples // 2, max_env_steps, idx
+                )
+            )
+
+        policy_loss = 0
+
+        # mix in expert samples.
+        expert_mixin_samples = random.sample(
+            self.expert_trajectories, num_policy_samples // 2
+        )
 
         rewards = []
         log_pis = []
@@ -776,10 +922,12 @@ class GCL(MixingDeepMaxent):
         # log sum exp trick
         exponents = torch.cat(rewards) - torch.tensor(log_pis).to(DEVICE)
         max_exponent = torch.max(exponents)
-        log_Z = max_exponent + torch.log(torch.exp(exponents - max_exponent).sum())
+        log_Z = max_exponent + torch.log(
+            torch.exp(exponents - max_exponent).sum()
+        )
 
         policy_loss += log_Z
-        policy_loss = ( num_expert_samples) * policy_loss
+        policy_loss = (num_expert_samples) * policy_loss
 
         # Backpropagate IRL loss
         loss = policy_loss - expert_loss

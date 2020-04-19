@@ -232,7 +232,7 @@ Transition = collections.namedtuple(
 Transition.__new__.__defaults__ = (None,) * len(Transition._fields)
 
 
-def play_complete(policy, env, feature_extractor, max_steps):
+def play_complete(policy, env, feature_extractor, max_steps, ped_id=None):
     """
     Plays using policy on environment for a maximum number of episodes.
 
@@ -248,7 +248,7 @@ def play_complete(policy, env, feature_extractor, max_steps):
     done = False
     ep_length = 0
 
-    state = feature_extractor.extract_features(env.reset())
+    state = feature_extractor.extract_features(env.reset(ped_id))
 
     while ep_length < max_steps:
         torch_state = torch.from_numpy(state).to(torch.float).to(DEVICE)
