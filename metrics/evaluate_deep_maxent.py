@@ -7,7 +7,7 @@ from datetime import datetime
 import numpy as np
 
 import torch
-
+import os
 sys.path.insert(0, "..")  # NOQA: E402
 sys.path.insert(0, "../..")  # NOQA: E402
 
@@ -15,7 +15,7 @@ import pickle
 
 from rlmethods.b_actor_critic import Policy
 
-
+import pdb
 import metrics
 import metric_utils
 
@@ -52,7 +52,7 @@ students003_processed_corrected.txt',
 
 parser.add_argument("--reward-path", type=str, nargs="?", default=None)
 
-parser.add_argument("--policy-path", type=str, required=True)
+parser.add_argument("--parent-policy-folder", type=str, required=True)
 
 parser.add_argument("--output-name", type=str, default="deep_maxent_eval")
 
@@ -68,6 +68,11 @@ def main(args):
     agent_width = 10
     obs_width = 10
     grid_size = 10
+
+
+    assert os.path.isdir(args.parent_policy_folder), "Folder does not exist!"
+
+    folder_dict = metric_utils.read_files_from_directories(args.parent_policy_folder)
 
     output["eval parameters"] = vars(args)
 
@@ -186,51 +191,61 @@ def main(args):
     output["feature_extractor"] = feat_ext
 
     # initialize policy
-    sample_state = env.reset()
-    state_size = feat_ext.extract_features(sample_state).shape[0]
-    policy = Policy(state_size, env.action_space.n, [256])
-    policy.load(args.policy_path)
-    policy.to(DEVICE)
+    for sub_folder in folder_dict:
 
-    # metric parameters
-    metric_applicator = metric_utils.MetricApplicator()
-    metric_applicator.add_metric(metrics.compute_trajectory_smoothness)
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
-    metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
-    metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
-    metric_applicator.add_metric(metrics.count_collisions, [10])
-    metric_applicator.add_metric(metrics.goal_reached, [10, 10])
-    metric_applicator.add_metric(metrics.pedestrian_hit, [10])
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
-    metric_applicator.add_metric(metrics.trajectory_length)
-    metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
-    # collect trajectories and apply metrics
-    num_peds = len(env.pedestrian_dict.keys())
-    output["metrics"] = metric_applicator.get_metrics()
-    output["metric_results"] = {}
+        for file in folder_dict[sub_folder]:
 
-    metric_results = metric_utils.collect_trajectories_and_metrics(
-        env,
-        feat_ext,
-        policy,
-        num_peds,
-        args.max_ep_length,
-        metric_applicator,
-        disregard_collisions=args.disregard_collisions,
-    )
+            policy_path = file
+            output_file = file.split('/')[-3:]
+            output_filename = ''
+            for data in output_file:
+                output_filename+=data
+            output_filename = output_filename.split('.')[0]
 
-    output["metric_results"] = metric_results
+            sample_state = env.reset()
+            state_size = feat_ext.extract_features(sample_state).shape[0]
+            policy = Policy(state_size, env.action_space.n, [256])
+            policy.load(policy_path)
+            policy.to(DEVICE)
 
-    pathlib.Path('./results/').mkdir(exist_ok=True)
+            # metric parameters
+            metric_applicator = metric_utils.MetricApplicator()
+            metric_applicator.add_metric(metrics.compute_trajectory_smoothness, [10])
+            metric_applicator.add_metric(metrics.compute_distance_displacement_ratio, [10])
+            metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
+            metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
+            metric_applicator.add_metric(metrics.count_collisions, [10])
+            metric_applicator.add_metric(metrics.goal_reached, [10, 10])
+            metric_applicator.add_metric(metrics.pedestrian_hit, [10])
+            metric_applicator.add_metric(metrics.trajectory_length)
+            metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
+            # collect trajectories and apply metrics
+            num_peds = len(env.pedestrian_dict.keys())
+            output["metrics"] = metric_applicator.get_metrics()
+            output["metric_results"] = {}
 
-    with open(
-        "./results/"
-        + args.output_name
-        + "_"
-        + datetime.now().strftime("%Y-%m-%d-%H:%M"),
-        "wb",
-    ) as f:
-        pickle.dump(output, f)
+            metric_results = metric_utils.collect_trajectories_and_metrics(
+                env,
+                feat_ext,
+                policy,
+                num_peds,
+                args.max_ep_length,
+                metric_applicator,
+                disregard_collisions=args.disregard_collisions,
+            )
+
+            output["metric_results"] = metric_results
+
+            pathlib.Path('./results/').mkdir(exist_ok=True)
+
+            with open(
+                "./results/"
+                + output_filename
+                + "_"
+                + datetime.now().strftime("%Y-%m-%d-%H:%M"),
+                "wb",
+            ) as f:
+                pickle.dump(output, f)
 
 
 if __name__ == "__main__":

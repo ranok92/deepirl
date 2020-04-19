@@ -105,6 +105,7 @@ class PotentialFieldController():
         calculates the attractive force the agent is experiencing given the 
         position of the agent and the goal
         returns a 2 dim vector
+        Equation 12. Khatib 1986
         '''
         global_coord = agent_state['position']
         #pdb.set_trace()
@@ -126,7 +127,9 @@ class PotentialFieldController():
     #calculates the repulsive force the agent experiences given its position and 
     #the position of the obstacles
     def calculate_repulsive_force_btwpoints(self, agent_state, obs):
-
+        '''
+        Equation 18 Khatib 1986
+        '''
         agent = agent_state['position']
         obs = obs['position']
         rho = np.hypot(agent[0]-obs[0], agent[1]-obs[1])+self.eps
