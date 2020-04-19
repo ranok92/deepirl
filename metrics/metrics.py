@@ -5,16 +5,23 @@ from featureExtractor.drone_feature_extractor import dist_2d, angle_between
 import warnings
 
 
-def compute_trajectory_smoothness(trajectory):
+def compute_trajectory_smoothness(trajectory, agent_radius, 
+                                 collision_penalty=100):
     """
     Returns the total and per step change in the orientation (in degrees)
     of the agent during the duration of the trajectory
+    Penalizes each collision with some penalty.
         input : trajectory (a list of states)
+                agent_radius 
+                collision_penalty
+
         output : total change in orientation,
                  avg change in orientation
     """
 
-    change_in_orientation = 0
+    collision_penalty_total = count_collisions(trajectory, agent_radius) * \
+                              collision_penalty
+    change_in_orientation = collision_penalty_total
     prev_orientation = None
     for state in trajectory:
 
