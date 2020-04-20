@@ -147,6 +147,7 @@ parser.add_argument(
     default=10,
     help="interval at which IRL saves its models.",
 )
+parser.add_argument("--pedestrian-width", type=float, default=10.0)
 
 
 def main():
@@ -180,9 +181,9 @@ def main():
         is_random=False,
         rows=576,
         cols=720,
-        agent_width=10,
+        agent_width=args.pedestrian_width,
         step_size=2,
-        obs_width=10,
+        obs_width=args.pedestrian_width,
         width=10,
         subject=args.subject,
         annotation_file=args.annotation_file,
