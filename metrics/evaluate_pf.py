@@ -30,14 +30,6 @@ parser.add_argument(
     help="Max length of a single episode.",
 )
 
-parser.add_argument(
-    "--feat-extractor",
-    type=str,
-    required=True,
-    help="The name of the \
-                     feature extractor to be used in the experiment.",
-)
-
 parser.add_argument("--dont-replace-subject", action="store_false")
 
 parser.add_argument(
@@ -51,8 +43,6 @@ students003_processed_corrected.txt',
 )
 
 parser.add_argument("--reward-path", type=str, nargs="?", default=None)
-
-parser.add_argument("--policy-path", type=str, required=True)
 
 parser.add_argument("--output-name", type=str, default="deep_maxent_eval")
 
@@ -117,6 +107,7 @@ def main(args):
 
     feat_ext_args = {}
     feat_ext = None
+    '''
     if args.feat_extractor == "DroneFeatureRisk_speedv2":
 
         feat_ext_args = {
@@ -187,7 +178,7 @@ def main(args):
 
     output["feature_extractor_params"] = feat_ext_args
     output["feature_extractor"] = feat_ext
-
+    '''
     # initialize policy
     '''
     sample_state = env.reset()
@@ -204,14 +195,13 @@ def main(args):
 
     # metric parameters
     metric_applicator = metric_utils.MetricApplicator()
-    metric_applicator.add_metric(metrics.compute_trajectory_smoothness)
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
+    metric_applicator.add_metric(metrics.compute_trajectory_smoothness, [10])
+    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio, [10])
     metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
     metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
     metric_applicator.add_metric(metrics.count_collisions, [10])
     metric_applicator.add_metric(metrics.goal_reached, [10, 10])
     metric_applicator.add_metric(metrics.pedestrian_hit, [10])
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.trajectory_length)
     metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
     # collect trajectories and apply metrics
