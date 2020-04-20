@@ -278,8 +278,6 @@ def main():
     if args.policy_path is not None:
         rl_method.policy.load(args.policy_path)
 
-    import pdb; pdb.set_trace()
-
     experiment_logger.log_header("Details of the RL method :")
     experiment_logger.log_info(rl_method.__dict__)
 
