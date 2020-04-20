@@ -3,7 +3,7 @@
 import numpy as np
 from featureExtractor.drone_feature_extractor import dist_2d, angle_between
 import warnings
-
+import ipdb
 
 def compute_trajectory_smoothness(trajectory, agent_radius, 
                                  collision_penalty=100):
@@ -240,7 +240,7 @@ def count_collisions(trajectory, agent_radius):
         for pedestrian in state["obstacles"]:
             ped_position = pedestrian["position"]
 
-            if dist_2d(ped_position, agent_pos) < 2 * agent_radius:
+            if dist_2d(ped_position, agent_pos) <= agent_radius:
                 if pedestrian['id'] not in collision_list:
                     collision_count += 1
                     collision_list.append(pedestrian['id'])
@@ -304,7 +304,7 @@ def pedestrian_hit(trajectory, agent_radius):
 
             distance = dist_2d(ped_position, agent_position)
 
-            if distance < 2 * agent_radius:
+            if distance <= (agent_radius):
                 return True
 
     return False

@@ -222,7 +222,7 @@ def collect_trajectories_and_metrics_non_NN(
 
         state = env.reset()
         current_pedestrian = env.cur_ped
-        print("Collecting trajectory {}".format(current_pedestrian))
+        print("Collecting trajectory {} \r".format(current_pedestrian))
         done = False
         t = 0
         traj = [copy.deepcopy(state)]
