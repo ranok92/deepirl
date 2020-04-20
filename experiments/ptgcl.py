@@ -171,7 +171,7 @@ def main():
     experiment_logger.log_header("Arguments for the experiment :")
     experiment_logger.log_info(vars(args))
 
-    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor)
+    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor, obs_width=args.pedestrian_width, agent_width=args.pedestrian_width)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
