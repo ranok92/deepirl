@@ -106,8 +106,8 @@ class LTHMP2020(MetricApplicator):
         self.add_metric(metrics.compute_distance_displacement_ratio)
         self.add_metric(metrics.proxemic_intrusions, [3])
         self.add_metric(metrics.anisotropic_intrusions, [20])
-        self.add_metric(metrics.count_collisions, [20])
-        self.add_metric(metrics.goal_reached, [10, 10])
+        self.add_metric(metrics.count_collisions, [5])
+        self.add_metric(metrics.goal_reached, [10, 5])
         self.add_metric(metrics.trajectory_length)
 
 

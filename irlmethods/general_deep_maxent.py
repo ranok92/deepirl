@@ -868,8 +868,6 @@ class PerTrajGCL(GCL):
         :type stochastic_sampling: Boolean.
         """
 
-        ped_start_idx = self.training_i % len(self.expert_trajectories)
-
         # expert loss
         expert_loss = 0
         expert_samples = random.sample(
@@ -888,7 +886,7 @@ class PerTrajGCL(GCL):
         for idx, _ in expert_samples:
             trajectories.extend(
                 self.generate_trajectories(
-                    num_expert_samples // 2, max_env_steps, idx
+                    num_policy_samples, max_env_steps, idx+1
                 )
             )
 
@@ -906,6 +904,7 @@ class PerTrajGCL(GCL):
                 torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
                 for tran in traj
             ]
+            states.append(torch.from_numpy(traj[-1].next_state).to(torch.float).to(DEVICE))
             states = torch.stack(states)
 
             reward = self.reward_net(states)

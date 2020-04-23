@@ -337,6 +337,7 @@ def main():
         len(expert_trajectories),
         args.rl_ep_length,
         metric_applicator,
+        disregard_collisions=True,
     )
 
     pd_metrics = pd.DataFrame(metric_results).T
