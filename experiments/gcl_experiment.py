@@ -283,7 +283,6 @@ def main():
 
     expert_trajectories = read_expert_trajectories(args.exp_trajectory_path)
 
-    import pdb; pdb.set_trace()
     irl_method = GCL(
         rl=rl_method,
         env=env,
