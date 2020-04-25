@@ -14,6 +14,7 @@ from tensorboardX import SummaryWriter
 sys.path.insert(0, "..")
 from neural_nets.base_network import BaseNN
 from irlmethods.irlUtils import play_features as play
+from irlmethods.irlUtils import lcr_regularizer, monotonic_regularizer
 from rlmethods.rlutils import play_complete
 import utils
 
@@ -677,6 +678,10 @@ class GCL(MixingDeepMaxent):
         :type stochastic_sampling: Boolean.
         """
 
+        # regularizers
+        g_lcr = 0
+        g_mono = 0
+
         # expert loss
         expert_loss = 0
         expert_samples = random.sample(
@@ -685,34 +690,18 @@ class GCL(MixingDeepMaxent):
         for traj in expert_samples:
             expert_rewards = self.reward_net(traj)
 
+            # update regularizers
+            g_lcr += lcr_regularizer(expert_rewards)
+            g_mono += monotonic_regularizer(expert_rewards)
+
             expert_loss += self.discounted_rewards(
                 expert_rewards, gamma, account_for_terminal_state
             )
 
         # policy loss
         trajectories = self.generate_trajectories(
-            num_expert_samples // 2, max_env_steps
+            num_expert_samples, max_env_steps
         )
-
-        policy_loss = 0
-
-        # mix in expert samples.
-        expert_mixin_samples = random.sample(
-            self.expert_trajectories, num_policy_samples // 2
-        )
-
-        # rewards = []
-        # for traj in expert_mixin_samples:
-        #     policy_rewards = self.reward_net(traj)
-        #     rewards.append(
-        #         self.discounted_rewards(
-        #             policy_rewards, gamma, account_for_terminal_state
-        #         )
-        #     )
-
-        # rewards = torch.cat(rewards)
-        # max_reward = torch.max(rewards)
-        # policy_loss += max_reward + torch.log(torch.exp(rewards - max_reward).sum())
 
         rewards = []
         log_pis = []
@@ -721,9 +710,19 @@ class GCL(MixingDeepMaxent):
                 torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
                 for tran in traj
             ]
+            states.append(
+                torch.from_numpy(traj[-1].next_state)
+                .to(torch.float)
+                .to(DEVICE)
+            )
             states = torch.stack(states)
 
             reward = self.reward_net(states)
+
+            #update regularizers
+            g_lcr += lcr_regularizer(reward)
+            g_mono += lcr_regularizer(reward)
+
             reward_sum = self.discounted_rewards(reward, gamma, traj[-1].done)
             rewards.append(reward_sum)
             log_pi = [
@@ -741,11 +740,11 @@ class GCL(MixingDeepMaxent):
             torch.exp(exponents - max_exponent).sum()
         )
 
-        policy_loss += log_Z
+        policy_loss = log_Z
         policy_loss = (num_expert_samples) * policy_loss
 
         # Backpropagate IRL loss
-        loss = policy_loss - expert_loss
+        loss = policy_loss - expert_loss + g_mono + g_lcr
 
         self.reward_optim.zero_grad()
         loss.backward()
@@ -886,7 +885,7 @@ class PerTrajGCL(GCL):
         for idx, _ in expert_samples:
             trajectories.extend(
                 self.generate_trajectories(
-                    num_policy_samples, max_env_steps, idx+1
+                    num_policy_samples, max_env_steps, idx + 1
                 )
             )
 
@@ -904,7 +903,11 @@ class PerTrajGCL(GCL):
                 torch.from_numpy(tran.state).to(torch.float).to(DEVICE)
                 for tran in traj
             ]
-            states.append(torch.from_numpy(traj[-1].next_state).to(torch.float).to(DEVICE))
+            states.append(
+                torch.from_numpy(traj[-1].next_state)
+                .to(torch.float)
+                .to(DEVICE)
+            )
             states = torch.stack(states)
 
             reward = self.reward_net(states)

@@ -965,6 +965,42 @@ def play_features(
 
     return torch.stack(features, dim=0)
 
+
+def lcr_regularizer(rewards):
+    """
+    implements locally constant rate (LCR) regularizer from guided cost learning.
+    This is basically a second derivative penalty.
+
+    :param rewards: torch tensor stack of rewards, which must still contain backprop info.
+    :type rewards: torch.tensor
+    """
+
+    if len(rewards) < 3:
+        return 0
+
+    g_lcr = (rewards[2:] - rewards[1:-1]) - (rewards[1:-1] - rewards[:-2])
+    g_lcr = g_lcr ** 2
+
+    return g_lcr.sum()
+
+def monotonic_regularizer(rewards):
+    """
+    Implements a penalty encouraging monotonic increase in rewards, from guided cost learning.
+
+    :param rewards: torch tensor stack of rewards, which must still contain backprop info.
+    :type rewards: torch.tensor
+    """
+
+    if len(rewards) < 2:
+        return 0
+
+    g_mono = rewards[:-1] - rewards[1:] - 1
+    zeros = torch.zeros(g_mono.shape).to(DEVICE)
+    g_mono = (torch.max(zeros, g_mono)) ** 2
+
+    return g_mono.sum()
+
+
 if __name__ == '__main__':
 
     
