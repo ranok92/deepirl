@@ -382,8 +382,8 @@ def extract_trajectory(annotation_file,
             state, _, _, _ = world.step()
             step_counter_segment += 1
             #step_counter_trajectory += 1 
-            if disp:
-                feature_extractor.overlay_bins(state)
+            #if disp:
+            #    feature_extractor.overlay_bins(state)
 
             if extract_action:
                 
@@ -410,9 +410,7 @@ def extract_trajectory(annotation_file,
             if feature_extractor is not None:
                 state = feature_extractor.extract_features(state)
                 state = torch.tensor(state)
-            
-            trajectory_info.append(state)
-
+            trajectory_info.append(copy.deepcopy(state))
             if trajectory_length_limit is not None:
 
                 if step_counter_segment%traj_seg_length == 0:
@@ -456,17 +454,18 @@ def extract_trajectory(annotation_file,
             action_info.append(default_action)
 
         if trajectory_length_limit is None:
+
             if feature_extractor is not None:
                 state_tensors = torch.stack(trajectory_info)
                 torch.save(state_tensors, os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), str(segment_counter))))
             
-            if extract_action:
-                #pdb.set_trace()
-                action_tensors = torch.stack(action_info)
-                torch.save(action_tensors,
-                        os.path.join(folder_to_save, 
-                                'action_of_sub_{}_segment{}.actions'.format(str(sub),
-                                str(segment_counter))))
+                if extract_action:
+                    #pdb.set_trace()
+                    action_tensors = torch.stack(action_info)
+                    torch.save(action_tensors,
+                            os.path.join(folder_to_save, 
+                                    'action_of_sub_{}_segment{}.actions'.format(str(sub),
+                                    str(segment_counter))))
             else:
                 '''
                 with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
@@ -474,8 +473,8 @@ def extract_trajectory(annotation_file,
                     pdb.set_trace()
                     json.dump(trajectory_info, fout)
                 '''
-                np.save('traj_of_sub_{}_segment{}.states'.format(str(sub), 
-                            str(segment_counter)), trajectory_info)
+                np.save(os.path.join(folder_to_save, 'traj_of_sub_{}_segment{}.states'.format(str(sub), 
+                            str(segment_counter))), trajectory_info)
                 
                 if extract_action:
 
@@ -751,14 +750,14 @@ def read_training_data(parent_folder):
 
 if __name__=='__main__':
 
-    
+    '''
     parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/\
 traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     output_tensor = read_training_data(parent_folder)
     pdb.set_trace()
-    
-    #********* section to extract trajectories **********
     '''
+    #********* section to extract trajectories **********
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -766,7 +765,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'DroneFeatureRisk_speedv2_with_actions_lag8'
+    feature_extractor_name = 'Raw_expert_states'
 
     #path to save the folder
     to_save = 'traj_info/frame_skip_1/students003/'
@@ -785,10 +784,10 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #initialize the feature extractor
-    feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
-                                               agent_width=10, obs_width=10,
-                                               debug=True,
-                                               grid_size=10, step_size=step_size)
+    #feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
+    #                                           agent_width=10, obs_width=10,
+    #                                           debug=True,
+    #                                           grid_size=10, step_size=step_size)
 
     
     #feature_extractor = VasquezF1(agent_width*6, 0, 2)
@@ -806,12 +805,12 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, 
                        folder_to_save, 
-                       feature_extractor=feature_extractor, 
+                       feature_extractor=None, 
                        show_states=False,
-                       extract_action=True,
-                       display=False, trajectory_length_limit=None)
+                       extract_action=False,
+                       display=True, trajectory_length_limit=None)
     
-    '''
+    
     #****************************************************
     #******** section to record trajectories
     '''
