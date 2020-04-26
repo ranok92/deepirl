@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, '..')
 import numpy as np
 from gym.spaces import Discrete, Box
-from featureExtractor.gridworld_featureExtractor import SocialNav,LocalGlobal,FrontBackSideSimple
+from featureExtractor.drone_feature_extractor import total_angle_between
 from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeatureMinimal, DroneFeatureOccup, DroneFeatureRisk, DroneFeatureRisk_v2
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed
 from envs.drone_env_utils import InformationCollector
@@ -452,7 +452,11 @@ class GridWorldDrone(GridWorld):
                     agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
                     self.agent_state = agent
                     self.state['agent_state'] = copy.deepcopy(self.agent_state)
-
+                    ref_vector = np.asarray([-1, 0])
+                    if self.state['agent_state']['orientation'] is not None:
+                        self.cur_heading_dir = (360 + rad_to_deg(total_angle_between(self.state['agent_state']['orientation'], ref_vector)))%360
+                    else:
+                        self.cur_heading_dir = 0
             #populating the ghost
             if float(element[1]) == self.ghost:
 
@@ -1154,8 +1158,8 @@ if __name__=="__main__":
                         step_reward=0.01,
                         show_comparison=True,
                         show_orientation=True,
-                        external_control=True,
-                        replace_subject=False, 
+                        external_control=False,
+                        replace_subject=True, 
                         segment_size=500,
                         consider_heading=True,                      
                         continuous_action=False,
@@ -1213,35 +1217,15 @@ if __name__=="__main__":
 
             state, reward , done, _ = world.step(action)
             #print(reward, done)
+            if done:
+                break
             info_collector.collect_information_per_frame(state)
             #print(state['agent_state']['orientation'])
             #feat_drone.overlay_bins(state)
             #print(state)
             #pdb.set_trace()
             feat = feat_drone.extract_features(state)
-            #pdb.set_trace()
-            #print(feat)
-            '''
-            if t%100==0:
-                world.rollback(10)
-                feat_drone.rollback(10, state)
-                t=1
-            '''
-            #feat2 = feat_drone_2.extract_features(state)
-            #orientation = feat_drone.extract_features(state)
-            '''
-            print('Global info:')
-            print(feat[0:9].reshape(3, 3))
-            print('global info_goal:')
-            print(feat[9:18].reshape(3, 3))
 
-            print('Occupancy grid info:')
-            print(feat[22:].reshape(window_size, window_size))
-            '''
-            #pdb.set_trace()
-
-            #print(world.agent_state)
-            #print (reward, done)
             t+=1
 
         #info_collector.collab_end_traj_results()
