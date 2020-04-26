@@ -4,6 +4,7 @@ import pathlib
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 
 import torch
 
@@ -13,10 +14,11 @@ sys.path.insert(0, "../..")  # NOQA: E402
 import pickle
 
 
-import metrics
-import metric_utils
+from metrics import metrics
+from metrics import metric_utils
 
 from rlmethods.soft_ac import QNetwork
+from featureExtractor import fe_utils
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -82,7 +84,7 @@ def main():
         subject=None,
         annotation_file=args.annotation_file,
         tick_speed=60,
-        obs_width=10,
+        obs_width=obs_width,
         step_size=step_size,
         agent_width=agent_width,
         external_control=True,
@@ -95,69 +97,14 @@ def main():
         width=grid_size,
     )
 
-    # initialize the feature extractor
-    from featureExtractor.drone_feature_extractor import (
-        DroneFeatureRisk_speedv2,
-    )
-    from featureExtractor.drone_feature_extractor import (
-        VasquezF1,
-        VasquezF2,
-        VasquezF3,
-    )
+    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor)
 
-    if args.feat_extractor == "DroneFeatureRisk_speedv2":
-
-        feat_ext_args = {
-            "agent_width": agent_width,
-            "obs_width": obs_width,
-            "step_size": step_size,
-            "grid_size": grid_size,
-            "thresh1": 18,
-            "thresh2": 30,
-        }
-
-        feat_ext = DroneFeatureRisk_speedv2(**feat_ext_args)
-
-    if args.feat_extractor == "VasquezF1":
-        feat_ext_args = {
-            "density_radius": 6 * agent_width,
-            "lower_speed_threshold": 18,
-            "upper_speed_threshold": 30,
-        }
-
-        feat_ext = VasquezF1(
-            feat_ext_args["density_radius"],
-            feat_ext_args["lower_speed_threshold"],
-            feat_ext_args["upper_speed_threshold"],
-        )
-
-    if args.feat_extractor == "VasquezF2":
-        feat_ext_args = {
-            "density_radius": 6 * agent_width,
-            "lower_speed_threshold": 18,
-            "upper_speed_threshold": 30,
-        }
-
-        feat_ext = VasquezF2(
-            feat_ext_args["density_radius"],
-            feat_ext_args["lower_speed_threshold"],
-            feat_ext_args["upper_speed_threshold"],
-        )
-
-    if args.feat_extractor == "VasquezF3":
-        feat_ext_args = {
-            "agent_width": agent_width,
-        }
-
-        feat_ext = VasquezF3(feat_ext_args["agent_width"])
-
-    output["feature_extractor_params"] = feat_ext_args
     output["feature_extractor"] = feat_ext
 
     # initialize policy
     sample_state = env.reset()
     state_size = feat_ext.extract_features(sample_state).shape[0]
-    policy = QNetwork(state_size, env.action_space.n, 256)
+    policy = QNetwork(state_size, env.action_space.n, 512)
     policy.load(args.policy_path)
     policy.to(DEVICE)
 
@@ -167,8 +114,8 @@ def main():
     metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
     metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
-    metric_applicator.add_metric(metrics.count_collisions, [20])
-    metric_applicator.add_metric(metrics.goal_reached, [10, 10])
+    metric_applicator.add_metric(metrics.count_collisions, [5])
+    metric_applicator.add_metric(metrics.goal_reached, [10, 0.5])
     metric_applicator.add_metric(metrics.trajectory_length)
 
     # collect trajectories and apply metrics
@@ -182,10 +129,15 @@ def main():
         policy,
         num_peds,
         args.max_ep_length,
-        metric_applicator
+        metric_applicator,
+        disregard_collisions=True,
     )
 
-    output["metric_results"] = metric_results
+
+    pd_metrics = pd.DataFrame(metric_results).T
+    pd_metrics = pd_metrics.applymap(lambda x: x[0])
+
+    output["metric_results"] = pd_metrics
 
     pathlib.Path('./results/').mkdir(exist_ok=True)
 
