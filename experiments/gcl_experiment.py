@@ -329,6 +329,10 @@ def main():
     )
 
     metric_applicator = metric_utils.LTHMP2020()
+
+    experiment_logger.log_header("Metrics and arguments :")
+    experiment_logger.log_info(metric_applicator.metrics_dict)
+
     metric_results = metric_utils.collect_trajectories_and_metrics(
         env,
         feat_ext,
