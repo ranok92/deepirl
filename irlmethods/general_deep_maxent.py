@@ -31,6 +31,7 @@ class RewardNet(BaseNN):
 
         self.linear1 = nn.Linear(hidden_dims, hidden_dims)
         self.linear2 = nn.Linear(hidden_dims, hidden_dims)
+        self.linear3 = nn.Linear(hidden_dims, hidden_dims)
 
         self.head = nn.Linear(hidden_dims, 1)
 
@@ -39,8 +40,10 @@ class RewardNet(BaseNN):
 
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
+        x = F.relu(self.linear3(x))
 
-        x = torch.tanh(self.head(x))
+        # x = torch.tanh(self.head(x))
+        x = F.relu(self.head(x))
 
         return x
 
