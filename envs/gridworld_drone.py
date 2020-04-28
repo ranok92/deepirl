@@ -775,8 +775,6 @@ class GridWorldDrone(GridWorld):
                             self.cur_ped += 1
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
-                    else:
-                        print('Selected pedestrian not available.')
         else:
             self.cur_ped = self.subject
 
