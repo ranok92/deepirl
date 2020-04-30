@@ -605,7 +605,7 @@ class MixingDeepMaxent(GeneralDeepMaxent):
 
 
 class GCL(MixingDeepMaxent):
-    def generate_trajectories(self, num_trajectories, max_env_steps):
+    def generate_trajectories(self, num_trajectories, max_env_steps, ped_id=None):
         """
         Generate trajectories in environemnt using leanred RL policy.
 
@@ -626,6 +626,7 @@ class GCL(MixingDeepMaxent):
                 self.env,
                 self.feature_extractor,
                 max_env_steps,
+                ped_id=ped_id
             )
 
             buffers.append(generated_buffer)
@@ -793,34 +794,6 @@ class GCL(MixingDeepMaxent):
 
 
 class PerTrajGCL(GCL):
-    def generate_trajectories(self, num_trajectories, max_env_steps, ped_id):
-        """
-        Generate trajectories in environemnt using leanred RL policy.
-
-        :param num_trajectories: number of trajectories to generate.
-        :type num_trajectories: int
-
-        :param max_env_steps: max steps to take in environment (rollout length.)
-        :type max_env_steps: int
-
-        :return: list of features encountered in playthrough.
-        :rtype: list of tensors of shape (num_states x feature_length)
-        """
-        buffers = []
-
-        for _ in range(num_trajectories):
-            generated_buffer = play_complete(
-                self.rl.policy,
-                self.env,
-                self.feature_extractor,
-                max_env_steps,
-                ped_id=ped_id,
-            )
-
-            buffers.append(generated_buffer)
-
-        return buffers
-
     def train_episode(
         self,
         num_rl_episodes,
@@ -870,6 +843,10 @@ class PerTrajGCL(GCL):
         :type stochastic_sampling: Boolean.
         """
 
+        # regularizers
+        g_lcr = 0
+        g_mono = 0
+
         # expert loss
         expert_loss = 0
         expert_samples = random.sample(
@@ -882,6 +859,10 @@ class PerTrajGCL(GCL):
             expert_loss += self.discounted_rewards(
                 expert_rewards, gamma, account_for_terminal_state
             )
+
+            # update regularizers
+            g_lcr += lcr_regularizer(expert_rewards)
+            g_mono += monotonic_regularizer(expert_rewards)
 
         # policy loss
         trajectories = []
@@ -914,6 +895,11 @@ class PerTrajGCL(GCL):
             states = torch.stack(states)
 
             reward = self.reward_net(states)
+
+            # update regularizers
+            g_lcr += lcr_regularizer(reward)
+            g_mono += monotonic_regularizer(reward)
+
             reward_sum = self.discounted_rewards(reward, gamma, traj[-1].done)
             rewards.append(reward_sum)
             log_pi = [
@@ -935,7 +921,7 @@ class PerTrajGCL(GCL):
         policy_loss = (num_expert_samples) * policy_loss
 
         # Backpropagate IRL loss
-        loss = policy_loss - expert_loss
+        loss = policy_loss - expert_loss + g_mono + g_lcr
 
         self.reward_optim.zero_grad()
         loss.backward()
