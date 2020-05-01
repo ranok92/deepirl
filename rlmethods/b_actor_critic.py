@@ -13,14 +13,13 @@ import numpy as np
 
 import statistics
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.distributions import Categorical
-
+import pygame
 import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, '..')
@@ -94,7 +93,6 @@ class Policy(BasePolicy):
         self.action_head = nn.Linear(hidden_dims[-1], action_dims)
         self.value_head = nn.Linear(hidden_dims[-1], 1)
         self.saved_actions = []
-        self.saved_entropy = []
         self.rewards = []
 
     def forward(self, x):
@@ -160,6 +158,77 @@ class Policy(BasePolicy):
         return ind.item()
 
 
+
+class PolicyRegression(BasePolicy):
+
+    def __init__(self, input_layer_dims, hidden_layer_dims,
+                 input_net=None,
+                 hidden_net=None):
+        """
+        Initialize a network given the details of the layers and number of nodes per layer.
+        """
+        super(PolicyRegression, self).__init__()
+        
+        self.hidden_layers = []
+
+        self.input_layer = nn.Sequential(
+            nn.Linear(input_layer_dims, hidden_layer_dims[0]),
+            nn.ELU()
+        )
+        for i in range(1, len(hidden_layer_dims)):
+            self.hidden_layers.append(nn.Sequential(nn.Linear(hidden_layer_dims[i-1], hidden_layer_dims[i]),
+                                                nn.ELU()
+                                                )
+                                        )
+
+        self.hidden_layer = nn.ModuleList(self.hidden_layers)
+        
+        self.orientation_head = nn.Sequential(
+                                            nn.Linear(hidden_layer_dims[-1], hidden_layer_dims[-1]),
+                                            nn.Sigmoid(),
+                                            nn.Linear(hidden_layer_dims[-1], 1)
+                                            )
+                                              
+        self.speed_head = nn.Sequential(
+                                        nn.Linear(hidden_layer_dims[-1], hidden_layer_dims[-1]),
+                                        nn.Sigmoid(),
+                                        nn.Linear(hidden_layer_dims[-1], 1)
+                                         )
+        
+        self.value_head = nn.Linear(hidden_layer_dims[-1], 1)
+        
+        #lists for bookkeeping
+        self.saved_actions = []
+        self.saved_entropy = []
+        self.rewards = []
+
+
+    def forward(self, x):
+        """
+        Forward propagation through the network
+        """
+        x = self.input_layer(x)
+        for i in range(len(self.hidden_layers)):
+            x = self.hidden_layers(x)
+        
+        orient_vals = self.orientation_head(x)
+        speed_vals = self.speed_head(x)
+        state_values = self.value_head(x)
+
+        return orient_vals, speed_vals, state_values
+
+    def sample_action(self, x):
+        action = self.eval_action(x)
+
+
+        return action
+    
+    def eval_action(self, x):
+
+        return 0
+
+    def eval_action_continuous(self, x):
+        return 0
 
 
 class ActorCritic:
@@ -279,11 +348,50 @@ class ActorCritic:
 
 
 
-    def generate_trajectory(self, num_trajs, render, store_raw=False, path=None, expert_svf=None):
+    def generate_trajectory(self, num_trajs, render, store_raw=False, 
+                            path=None, expert_svf=None,
+                            capture_frame_interval=None):
+        """
+        Generates trajectory based on the requirements.
 
+        input:
+            num_trajs : int containing the number of trajectories to generate.
+            render : Boolean (Flag to determine if rendering is needed)
+            store_raw : Boolean (Flag to determine if the states to save are state
+                        dictionaries.)
+            path : string, that points to the directory to save the trajectories
+
+            expert_svf : an svf dictionary of the following format 
+                            (key : value) - (state_hash_function : freqency)
+
+            capture_frame_interval : int/None denotes the intervals after 
+                                     which a screenshot of the game environment 
+                                     will be taken (Primairy for capturing sequences
+                                     of motion)
+
+
+        output:
+
+            reward_across_trajs : list denoting the reward obtained by the agent at
+                                  each of the runs.
+
+            frac_unknown_states_enc : float denoting the fraction of states encountered
+                                      by the current agent that were novel (not encountered
+                                      by the expert)
+
+            subject_list : list of the pedestrian ids in the order they were played
+
+            captured_framList : a 2D list where each 1d list is a sequence of screen capture 
+                                image arrays from a given trajectory.
+                                The order of the trajectories stored in the 2d list is the same 
+                                as the order of the pedestrians in the subject list
+
+        """
         reward_across_trajs = []
         frac_unknown_states_enc = []
+        master_captured_frame_list = []
         subject_list = None
+
         if self.env.replace_subject:
             subject_list = []
         
@@ -293,18 +401,18 @@ class ActorCritic:
             # action and states lists for current trajectory
             actions = []
             
-            state = self.env.reset()
-
 
             if self.feature_extractor is None:
-                state_features = state
+                state_features = self.env.reset()
             else:
                 state_features = self.feature_extractor.extract_features(self.env.reset())
                 state_features = torch.from_numpy(state_features).type(torch.FloatTensor).to(DEVICE)
+            
+            print('Replacing pedestrian :', self.env.cur_ped)
+            frames_per_ped = []
 
             if self.env.replace_subject:
                 subject_list.append(self.env.cur_ped)
-
             if store_raw:
                 states = [state]
             else:
@@ -355,6 +463,19 @@ class ActorCritic:
                 else:
                     states.append(state_features)
 
+                #take a screenshot if current frame matches the 
+                #frame interval
+
+                if capture_frame_interval:
+
+                    if (t%capture_frame_interval==0):
+
+                        screenshot = np.transpose(self.env.take_screenshot(), axes=(1, 0, 2))
+                        
+                        frames_per_ped.append(screenshot)
+
+
+
                 t+=1
             reward_across_trajs.append(run_reward)
             frac_unknown_states_enc.append(unknown_state_counter/total_states)
@@ -375,8 +496,15 @@ class ActorCritic:
                     print('Storing for ', traj_i)
                     np.save(os.path.join(path, 'traj%s.states' % str(traj_i)), states)
 
-            
-        return reward_across_trajs, frac_unknown_states_enc, subject_list
+                #store a screenshot of the end tracing the trajectories of the 
+                #ghost and that of the pedestrian
+                end_traj_screen_capture = np.transpose(self.env.take_screenshot(), axes=(1, 0, 2))
+                frames_per_ped.append(end_traj_screen_capture)
+                master_captured_frame_list.append(frames_per_ped)
+
+
+
+        return reward_across_trajs, frac_unknown_states_enc, subject_list, master_captured_frame_list
 
 
 
