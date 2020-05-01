@@ -76,7 +76,7 @@ def compute_distance_displacement_ratio(trajectory, agent_radius,
 
     total_distance_w_collisions = total_distance + penalty_from_collision
 
-    return total_displacement / total_distance_w_collisions
+    return total_displacement / (total_distance_w_collisions+0.001)
 
 
 def proxemic_intrusions(trajectory, units_to_meters_ratio):

@@ -220,6 +220,7 @@ def visualize_reward_per_spot(env, feat_extractor, reward_network,
         output : 
             N/A
     """
+    ax = plt.subplot(111, polar=True)
 
     for i in range(num_traj):
         
@@ -230,20 +231,22 @@ def visualize_reward_per_spot(env, feat_extractor, reward_network,
         t = 0
         while not done:
 
-            states_numpy = get_nearby_statevector(state, feat_extractor)
+            states_numpy = get_nearby_statevector(state, feat_extractor, div=div)
             states_torch = torch.from_numpy(states_numpy).type(torch.FloatTensor).to(DEVICE)
 
+            agent_head_dir = state['agent_head_dir']
             rewards = reward_network(states_torch)
             rewards = rewards.detach().cpu().numpy().squeeze()
             rewards = (rewards-np.min(rewards))*3
             
             x_axis = np.linspace(0, 2*np.pi, int(360/div), endpoint=False)
             width = (2*np.pi)/int(360/div)
-            ax = plt.subplot(111, polar=True)
             bars = ax.bar(x_axis, rewards, width=width, bottom=2)
+
+            ax.set_theta_zero_location("N", offset=-agent_head_dir)
             plt.draw()
             plt.pause(0.001)
-
+            ax.clear()
             action = policy_network.eval_action(state_feat)
             state, _, done, _ = env.step(action)
             env.render()
@@ -361,7 +364,7 @@ def main():
     '''
 
     visualize_reward_per_spot(env, feat_ext, reward_net, 
-                              policy_net, num_traj=20,
+                              policy_net, num_traj=20, div=36,
                               render=True)
 
 if __name__=='__main__':

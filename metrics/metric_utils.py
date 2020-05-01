@@ -3,8 +3,14 @@
 from collections import defaultdict
 import copy
 import torch
+import numpy as np
+
 import os, sys
+import glob
+import pdb
 sys.path.insert(0, "..")
+import metrics
+
 from featureExtractor.drone_feature_extractor import dist_2d
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -93,6 +99,39 @@ class MetricApplicator:
         :rtype: dictionary.
         """
         return self.metrics_dict
+
+
+
+
+def collect_metrics_from_trajectory(trajectory_parent_folder, metric_applicator):
+    """
+    Applies the metrics defined by add_metric to the trajectories
+    present in the parent folder provided.
+
+    input:
+        trajectory_parent_folder : A string containing the path to the folder 
+                                    containing the trajectories
+    """
+    
+    #read the trajectories from the parent folder
+
+    assert os.path.isdir(trajectory_parent_folder), "Bad folder, does not exist!"
+    trajectories = glob.glob(os.path.join(trajectory_parent_folder, '*.states.npy'))
+
+    metric_results = {}
+    #read each of the trajectory files into lists
+    for _, trajectory in enumerate(trajectories):
+        #retrieve the ped id from the filename 
+        #filename is of the form : /folder2/folder1/traj_of_sub_421_segment1.states.npy
+        traj = np.load(trajectory, allow_pickle=True)
+        file_name = trajectory.split('/')[-1]
+        ped_id = file_name.strip().split('_')[3]
+        traj_metric_result = metric_applicator.apply([traj])
+        metric_results[int(ped_id)] = traj_metric_result
+
+
+    return metric_results
+
 
 
 def collect_trajectories_and_metrics(
@@ -372,3 +411,16 @@ def read_files_from_directories(parent_directory, folder_dict=None):
 
     return folder_dict
 
+if __name__=="__main__":
+
+    metric_applicator = MetricApplicator()
+    metric_applicator.add_metric(metrics.compute_trajectory_smoothness, [10])
+    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio, [10])
+    metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
+    metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
+    metric_applicator.add_metric(metrics.count_collisions, [10])
+    metric_applicator.add_metric(metrics.goal_reached, [10, 10])
+    metric_applicator.add_metric(metrics.pedestrian_hit, [10])
+    metric_applicator.add_metric(metrics.trajectory_length)
+    metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
+    collect_metrics_from_trajectory("/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/Expert_raw_state_dictionary", metric_applicator)
