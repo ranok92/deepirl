@@ -492,7 +492,7 @@ class GridWorldDrone(GridWorld):
                     self.agent_state = np.array([int(top+(height/2)),int(left+(width/2))])
 
 
-    def render(self):
+    def render(self, show_trail_frames=30):
 
         #render board
         self.clock.tick(self.tickSpeed)
@@ -522,10 +522,10 @@ class GridWorldDrone(GridWorld):
 
         if self.show_trail:
 
-            self.draw_trajectory(self.pos_history, self.black, show_frames=False)
+            self.draw_trajectory(self.pos_history, self.black, show_frames=show_trail_frames)
 
             if self.ghost:
-                self.draw_trajectory(self.ghost_state_history, self.ghost_color, show_frames=False)
+                self.draw_trajectory(self.ghost_state_history, self.ghost_color, show_frames=show_trail_frames)
 
 
         pygame.display.update()
@@ -1061,6 +1061,13 @@ class GridWorldDrone(GridWorld):
             self.draw_arrow(trajectory[count][0]['position'],trajectory[count+1][0]['position'], color)
             current_frame = trajectory[count][1]
 
+    def take_screenshot(self):
+        '''
+        captures the current screen and returns a 3d array 
+        containing the pixel information
+        '''
+        return pygame.surfarray.array3d(self.gameDisplay)
+
 
 class UCYWorld(GridWorldDrone):
     """
@@ -1142,15 +1149,15 @@ if __name__=="__main__":
                                         thresh1=20,
                                         thresh2=30,
                                         show_agent_persp=True)
-    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt'
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt'
     #annotation_file = None
     world = GridWorldDrone(display=True, 
                         seed=20, obstacles=None, 
                         show_trail=True,
                         is_random=False,
                         annotation_file=annotation_file,
-                        subject=None,
+                        subject=13,
                         tick_speed=30, 
                         obs_width=7,
                         step_size=2,
