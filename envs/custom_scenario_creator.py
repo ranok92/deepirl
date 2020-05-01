@@ -1,6 +1,7 @@
 import pygame
 from gridworld_drone import GridWorldDrone
 
+from drone_data_utils import preprocess_data_from_control_points
 import numpy as np 
 
 import argparse
@@ -30,9 +31,15 @@ traj_counter = 0
 
 file_io = open(args.file_name, 'w')
 
+per_frame_file = args.file_name+'_per_frame.txt'
 file_io.write('{} - the number of splines\n'.format(args.splines))
-
+color_tuple = [0, 0, 0]
+update_color = False
 while traj_counter <  args.splines:
+
+    if update_color:
+        color_tuple[traj_counter%3] = (color_tuple[traj_counter%3] + 120)%255
+        update_color=False
 
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN:
@@ -46,6 +53,7 @@ while traj_counter <  args.splines:
             if key[pygame.K_q]:
                 record_flag = False
                 traj_counter += 1
+                update_color=True
                 file_io.write("{} - Num of control points\n".format(spline_point_counter))
                 for i in range(len(traj_point_container)):
                     point = traj_point_container[i]
@@ -58,10 +66,11 @@ while traj_counter <  args.splines:
             if event.type == pygame.MOUSEBUTTONDOWN: 
                 (x,y) = pygame.mouse.get_pos()
                 print(x,y)
+                print(color_tuple)
                 #for visualizing the points of the trajectory
-                pygame.draw.rect(game_display, (0, 0, 0), [x-5, y-5, 10, 10])
+                pygame.draw.rect(game_display, tuple(color_tuple), [x-5, y-5, 10, 10])
                 if prev_point is not None:
-                    pygame.draw.line(game_display, (0, 0, 0), prev_point, (x,y))
+                    pygame.draw.line(game_display, tuple(color_tuple), prev_point, (x,y))
                 prev_point = (x,y)
                 pygame.display.update()
                 #transform the points
@@ -72,3 +81,4 @@ while traj_counter <  args.splines:
                 traj_point_container.append((x,y))
 
 file_io.close()
+preprocess_data_from_control_points(args.file_name, 1, world_size=args.world_size)
