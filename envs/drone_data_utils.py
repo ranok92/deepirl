@@ -13,7 +13,7 @@ from featureExtractor.drone_feature_extractor import DroneFeatureSAM1, DroneFeat
 from featureExtractor.drone_feature_extractor import DroneFeatureRisk_speed, DroneFeatureRisk_speedv2
 from featureExtractor.drone_feature_extractor import VasquezF1, VasquezF2, VasquezF3
 from featureExtractor.drone_feature_extractor import Fahad, GoalConditionedFahad
-from featureExtractor.drone_feature_extractor import total_angle_between
+from featureExtractor.drone_feature_extractor import total_angle_between, dist_2d
 
 from scipy.interpolate import splev, splprep
 
@@ -44,10 +44,18 @@ UNIVERSITY STUDENTS:
 '''
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames):
+def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_size = [576, 720]):
+    '''
+    input:
+        list_of_ctrl_pts : path to the file containing the spline control points
+        frames : int containing the number of frame intervals to maintain
+        world_size : the size of the world on which to create the annotation file
+                     [rows, cols]
     #given the control points returns a dense array of all the in between points
     #the control points should be of the format 
+    #
     #frame number, ped_id, y_coord, x_coord
+    '''
     x = []
     y = []
     t = []
@@ -96,7 +104,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames):
 
 
 
-def read_data_from_file(annotation_file):
+def read_data_from_file(annotation_file, rows=576, cols=720):
     '''
 
     given a file_name read the f and convert that into a list.
@@ -108,8 +116,8 @@ def read_data_from_file(annotation_file):
     frame_number, ped_id, y_coord, x_coord
     
     '''
-    frame_x = 720
-    frame_y = 576  
+    frame_x = cols
+    frame_y = rows  
     diff_x = frame_x/2
     diff_y = frame_y/2  
     ped_id = -1
@@ -167,10 +175,16 @@ def preprocess_data_from_stanford_drone_dataset(annotation_file):
     return 0
 
 
-def preprocess_data_from_control_points(annotation_file, frame):
+def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[720, 576]):
     '''
     given a annotation file containing spline control points converts that 
     to a frame-by-frame representation and writes that on a txt file with a easy to read format
+    input:
+        annotation_file : the path to the annotation file
+        frame : int, denoting the number of frames to skip between each entries of the 
+                final frame by frame representation
+
+        world_size : the size of the world [cols, rows]
     '''
 
     file_name = annotation_file.strip().split('/')[-1].split('.')[0]
@@ -181,15 +195,15 @@ def preprocess_data_from_control_points(annotation_file, frame):
 
 
     print(dir_name) 
-    file_n = dir_name + file_name+'_processed_corrected'+'.txt'
+    file_n = dir_name + file_name+'_per_frame'+'.txt'
 
-    extracted_dict = read_data_from_file(annotation_file)
+    extracted_dict = read_data_from_file(annotation_file, rows=world_size[1], cols=world_size[0])
     dense_info_list = []
     for ped in extracted_dict.keys():
             
         #for i in range(len(extracted_dict[ped])):
         #    print(extracted_dict[ped][i])
-        dense_info = get_dense_trajectory_from_control_points(extracted_dict[ped], frame)
+        dense_info = get_dense_trajectory_from_control_points(extracted_dict[ped], frame, world_size)
 
         #for i in range(len(dense_info)):
         #    print(dense_info[i])
@@ -492,6 +506,7 @@ def extract_trajectory(annotation_file,
 
 
 
+
 def extract_subjects_from_file(annotation_file):
 
     sub_list = []
@@ -747,9 +762,159 @@ def read_training_data(parent_folder):
 
 
 
+def group_pedestrians_from_trajectories(trajectory_folder,
+                                         proximity_threshold=45,
+                                         temporal_threshold=0.45):
+    
+    '''
+    Returns 2 dictionaries where:
+    dictionary 1 stores the group information of each pedestrian.
+        (key : value ) - (ped-id : [group])
+    
+    dictionary 2 stores the group information of each group
+        (key : value) - (group-id : [ped id of the peds in the group])
+
+    dictionary 3 stores the classification information of each pedestrian,
+    stating if they are solo or not
+        (key : value) - (ped-id : 1/0 [based on group or solo])
+    '''
+
+    assert os.path.isdir(trajectory_folder), "bad folder path"
+
+    trajectories = glob.glob(os.path.join(trajectory_folder, '*.states.npy'))
+    trajectory_group_info_dict = {}
+
+    missing_peds = []
+    ped_index = 1
+    for trajectory in trajectories:
+
+        file_name = trajectory.split('/')[-1]
+        ped_id = file_name.strip().split('_')[3]
+        
+        if ped_id!=ped_index:
+            pdb.set_trace()
+            missing_ped.append(ped_index)
+            ped_index += 1
+        '''
+        group_info = find_pedestrian_group(trajectory, 
+                                              proximity_threshold=proximity_threshold,
+                                              temporal_threshold=temporal_threshold)
+        
+        trajectory_group_info_dict[ped_id] = group_info
+        '''
+    
+    #create the second dictionary
+    classification_info = {}
+    for key in trajectory_group_info_dict.keys():
+        if len(trajectory_group_info_dict[key])>0:
+            classification_info[key] = 1
+        else:
+            classification_info[key] = 0
+    
+    return trajectory_group_info_dict, classification_info
+
+
+
+
+def get_index_from_pedid_university_student_dataset(ped_id):
+    '''
+    Given the ped id will return the serial number of the pedestrian
+    (basically taking into account for the missing pedestrians)
+    Total number of pedestrian - 430, max pedestrian id 434
+
+    input:
+        ped_id : pedestrian id (int)
+    
+    output:
+        ped_index : serial index of the pedestrian
+    '''
+    #load the precomputed list that contains the difference between index and 
+    #id for each of the pedestrians
+
+    with open('university_students_ped_id_difference_dict.json', 'r') as fp:
+        diff_dict = json.load(fp)
+    
+    return ped_id - diff_dict[str(ped_id)] 
+
+
+
+    
+
+
+
+def find_pedestrian_group(pedestrian_trajectory, 
+                          proximity_threshold=40,
+                          temporal_threshold=0.7):
+    """
+    Returns a list containing the id of the pedestrians who are likely to belong to a group
+    input:
+        trajectory : a filename containing the trajectory of the said pedestrian.
+        proximity_threshold : integer containing how close the nearby pedestrians have to
+                              be to the subject inorder to be qualified to be in the same group
+        
+        temporal_threshold : a float mentioning for what fraction of the total trajectory does a
+                             nearby pedestrian have to be inside the proximity_threshold of a 
+                             subject in order to be classified as a fellow group member
+
+    output:
+        group : a list containing the ids of the pedestrians that are in the same group as the
+                subject pedestrian
+    """
+
+    #read the trajectory from the file
+
+    assert os.path.isfile(pedestrian_trajectory), 'Bad trajectory file!'
+
+    traj = np.load(pedestrian_trajectory, allow_pickle=True)
+    total_frames = len(traj)
+
+    #maintain a dictionary of all the pedestrians who pierce the proximity threshold
+    #and see who stays inside the proximity threshold for how long.
+    proximity_tracker = {}
+    for state in traj:
+
+        for obs in state['obstacles']:
+            agent_position = state['agent_state']['position']
+            ped_dist = dist_2d(agent_position, obs['position'])
+
+            if ped_dist <= proximity_threshold:
+
+                if obs['id'] not in proximity_tracker.keys():
+                    proximity_tracker[obs['id']] = 1
+                else:
+                    proximity_tracker[obs['id']] += 1
+    
+    #check through the proximity tracker to see which of the nearby pedestrians
+    #qualify to be in a group with the pedestrian at hand using the temporal threshold
+
+    temporal_threshold_frames = temporal_threshold * total_frames 
+    ped_group = []
+    for people in proximity_tracker.keys():
+
+        if proximity_tracker[people] > temporal_threshold_frames:
+            ped_group.append(people)
+    
+    return ped_group
+
+
+
+
 
 if __name__=='__main__':
 
+    #****************************************************************
+    #********section to grouping pedestrians
+    '''
+    dict1, dict2 = group_pedestrians_from_trajectories('/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+university_students/annotation/traj_info/frame_skip_1/students003/Raw_expert_states/', 
+                                        proximity_threshold=45, temporal_threshold=0.45)
+    pdb.set_trace()
+    #find_pedestrian_group('/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+#university_students/annotation/traj_info/frame_skip_1/students003/Raw_expert_states/\
+#traj_of_sub_13_segment1.states.npy', proximity_threshold=45, temporal_threshold=0.45)
+
+    '''
+    #***************************************************************
     '''
     parent_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/\
 traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
@@ -757,7 +922,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     pdb.set_trace()
     '''
     #********* section to extract trajectories **********
-    
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -808,9 +973,9 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
                        feature_extractor=None, 
                        show_states=False,
                        extract_action=False,
-                       display=True, trajectory_length_limit=None)
+                       display=False, trajectory_length_limit=None)
     
-    
+    '''
     #****************************************************
     #******** section to record trajectories
     '''
@@ -876,8 +1041,9 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #******** section for preprocessing data ************
-    '''
-    file_name = './t-junction-3.txt'
+    
+    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+custom_scenarios/annotation/sparse_splines/head_on_passing_2.txt'
 
     intval = preprocess_data_from_control_points(file_name, 1)
     
@@ -886,7 +1052,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
     
-    '''
+   
     #*****************************************************
     #********** getting information of the trajectories
     '''
