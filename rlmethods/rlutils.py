@@ -10,7 +10,7 @@ import numpy as np
 import torch
 sys.path.insert(0, '..')
 
-DEVICE = 'cuda' if torch.cuda.is_available else 'cpu'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class LossBasedTermination():
