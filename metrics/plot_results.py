@@ -230,9 +230,10 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         std_list = []
 
         for i in range(len(list_of_dictionary)):
-            mean_list.append(np.mean(np.mean(run_information_list[i][:, :, info], axis=1)))
-            std_list.append(np.std(np.mean(run_information_list[i][:, :, info], axis=1)))
-        
+            mean_list.append(np.mean(np.nanmean(run_information_list[i][:, :, info], axis=1)))
+            std_list.append(np.std(np.nanmean(run_information_list[i][:, :, info], axis=1)))
+            
+
         ax.bar(x_axis, mean_list, yerr=std_list, 
             alpha=alpha, capsize=capsize, align='center')
 
@@ -240,11 +241,25 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         if y_axis is not None:
             ax.set_ylabel(y_axis)
 
+        #get the filename to store the results
+        #filename for storing the mean  
+        
+        filename_mean = "./numerical_results/"+fig_title+"-"+metric_name + "_mean.txt"
+        with open(filename_mean, "wb") as fp:
+            pickle.dump(mean_list, fp)
+            fp.close()
+
+        #filename for storing the std 
+        filename_std = "./numerical_results/"+fig_title+"-"+metric_name + "_std.txt"
+        with open(filename_std, "wb") as fp:
+            pickle.dump(std_list, fp)
+            fp.close()
+
         ax.set_xticks(x_axis)
         ax.set_xticklabels(list_of_agent_names)
         ax.yaxis.grid(True)
-        title = fig_title+metric_info[info]
-        ax.set_title(title)
+        #title = fig_title+metric_info[info]
+        #ax.set_title(title)
         plt.show()
         '''
         file_name = title+'.fig.pickle'
@@ -343,7 +358,7 @@ def plot_information_per_time_frame(list_of_dictionary, list_of_agent_names,
             if y_axis is not None:
                 ax.set_ylabel(y_axis)
             ax.legend()
-            title = fig_title
+            #title = fig_title
             ax.set_title(title)
             agent_counter += 1
 
@@ -376,13 +391,13 @@ if __name__=='__main__':
                                --fig-title 'Distance displacement ratio'
                                --metric-name 'compute_distance_displacement_ratio'
 
-     
+    
     plot_histogram(master_dictionary_list, agent_names, 
                    args.metric_name, args.fig_title, 
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis)
-       """
-
+       
+"""
     #################################################
     #uncomment this to get barplots with erros
     """
@@ -392,14 +407,14 @@ if __name__=='__main__':
                                 --metric-name 'compute_trajectory_smoothness'
                                 --metric-info 'total' 'average'
     
-        """
-
+       """ 
+   
     barplots_with_errorbars(master_dictionary_list, agent_names, 
                    args.metric_name, args.fig_title,
                    metric_info=args.metric_info,
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis) 
-    
+        
     #################################################
     #uncomment this to get line plots over time frames.
     """
@@ -411,11 +426,11 @@ if __name__=='__main__':
         **here the ped_list is modified below.
 
  
-    ped_list = [11, 13, 36, 91 ,10, 77]
+    ped_list = [11, 13, 36, 91, 10, 77]
     plot_information_per_time_frame(master_dictionary_list, 
                                     agent_names, 
                                     args.metric_name, args.fig_title,
                                     metric_info=args.metric_info,
                                     ped_list=ped_list, x_label=args.x_axis,
                                     y_axis=args.y_axis) 
-       """
+    """
