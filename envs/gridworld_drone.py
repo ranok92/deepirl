@@ -101,9 +101,6 @@ class GridWorldDrone(GridWorld):
                          agent_width=agent_width,
                          step_size=step_size
                         )
-        if display:
-            self.enable_rendering(tick_speed)
-
 
         self.show_comparison = show_comparison
 
@@ -204,6 +201,8 @@ class GridWorldDrone(GridWorld):
         self.segment_size = segment_size
         self.show_orientation = show_orientation
 
+        if display:
+            self.enable_rendering(tick_speed)
 
     def draw_obstacle(self, obs):
         """
@@ -266,7 +265,12 @@ class GridWorldDrone(GridWorld):
 
                 for line in f:
                     line = line.strip().split(' ')
-                    self.annotation_list.append(line)
+                    if len(line)==2:
+                        print('Overriding the size of the environment from the annotation file.')
+                        self.rows = int(line[1])
+                        self.cols = int(line[0])
+                    if len(line)==4:
+                        self.annotation_list.append(line)
         else:
 
             self.annotation_list = []

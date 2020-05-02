@@ -207,6 +207,12 @@ def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[72
 
         #for i in range(len(dense_info)):
         #    print(dense_info[i])
+        #add the world size to the trajectory file
+        with open(file_n, 'a') as f:
+            for val in world_size:
+                f.write("%s " % val)
+            f.write("\n")
+
         with open(file_n, 'a') as f:
             if dense_info is not None:
                 for info in dense_info:
