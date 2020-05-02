@@ -151,6 +151,7 @@ def agent_drift_analysis(agent,
                                                                      pos_reset))
 
     #an array containing the drift value for each pedestrian
+    
     drift_info_detailed = np.zeros(len(ped_list))
     for i in tqdm(range(len(ped_list))):
 
@@ -266,35 +267,53 @@ def plot_drift_results(parent_folder, ped_list=None):
     """
     Plots the dirft results.
         input: 
+
             drift_lists : 3 dimensional list where:
                             The outer most dimension represents the number of agents' 
                             runs present in the list
                             The next dimension represents number of drift intervals present.
                             The final dimension represents number of pedestrians against which
                             the drift values have been calculated.
-        
+
+            #also takes in the following arguments from the command line
+            1. args.start_interval
+            2. args.end_interval
+            3. args.increment_interval
+            4. args.agent_type [list containing the names you want get printed
+                                in the legend of the plot]
+
         output : plot of the result.
 
     """
-    file_list = read_files_from_directories(parent_folder)
+    file_structure_dict = read_files_from_directories(parent_folder)
+    agent_type_list = []
 
-    print('reading from file :', file_list[0])
-    master_drift_array = np.load(file_list[0])
+    key_list = []
 
-    for i in range(1, len(file_list)):
-        print('reading from file :', file_list[i])
-        master_drift_array = np.concatenate((master_drift_array, np.load(file_list[i])), axis=0)
+    for key in file_structure_dict.keys():
+        key_list.append(key)
 
+    #insert the first element in agent_type_list and master_drift_array
+    agent_type_list.append(key_list[0])
+
+    print('Reading from file :', file_structure_dict[key_list[0]][0])
+    master_drift_array = np.load(file_structure_dict[key_list[0]][0])
+
+    #insert the rest of the elements in the agent_type_list and the 
+    #master_drift_array
+    for i in range(1, len(key_list)):
+        agent_type_list.append(key_list[i])
+        print('reading from file :', file_structure_dict[key_list[i]][0])
+        master_drift_array = np.concatenate((master_drift_array, np.load(file_structure_dict[key_list[i]][0])), axis=0)
         
     if ped_list is not None:
-        master_drift_array = master_drift_array[:, :, ped_list]
+        master_drift_array = master_drift_array[:, :, :]
 
-    pdb.set_trace()
+    
     start_interval = args.start_interval
     reset_int = args.increment_interval
     reset_lim = args.end_interval
 
-    agent_type_list = args.agent_type
     x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
     #get the mean and std deviation of pedestrians from drift_lists
 
@@ -383,6 +402,10 @@ def run_analysis(args):
     agent_type_list = []
 
     policy_network_counter = 0
+
+    #folder_dict = read_files_from_directories(args.parent_directory)
+    
+    
     for i in range(len(args.agent_type)):
 
         if args.agent_type[i] == 'Policy_network':
@@ -449,7 +472,6 @@ def run_analysis(args):
                                 reset_interval=reset_int, max_interval=reset_lim)
     
     drift_info_numpy = np.asarray(drift_lists)
-    pdb.set_trace()
     #****************************************************
 
 
@@ -476,13 +498,14 @@ def run_analysis(args):
 
 if __name__ == '__main__':
 
-    
     args = parser.parse_args()
-    '''
+
+    
     #****************************************************
+    #******for generating the drift files
     run_analysis(args)
     #****************************************************
-    
+    '''
     data = np.genfromtxt('./Pedestrian_info/all150.csv', delimiter=' ')
     pdb.set_trace()
     ped_list = data[:,1]
@@ -490,6 +513,11 @@ if __name__ == '__main__':
 
     play_environment(ped_list.tolist())
     '''
+    #***************************************************
+    #get pedlist from files
+    #***************************************************
+    '''
+    #********** for compiling multiple drift files to get the plots******
     ped_list = np.zeros(1)
     for list_name in args.ped_list:
         ped_list = np.concatenate((ped_list, np.load(list_name)), axis=0)
@@ -497,5 +525,8 @@ if __name__ == '__main__':
     ped_list = ped_list[1:].astype(int)
 
     ped_list = np.sort(ped_list)
-
-    plot_drift_results('./drift_results')
+    
+    #plot the precomputed drift results
+    plot_drift_results(args.parent_folder, ped_list=ped_list)
+    '''
+    #**************************************************************
