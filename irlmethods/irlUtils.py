@@ -658,7 +658,9 @@ def calculate_svf_from_sampling(no_of_samples=1000, env=None,
         visitation_array = np.array([sorted_svf_dict[key] for key in sorted_svf_dict.keys()])
         state_numpy_bool = state_numpy.astype(bool)
         key_array = np.asarray([key for key in sorted_svf_dict.keys()])
-        smoothed_state_counts = smooth_svf(state_numpy, visitation_array, smooth_state_array)
+        smoothed_state_counts = smooth_svf(state_numpy, visitation_array,
+                                           smooth_state_array,
+                                           state_numpy_bool)
         
         counter = 0
         for key in sorted_svf_dict.keys():

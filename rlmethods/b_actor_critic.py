@@ -93,6 +93,7 @@ class Policy(BasePolicy):
         self.action_head = nn.Linear(hidden_dims[-1], action_dims)
         self.value_head = nn.Linear(hidden_dims[-1], 1)
         self.saved_actions = []
+        self.saved_entropy = []
         self.rewards = []
 
     def forward(self, x):
