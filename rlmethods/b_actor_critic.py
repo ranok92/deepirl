@@ -240,7 +240,7 @@ class ActorCritic:
                  log_interval=100, max_episodes=0, max_episode_length=200, 
                  hidden_dims=[128], lr=0.001,
                  reward_threshold_ratio=0.99, plot_loss=False, 
-                 save_folder=None, entropy_coeff=0.001):
+                 save_folder=None, entropy_coeff=0):
         """__init__
 
         :param env: environment to act in. Uses the same interface as gym
