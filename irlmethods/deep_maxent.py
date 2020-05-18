@@ -34,6 +34,10 @@ from rlmethods.b_actor_critic import Policy
 #adding tensorboard for visualization
 from tensorboardX import SummaryWriter
 
+
+from guppy import hpy
+from memory_profiler import profile
+
 #writer = SummaryWriter('../test_meIRL/tensorboard_log')
 
 
@@ -543,7 +547,6 @@ class DeepMaxEnt():
     ########################################################################
 
 
-
     def train(self,smoothing=False):
         '''
         Contains the code for the main training loop of the irl method.
@@ -568,6 +571,10 @@ class DeepMaxEnt():
         #not the best way to call the method but I am too tired to make anything fancy
         #generating svf from samples
         print('Reading expert-svf . . ')
+
+        hp = hpy()
+        start = hp.heap()
+
         prev_nn_reward_list = []
         prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
@@ -690,7 +697,7 @@ class DeepMaxEnt():
 
             ###############################################################
 
-
+            '''
             self.plot_info((lossList, svf_diff_list, 
                             l1_reg_list, dot_prod_list, rewards_norm_list, 
                             reward_grad_norm_list, model_performance_list, 
@@ -700,7 +707,7 @@ class DeepMaxEnt():
                             'reward-net-grad-norm', 'model-performance-true',
                             'model-performance-nn')
                             )
-
+            '''
 
 
             #pdb.set_trace()
@@ -738,5 +745,8 @@ class DeepMaxEnt():
                               'model-performance-nn')
                             )
             '''
+            diff_per_iter = hp.heap() - start
+            print(" Memory usage in iteration: {}".format(i), diff_per_iter)
+
         self.writer.close()
         return self.reward

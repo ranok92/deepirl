@@ -37,10 +37,10 @@ parser.add_argument("--num-trajs", type=int, default=10)
 parser.add_argument("--view-reward", action="store_true")
 
 parser.add_argument(
-    "--policy-net-hidden-dims", nargs="*", type=int, default=[128]
+    "--policy-net-hidden-dims", nargs="*", type=int, default=[256]
 )
 parser.add_argument(
-    "--reward-net-hidden-dims", nargs="*", type=int, default=[128]
+    "--reward-net-hidden-dims", nargs="*", type=int, default=[256]
 )
 
 parser.add_argument("--lr", type=float, default=0.0001)
