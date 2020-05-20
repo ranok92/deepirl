@@ -274,7 +274,7 @@ class DeepMaxEnt():
 
 
 
-
+    @profile
     def calculate_grads(self, stateRewards, freq_diff):
         
         #calculates the gradients on the reward network
@@ -344,6 +344,7 @@ class DeepMaxEnt():
         return reward_function(all_states)
 
 
+    @profile
     def get_rewards_of_states(self, reward_function, state_list):
         '''
         Calculates the rewards of the states provided in the state_list.
@@ -611,6 +612,7 @@ class DeepMaxEnt():
             #torch.manual_seed(7)
             #np.random.seed(7)
             print('Starting RL training. . .')
+            print('Memory profile :')
             self.rl.train(
                 self.rl_episodes,
                 self.rl_max_episode_len,

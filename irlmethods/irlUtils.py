@@ -31,6 +31,8 @@ import re
 #for visual
 import matplotlib.pyplot as plt
 import re
+
+from memory_profiler import profile
 numbers = re.compile(r'(\d+)')
 
 def numericalSort(value):
@@ -284,7 +286,7 @@ def expert_svf(traj_path, feat=None, gamma=0.99):
 
     return svf
 '''
-
+@profile
 def calculate_expert_svf(traj_path, max_time_steps=30, 
                         feature_extractor=None,
                         smoothing=False, gamma=0.99):
@@ -475,6 +477,7 @@ def calculate_expert_svf_with_smoothing(traj_path,
     return collections.OrderedDict(sorted(svf.items()))
 
 
+@profile
 def calculate_svf_from_sampling(no_of_samples=1000, env=None,
                                 policy_nn=None, reward_nn=None,
                                 episode_length=20, feature_extractor=None,
@@ -769,7 +772,7 @@ def calculate_svf_from_sampling_using_smoothing(no_of_samples=1000, env=None,
 
 
 
-
+@profile
 def get_states_and_freq_diff(expert_svf_dict, agent_svf_dict, feat):
     '''
     takes in the svf dictionaries for the expert and the agent
