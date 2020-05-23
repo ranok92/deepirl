@@ -10,6 +10,7 @@ import os
 import copy
 import pygame
 from numba import njit, jit
+from collections import deque
 
 ##################################################
 # *********** feature extracting functions********#
@@ -74,6 +75,7 @@ def get_rot_matrix(theta):
     return np.asarray(
         [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
     )
+
 
 
 def arange_orientation_info(dim_vector_8):
@@ -1336,7 +1338,7 @@ class DroneFeatureSAM1:
         self.step_size = step_size
         self.grid_size = grid_size
         # self.prev_frame_info = None
-        self.agent_state_history = []
+        self.agent_state_history = deque(maxlen=200)
         self.state_rep_size = None
 
         self.thresh1 = thresh1 * step_size
