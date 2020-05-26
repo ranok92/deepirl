@@ -65,7 +65,7 @@ parser.add_argument(
 The trajectories have to be list of dictionaires containing the raw state.",
 )
 
-parser.add_argument("--max-drift-timestep", type=int, default=100)
+parser.add_argument("--drift-timesteps", type=lambda s: [int(t) for t in s.split(',')], default=100)
 
 
 def main(args):
@@ -257,21 +257,21 @@ def main(args):
 
                 # drift calculation
                 drift_matrix = np.zeros(
-                    (len(env.pedestrian_dict.keys()), args.max_drift_analysis)
+                    (len(env.pedestrian_dict.keys()), len(args.drift_timesteps))
                 )
-                for drift_timestep in range(args.max_drift_timestep):
+                for drift_idx, drift_timestep in enumerate(args.drift_timesteps):
                     ped_drifts = agent_drift_analysis(
                         policy,
                         "Policy_network",
                         env,
-                        list(env.pedestrian_dict.keys()),
+                        list([int(ped_key) for ped_key in env.pedestrian_dict.keys()]),
                         feat_extractor=feat_ext,
                         pos_reset=drift_timestep,
                     )
 
                     assert len(ped_drifts) == len((env.pedestrian_dict.keys()))
 
-                    drift_matrix[:, drift_timestep] = ped_drifts
+                    drift_matrix[:, drift_idx] = ped_drifts
 
                 output["metric_results"]["drifts"] = drift_matrix
 
