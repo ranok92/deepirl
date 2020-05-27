@@ -567,9 +567,6 @@ class DeepMaxEnt():
         #generating svf from samples
         print('Reading expert-svf . . ')
 
-        hp = hpy()
-        start = hp.heap()
-
         prev_nn_reward_list = []
         prev_state_list = []
         expertdemo_svf = self.expert_svf_dict(self.rl_max_episode_len,
@@ -606,7 +603,6 @@ class DeepMaxEnt():
             #torch.manual_seed(7)
             #np.random.seed(7)
             print('Starting RL training. . .')
-            print('Memory profile :')
             self.rl.train(
                 self.rl_episodes,
                 self.rl_max_episode_len,
@@ -741,8 +737,6 @@ class DeepMaxEnt():
                               'model-performance-nn')
                             )
             '''
-            diff_per_iter = hp.heap() - start
-            print(" Memory usage in iteration: {}".format(i), diff_per_iter)
 
         self.writer.close()
         return self.reward

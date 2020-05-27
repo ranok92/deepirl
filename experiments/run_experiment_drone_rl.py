@@ -361,7 +361,7 @@ def main():
         seed=args.seed,
         obstacles=None,
         show_trail=False,
-        is_random=False,
+        is_random=True,
         annotation_file=args.annotation_file,
         subject=args.subject,
         tick_speed=60,
