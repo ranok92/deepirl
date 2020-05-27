@@ -31,8 +31,6 @@ from neural_nets.base_network import BasePolicy
 import gc
 import psutil
 
-from memory_profiler import profile
-
 
 process = psutil.Process(os.getpid())
 def display_memory_usage(memory_in_bytes):
@@ -581,7 +579,6 @@ class ActorCritic:
         del self.policy.saved_entropy[:]
 
 
-    @profile
     def train(self, max_episodes=None, max_episode_length=None, reward_network=None):
         """Train actor critic method on given gym environment."""
         #along with the policy, the train now returns the loss and the 

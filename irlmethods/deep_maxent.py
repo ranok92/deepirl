@@ -35,9 +35,6 @@ from rlmethods.b_actor_critic import Policy
 from tensorboardX import SummaryWriter
 
 
-from guppy import hpy
-from memory_profiler import profile
-
 #writer = SummaryWriter('../test_meIRL/tensorboard_log')
 
 
@@ -273,8 +270,6 @@ class DeepMaxEnt():
 
 
 
-
-    @profile
     def calculate_grads(self, stateRewards, freq_diff):
         
         #calculates the gradients on the reward network
@@ -344,7 +339,6 @@ class DeepMaxEnt():
         return reward_function(all_states)
 
 
-    @profile
     def get_rewards_of_states(self, reward_function, state_list):
         '''
         Calculates the rewards of the states provided in the state_list.
