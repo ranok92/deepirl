@@ -144,6 +144,30 @@ def reset_wrapper(s, dtype=torch.float):
 
     return torch.from_numpy(s).type(dtype)
 
+def copy_dict(in_dict):
+    """
+    Makes a faster deep copy of a dictionary, provided it only includes
+    native types, numpy arrays, and other dicts containing the
+    aforementioned.
+
+    :param in_dict: dictionary to copy.
+    :type in_dict: dict.
+    :return: (deep) copy of input dictionary.
+    :rtype: dict.
+    """
+    out_dict = {}
+
+    for key, val in in_dict.items():
+        if isinstance(val, np.ndarray):
+            out_dict[key] = val.copy()
+        elif isinstance(val, dict):
+            out_dict[key] = copy_dict(val)
+
+        else:
+            out_dict[key] = val
+
+    return out_dict
+
 class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout

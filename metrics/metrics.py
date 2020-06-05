@@ -5,23 +5,17 @@ from featureExtractor.drone_feature_extractor import dist_2d, angle_between
 import warnings
 import ipdb
 
-def compute_trajectory_smoothness(trajectory, agent_radius, 
-                                 collision_penalty=100):
+def compute_trajectory_smoothness(trajectory):
     """
     Returns the total and per step change in the orientation (in degrees)
     of the agent during the duration of the trajectory
-    Penalizes each collision with some penalty.
         input : trajectory (a list of states)
-                agent_radius 
-                collision_penalty
 
         output : total change in orientation,
                  avg change in orientation
     """
 
-    collision_penalty_total = count_collisions(trajectory, agent_radius) * \
-                              collision_penalty
-    change_in_orientation = collision_penalty_total
+    change_in_orientation = 0.0
     prev_orientation = None
     for state in trajectory:
 
@@ -36,8 +30,7 @@ def compute_trajectory_smoothness(trajectory, agent_radius,
     return change_in_orientation, change_in_orientation / len(trajectory)
 
 
-def compute_distance_displacement_ratio(trajectory, agent_radius, 
-                                        collision_penalty=200):
+def compute_distance_displacement_ratio(trajectory):
     """
     Returns the ration between the final displacement achieved by the agent and
     the distance travelled by the agent. Meant as an objective
@@ -46,17 +39,13 @@ def compute_distance_displacement_ratio(trajectory, agent_radius,
     1 indicate that the path taken by the agent are close to
     optimal paths that could have been taken.
 
-    Penalizes the trajectory length with +100 steps with each collision with 
-    obstacles.
         input : trajectory
                 agent_radius (to calculate the total collisions)
-                collision_penalty
-                
+
         output : final dispacement/ total distance travelled
     """
-    total_collisions = count_collisions(trajectory, agent_radius)
 
-    penalty_from_collision = total_collisions*collision_penalty
+    EPS = 0.001
 
     total_displacement = np.linalg.norm(
         trajectory[0]["agent_state"]["position"]
@@ -74,9 +63,7 @@ def compute_distance_displacement_ratio(trajectory, agent_radius,
         total_distance += step_distance
         prev_pos = state["agent_state"]["position"]
 
-    total_distance_w_collisions = total_distance + penalty_from_collision
-
-    return total_displacement / (total_distance_w_collisions+0.001)
+    return total_displacement / (total_distance + EPS)
 
 
 def proxemic_intrusions(trajectory, units_to_meters_ratio):

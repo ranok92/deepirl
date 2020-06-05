@@ -164,7 +164,10 @@ def agent_drift_analysis(agent,
 
         final_frame = env.final_frame
         if feat_extractor is not None:
-            feat_extractor.reset()
+            try:
+                feat_extractor.reset()
+            except AttributeError:
+                pass
             state_feat = feat_extractor.extract_features(state)
             state_feat = torch.from_numpy(state_feat).type(torch.FloatTensor).to(DEVICE)
 
