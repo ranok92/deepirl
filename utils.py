@@ -157,6 +157,9 @@ def copy_dict(in_dict):
     """
     out_dict = {}
 
+    if in_dict is None:
+        return None
+
     for key, val in in_dict.items():
         if isinstance(val, np.ndarray):
             out_dict[key] = val.copy()
