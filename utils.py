@@ -1,9 +1,12 @@
-''' general utilities that might find use in many seperate cases '''
+""" general utilities that might find use in many seperate cases """
 
 import numpy as np
+import pandas as pd
+import random
 import torch
 import sys
 import os
+import collections
 
 
 class HistoryBuffer:
@@ -13,7 +16,8 @@ class HistoryBuffer:
         self.bufferSize = bufferSize
         self.buffer = []
         self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     def addState(self, state):
         """ add a state to the history buffer each state is assumed to be of
@@ -33,7 +37,7 @@ class HistoryBuffer:
         arrSize = self.buffer[0].shape[1]
         arrayHist = np.asarray(self.buffer)
 
-        arrayHist = np.reshape(arrayHist, (1, arrSize*self.bufferSize))
+        arrayHist = np.reshape(arrayHist, (1, arrSize * self.bufferSize))
         state = torch.from_numpy(arrayHist).to(self.device)
         state = state.type(torch.cuda.FloatTensor)
 
@@ -41,7 +45,7 @@ class HistoryBuffer:
 
 
 def to_oh(idx, size):
-    '''
+    """
     creates a one-hot array of length 'size' and sets indexes in list 'idx' to
     be ones.
 
@@ -51,7 +55,7 @@ def to_oh(idx, size):
 
     return:
         output numpy vector of size ('size' x 1)
-    '''
+    """
     out = np.zeros(size)
     out[idx] = 1
 
@@ -69,6 +73,7 @@ def reset_torch_state(dtype=torch.float32):
 
         :param f: env.reset() being decorated.
         """
+
         def inner(*args, **kwargs):
             """returns a torch tensor for cpu or gpu when appropriate."""
 
@@ -78,7 +83,9 @@ def reset_torch_state(dtype=torch.float32):
                 return torch.from_numpy(s).cuda().type(dtype)
 
             return torch.from_numpy(s).type(dtype)
+
         return inner
+
     return real_decorator
 
 
@@ -93,6 +100,7 @@ def step_torch_state(dtype=torch.float32):
 
         :param f: env.step() being decorated.
         """
+
         def inner(*args, **kwargs):
             """returns a torch tensor for cpu or gpu when appropriate."""
 
@@ -107,6 +115,7 @@ def step_torch_state(dtype=torch.float32):
             return s, r, d, p
 
         return inner
+
     return real_decorator
 
 
@@ -118,10 +127,10 @@ def identity_dec(f):
 
 
 def identity_wrapper(*output):
-    if len(output)==1:
+    if len(output) == 1:
 
         return output[0]
-    elif len(output)==0:
+    elif len(output) == 0:
         return None
 
     return output
@@ -155,10 +164,11 @@ def copy_dict(in_dict):
     :return: (deep) copy of input dictionary.
     :rtype: dict.
     """
-    out_dict = {}
 
     if in_dict is None:
         return None
+
+    out_dict = {}
 
     for key, val in in_dict.items():
         if isinstance(val, np.ndarray):
@@ -171,11 +181,33 @@ def copy_dict(in_dict):
 
     return out_dict
 
+def seed_all(seed):
+    """ Use a seed to seed numpy, pytorch, and python random modules. """
+
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
+
 class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
+        sys.stdout = open(os.devnull, "w")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
         sys.stdout = self._original_stdout
+
+
+class DataTable:
+    def __init__(self):
+        self.data = collections.defaultdict(list)
+
+    def add_row(self, data_dict, step):
+        for key, val in data_dict.items():
+            self.data[key].append(val)
+
+        self.data['step'].append(step)
+
+    def write_csv(self, file):
+        pd_data = pd.DataFrame(self.data)
+        pd_data.to_csv(file)

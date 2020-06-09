@@ -1,13 +1,11 @@
 """ Utilities for generating results from metrics """
 
 from collections import defaultdict
-import copy
 import torch
 import numpy as np
 
 import os, sys
 import glob
-import pdb
 sys.path.insert(0, "..")
 import metrics
 
@@ -134,7 +132,6 @@ def collect_metrics_from_trajectory(trajectory_parent_folder, metric_applicator)
     return metric_results
 
 
-
 def collect_trajectories_and_metrics(
     env,
     feature_extractor,
@@ -180,7 +177,7 @@ def collect_trajectories_and_metrics(
 
         state = env.reset()
         current_pedestrian = env.cur_ped
-        print("Collecting trajectory {}".format(current_pedestrian), end='\r')
+        print("Collecting trajectory {}".format(current_pedestrian), end="\r")
         done = False
         t = 0
         traj = [copy_dict(state)]
@@ -412,16 +409,16 @@ def read_files_from_directories(parent_directory, folder_dict=None):
 
     return folder_dict
 
-if __name__=="__main__":
 
-    metric_applicator = MetricApplicator()
-    metric_applicator.add_metric(metrics.compute_trajectory_smoothness, [10])
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio, [10])
-    metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
-    metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
-    metric_applicator.add_metric(metrics.count_collisions, [10])
-    metric_applicator.add_metric(metrics.goal_reached, [10, 10])
-    metric_applicator.add_metric(metrics.pedestrian_hit, [10])
-    metric_applicator.add_metric(metrics.trajectory_length)
-    metric_applicator.add_metric(metrics.distance_to_nearest_pedestrian_over_time)
-    collect_metrics_from_trajectory("/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/Expert_raw_state_dictionary", metric_applicator)
+class LTHMP2020(MetricApplicator):
+    """ Collection of metrics applied for the LTHMP 2020 workshop. """
+
+    def __init__(self):
+        super().__init__()
+        self.add_metric(metrics.compute_trajectory_smoothness)
+        self.add_metric(metrics.compute_distance_displacement_ratio)
+        self.add_metric(metrics.proxemic_intrusions, [3])
+        self.add_metric(metrics.anisotropic_intrusions, [20])
+        self.add_metric(metrics.count_collisions, [5])
+        self.add_metric(metrics.goal_reached, [10, 5])
+        self.add_metric(metrics.trajectory_length)

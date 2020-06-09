@@ -655,7 +655,7 @@ class GridWorldDrone(GridWorld):
         return reward, done
 
 
-    def reset(self):
+    def reset(self, ped=None):
         '''
         Resets the environment, starting the obstacles from the start.
         If subject is specified, then the initial frame and final frame is set
@@ -669,7 +669,7 @@ class GridWorldDrone(GridWorld):
         Pro tip: Use this function while training the agent.
         '''
         if self.replace_subject:
-            return self.reset_and_replace()
+            return self.reset_and_replace(ped)
 
         else:
             self.current_frame = self.initial_frame
@@ -769,6 +769,8 @@ class GridWorldDrone(GridWorld):
         if self.subject is None:
             while True:
                 if ped is not None:
+                    while str(ped) not in self.pedestrian_dict.keys():
+                        ped += 1
                     self.cur_ped=ped
                     break
                 else:
@@ -781,8 +783,6 @@ class GridWorldDrone(GridWorld):
                             self.cur_ped += 1
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
-                    else:
-                        print('Selected pedestrian not available.')
         else:
             self.cur_ped = self.subject
 
