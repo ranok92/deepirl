@@ -72,8 +72,11 @@ def numericalSort(value):
 
 
 def main():
-    
+
     args = parser.parse_args()
+
+    utils.seed_all(args.seed)
+
     if args.on_server:
         # matplotlib without monitor
         matplotlib.use('Agg')
