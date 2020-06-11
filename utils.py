@@ -204,7 +204,11 @@ class DataTable:
 
     def add_row(self, data_dict, step):
         for key, val in data_dict.items():
-            self.data[key].append(val)
+            if isinstance(val, torch.Tensor):
+                corrected_val = val.cpu().detach().item()
+            else:
+                corrected_val = val
+            self.data[key].append(corrected_val)
 
         self.data['step'].append(step)
 

@@ -525,7 +525,7 @@ def main():
     smoothing_flag = False
     if args.svf_smoothing:
         smoothing_flag = True
-    
+
     irl_method.train(smoothing=smoothing_flag)
 
     if not args.dont_save:

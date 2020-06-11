@@ -24,8 +24,9 @@ from torch.nn.utils import clip_grad_norm_
 
 from torch.optim.lr_scheduler import StepLR
 
-
 from tensorboardX import SummaryWriter
+
+import utils
 
 
 class RewardNet(BaseNN):
@@ -130,7 +131,7 @@ class DeepMaxEnt:
         self.l1regularizer = l1regularizer
 
         # folders for saving purposes
-        self.save_folder_tf = (
+        self.save_root = (
             save_folder
             + "-reg-"
             + str(self.l1regularizer)
@@ -138,29 +139,14 @@ class DeepMaxEnt:
             + str(self.seed)
             + "-lr-"
             + str(learning_rate)
-            + "/tf_logs/"
         )
 
-        self.plot_save_folder = (
-            save_folder
-            + "-reg-"
-            + str(self.l1regularizer)
-            + "-seed-"
-            + str(self.seed)
-            + "-lr-"
-            + str(learning_rate)
-            + "/plots/"
-        )
+        self.save_folder_tf = self.save_root + "/tf_logs/"
+
+        self.plot_save_folder = self.save_root + "/plots/"
 
         self.reward_network_save_folder = (
-            save_folder
-            + "-reg-"
-            + str(self.l1regularizer)
-            + "-seed-"
-            + str(self.seed)
-            + "-lr-"
-            + str(learning_rate)
-            + "/saved-models-rewards/"
+            self.save_root + "/saved-models-rewards/"
         )
 
         self.policy_network_save_folder = (
@@ -182,6 +168,8 @@ class DeepMaxEnt:
         self.clipping = clipping_value
         self.writer = SummaryWriter(self.save_folder_tf)
         self.enumerate_all = enumerate_all
+
+        self.data_table = utils.DataTable()
 
     def expert_svf_dict(
         self, max_time_steps, feature_extractor, smoothing=False, gamma=1
@@ -256,7 +244,6 @@ class DeepMaxEnt:
             torch.norm(stateRewards.squeeze(), 1),
         )
 
-
     def per_state_reward(self, reward_function):
         """
         calculates the rewards of all possible states. Suitable with small state spaces
@@ -288,7 +275,6 @@ class DeepMaxEnt:
 
         return reward_function(state_tensors)
 
-
     def plot_info(self, inp_tuple, name_tuple):
         # pass a tuple containing n number of lists , this function goes through all and plots them
         i = 0
@@ -310,7 +296,6 @@ class DeepMaxEnt:
                 self.plot_save_folder + name_tuple[i] + str(iteration) + ".jpg"
             )
             plt.savefig(file_name)
-
 
     def extract_svf_difference(self, svf_dict, svf_array):
         # here the dict is converted to array and the difference is taken
@@ -538,6 +523,22 @@ class DeepMaxEnt:
                 "Log_info/reward_grad_norm", reward_nn_grad_magnitude, i
             )
 
+            self.data_table.add_row(
+                {
+                    "Log_info/model_performance_true": true_reward,
+                    "Log_info/model_performance_nn": nn_reward,
+                    "Log_info/svf_difference": np.linalg.norm(
+                        diff_freq.cpu().numpy(), 1
+                    ),
+                    "Log_info/loss": loss,
+                    "Log_info/dot_product_val": dot_prod,
+                    "info/l1_parameters": l1val,
+                    "Log_info/reward_norm": rewards_norm,
+                    "Log_info/reward_grad_norm": reward_nn_grad_magnitude,
+                },
+                i,
+            )
+
             self.optimizer.step()
 
             self.lr_scheduler.step()
@@ -560,6 +561,9 @@ class DeepMaxEnt:
             prev_state_list = states_visited
             prev_nn_reward_list = state_rewards
             prev_diff = diff_freq
+
+        with open(self.save_root + '/irl_datatable.csv', 'w') as f:
+            self.data_table.write_csv(f)
 
         self.writer.close()
         return self.reward
