@@ -16,7 +16,7 @@ import matplotlib
 import datetime, time
 
 # from debugtools import compile_results
-from utils import step_wrapper, reset_wrapper
+from utils import step_wrapper, reset_wrapper, seed_all
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--policy-path", type=str, nargs="?", default=None)
@@ -140,6 +140,8 @@ def main():
     ###################
 
     args = parser.parse_args()
+
+    seed_all(args.seed)
 
     if args.on_server:
 
