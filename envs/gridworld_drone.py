@@ -235,7 +235,7 @@ class GridWorldDrone(GridWorld):
             mag = 10 + 10 * self.agent_state['speed']
 
             if self.agent_state['orientation'] is not None: 
-                    pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
+                pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
                                         [self.agent_state['position'][1]+self.agent_state['orientation'][1]*mag, self.agent_state['position'][0]+self.agent_state['orientation'][0]*mag], 
                                         2)
 
@@ -455,7 +455,7 @@ class GridWorldDrone(GridWorld):
                 if float(element[1]) == self.cur_ped:
                     agent = self.pedestrian_dict[element[1]][str(self.current_frame)]
                     self.agent_state = agent
-                    self.state['agent_state'] = copy.deepcopy(self.agent_state)
+                    self.state['agent_state'] = utils.copy_dict(self.agent_state)
                     ref_vector = np.asarray([-1, 0])
                     if self.state['agent_state']['orientation'] is not None:
                         self.cur_heading_dir = (360 + rad_to_deg(total_angle_between(self.state['agent_state']['orientation'], ref_vector)))%360
@@ -587,10 +587,10 @@ class GridWorldDrone(GridWorld):
 
             self.heading_dir_history.append(self.cur_heading_dir)
 
-            self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
+            self.pos_history.append((utils.copy_dict(self.agent_state), self.current_frame))
 
             if self.ghost:
-                self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
+                self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
         #calculate the reward and completion condition
         reward, done = self.calculate_reward(action)
@@ -611,9 +611,9 @@ class GridWorldDrone(GridWorld):
 
         #added new
         if not self.release_control:
-            self.state['agent_state'] = copy.deepcopy(self.agent_state)
+            self.state['agent_state'] = utils.copy_dict(self.agent_state)
             self.state['agent_head_dir'] = self.cur_heading_dir
-            self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
+            self.state['ghost_state'] = utils.copy_dict(self.ghost_state)
         if self.external_control:
             if done:
                 self.release_control = True
@@ -655,7 +655,7 @@ class GridWorldDrone(GridWorld):
         return reward, done
 
 
-    def reset(self):
+    def reset(self, ped=None):
         '''
         Resets the environment, starting the obstacles from the start.
         If subject is specified, then the initial frame and final frame is set
@@ -669,7 +669,7 @@ class GridWorldDrone(GridWorld):
         Pro tip: Use this function while training the agent.
         '''
         if self.replace_subject:
-            return self.reset_and_replace()
+            return self.reset_and_replace(ped)
 
         else:
             self.current_frame = self.initial_frame
@@ -731,7 +731,7 @@ class GridWorldDrone(GridWorld):
 
 
             self.state = {}
-            self.state['agent_state'] = copy.deepcopy(self.agent_state)
+            self.state['agent_state'] = utils.copy_dict(self.agent_state)
             self.state['agent_head_dir'] = self.cur_heading_dir #starts heading towards top
             self.state['goal_state'] = self.goal_state
 
@@ -739,11 +739,11 @@ class GridWorldDrone(GridWorld):
             #if self.obstacles is not None:
             self.state['obstacles'] = self.obstacles
 
-            self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
+            self.pos_history.append((utils.copy_dict(self.agent_state), self.current_frame))
             if self.ghost:
-                self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
+                self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
-            self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
+            self.state['ghost_state'] = utils.copy_dict(self.ghost_state)
             self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
             self.cur_heading_dir = 0
             self.heading_dir_history = []
@@ -769,6 +769,8 @@ class GridWorldDrone(GridWorld):
         if self.subject is None:
             while True:
                 if ped is not None:
+                    while str(ped) not in self.pedestrian_dict.keys():
+                        ped += 1
                     self.cur_ped=ped
                     break
                 else:
@@ -781,8 +783,6 @@ class GridWorldDrone(GridWorld):
                             self.cur_ped += 1
                     if str(self.cur_ped) in self.pedestrian_dict.keys():
                         break
-                    else:
-                        print('Selected pedestrian not available.')
         else:
             self.cur_ped = self.subject
 
@@ -813,7 +813,7 @@ class GridWorldDrone(GridWorld):
 
         self.get_state_from_frame_universal(self.annotation_dict[str(self.current_frame)])
 
-        self.agent_state = copy.deepcopy(self.pedestrian_dict[str(self.cur_ped)][str(self.current_frame)])
+        self.agent_state = utils.copy_dict(self.pedestrian_dict[str(self.cur_ped)][str(self.current_frame)])
         #the starting state for any pedestrian in the dict has none for orientation and speed
         self.agent_state['speed'] = 0  #zero speed
         self.cur_heading_dir = 0
@@ -824,7 +824,7 @@ class GridWorldDrone(GridWorld):
 
 
         self.state = {}
-        self.state['agent_state'] = copy.deepcopy(self.agent_state)
+        self.state['agent_state'] = utils.copy_dict(self.agent_state)
         self.state['agent_head_dir'] = self.cur_heading_dir #starts heading towards top
         self.state['goal_state'] = self.goal_state
 
@@ -833,18 +833,18 @@ class GridWorldDrone(GridWorld):
         self.state['obstacles'] = self.obstacles
 
         self.pos_history = []
-        self.pos_history.append((copy.deepcopy(self.agent_state), self.current_frame))
+        self.pos_history.append((utils.copy_dict(self.agent_state), self.current_frame))
         if self.ghost:
             self.ghost_state_history = []
-            self.ghost_state = copy.deepcopy(self.agent_state)
-            self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
+            self.ghost_state = utils.copy_dict(self.agent_state)
+            self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
         if self.ghost:
             self.ghost_state_history = []
-            self.ghost_state = copy.deepcopy(self.agent_state)
-            self.ghost_state_history.append((copy.deepcopy(self.ghost_state), self.current_frame))
+            self.ghost_state = utils.copy_dict(self.agent_state)
+            self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
-        self.state['ghost_state'] = copy.deepcopy(self.ghost_state)
+        self.state['ghost_state'] = utils.copy_dict(self.ghost_state)
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.heading_dir_history = []
         self.heading_dir_history.append(self.cur_heading_dir)
@@ -945,7 +945,7 @@ class GridWorldDrone(GridWorld):
 
         if self.external_control:
 
-            self.agent_state = copy.deepcopy(self.pos_history[-frames-1])
+            self.agent_state = utils.copy_dict(self.pos_history[-frames-1])
             self.cur_heading_dir = self.heading_dir_history[-frames-1]
 
             if frames > len(self.heading_dir_history):
@@ -958,7 +958,7 @@ class GridWorldDrone(GridWorld):
 
         if self.release_control:
             self.release_control = False
-        self.state['agent_state'] = copy.deepcopy(self.agent_state)
+        self.state['agent_state'] = utils.copy_dict(self.agent_state)
         if self.display:
             self.render()
 
@@ -968,11 +968,11 @@ class GridWorldDrone(GridWorld):
     def return_position(self, ped_id, frame_id):
 
         try:
-            return copy.deepcopy(self.pedestrian_dict[str(ped_id)][str(frame_id)])
+            return utils.copy_dict(self.pedestrian_dict[str(ped_id)][str(frame_id)])
         except KeyError:
             while str(frame_id) not in self.pedestrian_dict[str(ped_id)]:
                 frame_id -= 1
-            return copy.deepcopy(self.pedestrian_dict[str(ped_id)][str(frame_id)])
+            return utils.copy_dict(self.pedestrian_dict[str(ped_id)][str(frame_id)])
 
 
     def draw_arrow(self, base_position , next_position, color):
@@ -1105,7 +1105,7 @@ class UCYWorld(GridWorldDrone):
         width=10,
         ):
 
-        args = copy.deepcopy(locals())
+        args = utils.copy_dict(locals())
 
         # these arguments are side effects of calling locals()
         del args['self']

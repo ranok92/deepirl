@@ -14,7 +14,7 @@ import pandas as pd
 sys.path.insert(0, "..")  # NOQA: E402
 from envs.gridworld_drone import GridWorldDrone as GridWorld
 from irlmethods.irlUtils import read_expert_trajectories
-from irlmethods.general_deep_maxent import MixingDeepMaxent
+from irlmethods.general_deep_maxent import PerTrajGCL
 from logger.logger import Logger
 import utils
 from featureExtractor import fe_utils
@@ -140,7 +140,14 @@ parser.add_argument("--num-expert-samples", type=int, default=32)
 parser.add_argument("--num-policy-samples", type=int, default=32)
 parser.add_argument("--save-dir", type=str, default="./results")
 parser.add_argument("--pre-train-iterations", type=int, default=0)
-parser.add_argument("--pre-train-rl-iterations", type=int, default=8000)
+parser.add_argument("--pre-train-rl-iterations", type=int, default=0)
+parser.add_argument(
+    "--saving-interval",
+    type=int,
+    default=10,
+    help="interval at which IRL saves its models.",
+)
+parser.add_argument("--pedestrian-width", type=float, default=10.0)
 
 
 def main():
@@ -164,7 +171,7 @@ def main():
     experiment_logger.log_header("Arguments for the experiment :")
     experiment_logger.log_info(vars(args))
 
-    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor)
+    feat_ext = fe_utils.load_feature_extractor(args.feat_extractor, obs_width=args.pedestrian_width, agent_width=args.pedestrian_width)
 
     experiment_logger.log_header("Parameters of the feature extractor :")
     experiment_logger.log_info(feat_ext.__dict__)
@@ -174,9 +181,9 @@ def main():
         is_random=False,
         rows=576,
         cols=720,
-        agent_width=10,
+        agent_width=args.pedestrian_width,
         step_size=2,
-        obs_width=10,
+        obs_width=args.pedestrian_width,
         width=10,
         subject=args.subject,
         annotation_file=args.annotation_file,
@@ -277,13 +284,14 @@ def main():
 
     expert_trajectories = read_expert_trajectories(args.exp_trajectory_path)
 
-    irl_method = MixingDeepMaxent(
+    irl_method = PerTrajGCL(
         rl=rl_method,
         env=env,
         expert_trajectories=expert_trajectories,
         learning_rate=args.lr_irl,
         l2_regularization=args.regularizer,
         save_folder=to_save,
+        saving_interval=args.saving_interval,
     )
 
     print("IRL method intialized.")
@@ -299,10 +307,14 @@ def main():
         gamma=args.gamma,
     )
 
-    rl_method.train(args.pre_train_rl_iterations, args.rl_ep_length, reward_network=irl_method.reward_net)
+    rl_method.train(
+        args.pre_train_rl_iterations,
+        args.rl_ep_length,
+        reward_network=irl_method.reward_net,
+    )
 
     # save intermediate RL result
-    rl_method.policy.save(to_save+'/policy')
+    rl_method.policy.save(to_save + "/policy")
 
     irl_method.train(
         args.irl_iterations,
@@ -325,20 +337,22 @@ def main():
         len(expert_trajectories),
         args.rl_ep_length,
         metric_applicator,
+        disregard_collisions=True,
     )
 
     pd_metrics = pd.DataFrame(metric_results).T
     pd_metrics = pd_metrics.applymap(lambda x: x[0])
     pd_metrics.to_pickle(to_save + "/metrics.pkl")
 
-    with open(to_save + "/rl_data.csv", 'a') as f:
+    with open(to_save + "/rl_data.csv", "a") as f:
         rl_method.data_table.write_csv(f)
 
-    with open(to_save + "/irl_data.csv", 'a') as f:
+    with open(to_save + "/irl_data.csv", "a") as f:
         irl_method.data_table.write_csv(f)
 
-    with open(to_save + "/pre_irl_data.csv", 'a') as f:
+    with open(to_save + "/pre_irl_data.csv", "a") as f:
         irl_method.pre_data_table.write_csv(f)
+
 
 if __name__ == "__main__":
     main()

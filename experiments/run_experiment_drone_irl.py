@@ -190,6 +190,8 @@ parser.add_argument("--replay-buffer-size", type=int, default=5000)
 def main():
     args = parser.parse_args()
 
+    utils.seed_all(args.seed)
+
     if args.on_server:
         # matplotlib without monitor
         matplotlib.use("Agg")
@@ -525,7 +527,7 @@ def main():
     smoothing_flag = False
     if args.svf_smoothing:
         smoothing_flag = True
-    
+
     irl_method.train(smoothing=smoothing_flag)
 
     if not args.dont_save:

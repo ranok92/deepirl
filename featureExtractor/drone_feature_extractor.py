@@ -12,9 +12,6 @@ import pygame
 from numba import njit, jit
 from collections import deque
 
-##################################################
-# *********** feature extracting functions********#
-
 
 @njit
 def angle_between(v1, v2):
@@ -670,7 +667,7 @@ def vector_to_goal_features(goal_position, agent_position, agent_orientation):
         features[2] = 1.0
     elif 0.625 * np.pi <= angle < 0.875 * np.pi:
         features[3] = 1.0
-    elif 0.875 * np.pi <= angle < np.pi:
+    elif 0.875 * np.pi <= angle <= np.pi:
         features[4] = 1.0
     elif -np.pi <= angle < -0.875 * np.pi:
         features[4] = 1.0
@@ -1338,7 +1335,7 @@ class DroneFeatureSAM1:
         self.step_size = step_size
         self.grid_size = grid_size
         # self.prev_frame_info = None
-        self.agent_state_history = deque(maxlen=200)
+        self.agent_state_history = deque(maxlen=1)
         self.state_rep_size = None
 
         self.thresh1 = thresh1 * step_size
@@ -1765,7 +1762,7 @@ class DroneFeatureSAM1:
 
     def reset(self):
 
-        self.agent_state_history = []
+        self.agent_state_history = deque(maxlen=1)
 
 
 class DroneFeatureMinimal(DroneFeatureSAM1):
