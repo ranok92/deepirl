@@ -20,8 +20,6 @@ parser.add_argument('--metric-info', type=str, nargs='*', default=None,
                     help="Description of the values of each of the indexes if \
                         the metrics result is more than one.")
                         
-parser.add_argument('--fig-title', type=str, required=True)
-
 parser.add_argument('--ped-file-list', nargs="*", type=str,
                     default=["./ped_lists/easy.npy", 
                     "./ped_lists/med.npy", "./ped_lists/hard.npy"],
@@ -143,12 +141,29 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
 
 
 def barplots_with_errorbars(list_of_dictionary, list_of_agent_names, 
-                            metric_name, fig_title, metric_info=None,
+                            metric_name, metric_info=None,
                             ped_list=None, x_axis=None, y_axis=None):
     """
     given a list of dictionary containing run information of different agents
     will return a histogram plot featuring the agent groups and the metrics provided
     against the pedestrians asked for.
+
+    **The function now stores a dictionary containing all the relevant information
+    for simplified future plots.
+
+    The dictionary contains the following keys:
+
+        metric name: name of the metric
+        metric_info (optional): addiitonal info on metric
+        ped_list : list of pedestrian involved in the calculation 
+                    of the metric. 
+        agent_list: List of the agents involved.
+                    The order of the agent_list, mean_list and stddev_list
+                    should be consistent.
+
+        mean_list: List containing the mean values
+        stddev_list: List containing the standard deviation of the values
+
     input:
         list_of_dictionary : a 2d list of dictionaries arranged in this format
                              [
@@ -158,13 +173,9 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         list_of_agent_names : a list of strings containing the name of the agents.
                               This will be used to populate the legend.
 
-        metrics : a string containing the name of the metric
+        metric_name : a string containing the name of the metric
                   that needs to be retrieved from the dictionary.
                   Names should exactly match the key in the dictonary
-
-        fig_title : Title to be used in the figure. If metric_info is not none,
-                    this gets appended with the metric_info to create the final 
-                    title.
 
         metric_info : If the information for the metric is of size>1, 
                 For example: 'compute_trajectory_smoothness' comprises of a 
@@ -180,6 +191,7 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
 
     output:
         a barplot with error bars against each value in the metric
+
 
     """
 
@@ -241,19 +253,24 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         if y_axis is not None:
             ax.set_ylabel(y_axis)
 
-        #get the filename to store the results
-        #filename for storing the mean  
-        
-        filename_mean = "./numerical_results/"+fig_title+"-"+metric_name + "_mean.txt"
-        with open(filename_mean, "wb") as fp:
-            pickle.dump(mean_list, fp)
+
+        #Create the storage dictionary
+        storage_dict = {}
+
+        storage_dict['metric_name'] = metric_name
+
+        storage_dict['metric_info'] = metric_info
+        storage_dict['ped_list'] = ped_list
+        storage_dict['agent_list'] = list_of_agent_names
+        storage_dict['mean_list'] = mean_list
+        storage_dict['std_list'] = std_list
+
+
+        filename_info_dict = "./numerical_results/"+metric_name + "_info_dict.pk"
+        with open(filename_info_dict, 'wb') as fp:
+            pickle.dump(storage_dict, fp)
             fp.close()
 
-        #filename for storing the std 
-        filename_std = "./numerical_results/"+fig_title+"-"+metric_name + "_std.txt"
-        with open(filename_std, "wb") as fp:
-            pickle.dump(std_list, fp)
-            fp.close()
 
         ax.set_xticks(x_axis)
         ax.set_xticklabels(list_of_agent_names)
@@ -410,7 +427,7 @@ if __name__=='__main__':
        """ 
    
     barplots_with_errorbars(master_dictionary_list, agent_names, 
-                   args.metric_name, args.fig_title,
+                   args.metric_name,
                    metric_info=args.metric_info,
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis) 

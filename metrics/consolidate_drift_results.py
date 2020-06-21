@@ -40,8 +40,5 @@ for file in args.drift_files:
     if drift_info.shape[1]!=ped_list.shape[0]:
         print("there is inconsistency in stuff.")
 
-    master_drift_results.append(drift_info.tolist())
-    pdb.set_trace()
 
-plot_drift_results(master_drift_results, args.start_interval, 
-                   args.end_interval, args.increment_interval)
+plot_drift_results(args.parent_folder, ped_list=ped_list)
