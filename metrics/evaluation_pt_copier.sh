@@ -9,22 +9,22 @@ for res_type in $ALL_RES_PATH/*; do
     echo "found result type" $res_type
     for seed in $res_type/*; do
         # low svf symlink
-        if [ -d $seed/tf_logs/ ]; then
+        if [ -d "$seed"/tf_logs/ ]; then
             low_svf="$(python -W ignore $LOW_SVF_FINDER_DIR --tf-file $seed/tf_logs/* | sed -nr 's/.*step\s([0-9]+)/\1/p').pt"
             echo "creating symlink $seed/$low_svf into $seed"
-            ln -sf $seed/$low_svf $seed
+            ln -sf "$seed"/saved-models/$low_svf "$seed"/"low_svf_$low_svf"
         fi
 
         # latest iteration symlink
-        if [ -d $seed/saved-models/ ]; then
+        if [ -d "$seed"/saved-models/ ]; then
             last_iter="$(ls -v $seed/saved-models | tail -1)"
             echo "creating symlink $seed/$last_iter into $seed"
-            ln -sf $seed/$last_iter $seed
+            ln -sf "$seed"/saved-models/$last_iter "$seed"/"last_iter_$last_iter"
         fi
-        if [ -d $seed/policy-models/ ]; then
-            last_iter="$(ls -v $seed/policy-models | tail -1)"
+        if [ -d "$seed"/policy-models/ ]; then
+            last_iter="$(ls -v "$seed"/policy-models | tail -1)"
             echo "creating symlink $seed/$last_iter into $seed"
-            ln -sf $seed/$last_iter $seed
+            ln -sf "$seed"/policy-models/$last_iter "$seed"/"last_iter_$last_iter"
         fi
     done
 done
