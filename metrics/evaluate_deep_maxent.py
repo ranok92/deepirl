@@ -288,6 +288,7 @@ def main(args):
                 drift_matrix[:, drift_idx] = ped_drifts
 
             output["metric_results"]["drifts"] = drift_matrix
+            output["metric_results"]["drifts_header"] = args.drift_timesteps
 
             pathlib.Path("./results/").mkdir(exist_ok=True)
 
