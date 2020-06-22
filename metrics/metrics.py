@@ -317,7 +317,11 @@ def distance_to_nearest_pedestrian_over_time(trajectory):
         distances = [
             dist_2d(ped_pos, agent_position) for ped_pos in ped_positions
         ]
-        min_distances.append(np.min(distances))
+
+        if len(distances) == 0:
+            min_distances.append(None)
+        else:
+            min_distances.append(np.min(distances))
 
     return min_distances
 
