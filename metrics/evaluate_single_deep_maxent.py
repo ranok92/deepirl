@@ -282,17 +282,17 @@ def main(args):
 
             pathlib.Path("./results/").mkdir(exist_ok=True)
 
-            with open(
-                "./results/"
-                + args.output_name
-                + "_"
-                + parent_dir_name
-                + "_"
-                + pathlib.Path(args.policy_path).name
-                + datetime.now().strftime("%Y-%m-%d-%H:%M"),
-                "wb",
-            ) as f:
-                pickle.dump(output, f)
+        with open(
+            "./results/"
+            + args.output_name
+            + "_"
+            + parent_dir_name
+            + "_"
+            + pathlib.Path(args.policy_path).name
+            + datetime.now().strftime("%Y-%m-%d-%H:%M"),
+            "wb",
+        ) as f:
+            pickle.dump(output, f)
     else:
         # when raw trajectories are directly provided.
         # metric parameters
