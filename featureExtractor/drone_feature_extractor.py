@@ -549,6 +549,9 @@ def social_force_features(
     :rtype: float np.array of shape (3,)
     """
 
+    if len(pedestrian_positions) == 0:
+        return np.zeros(3)
+
     # in the paper formula, 'i' is our agent, while 'j's are the pedestrians.
 
     rel_positions = pedestrian_positions - agent_position
