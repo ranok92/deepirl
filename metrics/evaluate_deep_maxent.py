@@ -54,7 +54,7 @@ students003_processed_corrected.txt",
 
 parser.add_argument("--reward-path", type=str, nargs="?", default=None)
 
-parser.add_argument("--parent-policy-folder", type=str, required=True)
+parser.add_argument("--parent-policy-folder", type=str, required=False)
 
 parser.add_argument("--output-name", type=str, default="deep_maxent_eval")
 
@@ -305,10 +305,10 @@ def main(args):
         # metric parameters
         metric_applicator = metric_utils.MetricApplicator()
         metric_applicator.add_metric(
-            metrics.compute_trajectory_smoothness, [10]
+            metrics.compute_trajectory_smoothness, 
         )
         metric_applicator.add_metric(
-            metrics.compute_distance_displacement_ratio, [10]
+            metrics.compute_distance_displacement_ratio,
         )
         metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
         metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
