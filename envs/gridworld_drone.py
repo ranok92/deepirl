@@ -107,7 +107,8 @@ class GridWorldDrone(GridWorld):
         self.ghost = None
         self.ghost_state = None
         self.ghost_state_history = []
-        self.ghost_color = (140, 0, 200)
+        self.ghost_color = (200, 0, 200)
+        self.ghost_color_trail = (250, 175, 250)
 
 
         self.annotation_file = annotation_file#file from which the video information will be used
@@ -204,19 +205,24 @@ class GridWorldDrone(GridWorld):
         if display:
             self.enable_rendering(tick_speed)
 
-    def draw_obstacle(self, obs):
+    def draw_obstacle(self, obs, cartoon=False):
         """
         ped_position : [row, col]
         """
         #pdb.set_trace()
-        font = pygame.freetype.Font(None, 15)
+        font = pygame.freetype.Font(None, 12)
 
         index = int(obs['id'])%len(self.ped_images)
-        self.gameDisplay.blit(self.ped_images[index], 
-                              (obs['position'][1]-(self.obs_width/2), 
-                               obs['position'][0]-(self.obs_width/2)))
+        if cartoon:
+            self.gameDisplay.blit(self.ped_images[index], 
+                                  (obs['position'][1]-(self.obs_width/2), 
+                                   obs['position'][0]-(self.obs_width/2)))
+        else:
+            pygame.draw.rect(self.gameDisplay, self.red, [obs['position'][1]-(self.obs_width/2),obs['position'][0]-(self.obs_width/2), \
+                            self.obs_width, self.obs_width])
+
         font.render_to(self.gameDisplay, 
-                              (obs['position'][1]-(self.obs_width/2)-10,obs['position'][0]-(self.obs_width/2)-5), 
+                              (obs['position'][1]-(self.obs_width/2)+10,obs['position'][0]-(self.obs_width/2)+5), 
                               obs['id'], fgcolor=(0,0,0))
 
         if self.show_orientation:
@@ -225,11 +231,17 @@ class GridWorldDrone(GridWorld):
                                     [obs['position'][1]+obs['orientation'][1]*10, obs['position'][0]+obs['orientation'][0]*10], 2)
 
 
-    def draw_agent(self):
+    def draw_agent(self, cartoon=False):
 
-        self.gameDisplay.blit(self.agent_image, 
+        if cartoon:
+            self.gameDisplay.blit(self.agent_image, 
                               (self.agent_state['position'][1]-(self.agent_width/2), 
                                self.agent_state['position'][0]-(self.agent_width/2)))
+        else:
+            pygame.draw.rect(self.gameDisplay, self.black, [self.agent_state['position'][1]-(self.agent_width/2), \
+                             self.agent_state['position'][0]-(self.agent_width/2), \
+                            self.agent_width, self.agent_width])
+
 
         if self.show_orientation:
             mag = 10 + 10 * self.agent_state['speed']
@@ -525,11 +537,11 @@ class GridWorldDrone(GridWorld):
                             (self.agent_width/2), self.agent_width, self.agent_width])
 
         if self.show_trail:
-
-            self.draw_trajectory(self.pos_history, self.black, show_frames=show_trail_frames)
+            #pdb.set_trace()
+            self.draw_trajectory(self.pos_history, (200,200,200), show_frames=show_trail_frames)
 
             if self.ghost:
-                self.draw_trajectory(self.ghost_state_history, self.ghost_color, show_frames=show_trail_frames)
+                self.draw_trajectory(self.ghost_state_history, self.ghost_color_trail, show_frames=show_trail_frames)
 
 
         pygame.display.update()
@@ -589,8 +601,8 @@ class GridWorldDrone(GridWorld):
 
             self.pos_history.append((utils.copy_dict(self.agent_state), self.current_frame))
 
-            if self.ghost:
-                self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
+            #if self.ghost:
+            #    self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
         #calculate the reward and completion condition
         reward, done = self.calculate_reward(action)
@@ -839,11 +851,6 @@ class GridWorldDrone(GridWorld):
             self.ghost_state = utils.copy_dict(self.agent_state)
             self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
 
-        if self.ghost:
-            self.ghost_state_history = []
-            self.ghost_state = utils.copy_dict(self.agent_state)
-            self.ghost_state_history.append((utils.copy_dict(self.ghost_state), self.current_frame))
-
         self.state['ghost_state'] = utils.copy_dict(self.ghost_state)
         self.distanceFromgoal = np.linalg.norm(self.agent_state['position']-self.goal_state,1)
         self.heading_dir_history = []
@@ -1028,12 +1035,12 @@ class GridWorldDrone(GridWorld):
         end_frame = trajectory[-1][1]
 
         #draw the start and end of the trajectory
-        pygame.draw.circle(self.gameDisplay,(0,255,0),
+        pygame.draw.circle(self.gameDisplay, color,
                             (int(start_pos[1]),int(start_pos[0])),
                             rad)
 
 
-        pygame.draw.circle(self.gameDisplay,(0,0,255),
+        pygame.draw.circle(self.gameDisplay, color,
                     (int(end_pos[1]),int(end_pos[0])),
                     rad)
         
@@ -1053,7 +1060,7 @@ class GridWorldDrone(GridWorld):
                 if count%show_frames == 0:
                     cur_pos = trajectory[count][0]['position']
                     
-                    pygame.draw.circle(self.gameDisplay,(0,0,255),
+                    pygame.draw.circle(self.gameDisplay, color,
                                 (int(cur_pos[1]),int(cur_pos[0])),
                                 3)
 
@@ -1153,15 +1160,18 @@ if __name__=="__main__":
                                         thresh1=20,
                                         thresh2=30,
                                         show_agent_persp=True)
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
-    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_processed.txt'
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+#arxiepiskopi/annotation/processed/arxiepiskopi1_per_frame.txt'
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    obstacle_map = './maps/real_map.jpg'
     #annotation_file = None
     world = GridWorldDrone(display=True, 
                         seed=20, obstacles=None, 
-                        show_trail=True,
+                        show_trail=False,
                         is_random=False,
                         annotation_file=annotation_file,
-                        subject=13,
+                        subject=None,
                         tick_speed=30, 
                         obs_width=7,
                         step_size=2,
