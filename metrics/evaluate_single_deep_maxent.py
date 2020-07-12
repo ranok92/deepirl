@@ -154,8 +154,8 @@ def main(args):
     if args.feat_extractor == "VasquezF1":
         feat_ext_args = {
             "density_radius": 6 * agent_width,
-            "lower_speed_threshold": 18,
-            "upper_speed_threshold": 30,
+            "lower_speed_threshold": 0.5,
+            "upper_speed_threshold": 1.0,
         }
 
         feat_ext = VasquezF1(
@@ -167,8 +167,8 @@ def main(args):
     if args.feat_extractor == "VasquezF2":
         feat_ext_args = {
             "density_radius": 6 * agent_width,
-            "lower_speed_threshold": 18,
-            "upper_speed_threshold": 30,
+            "lower_speed_threshold": 0.5,
+            "upper_speed_threshold": 1.0,
         }
 
         feat_ext = VasquezF2(
