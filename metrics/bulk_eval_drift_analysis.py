@@ -129,26 +129,28 @@ def main(bulk_args):
                         break
 
                 break
-
+            
+            #pdb.set_trace()
             per_feat_args = Namespace(
                     max_ep_length=bulk_args.max_ep_length,
                     feat_extractor=feature_name,
                     annotation_file=bulk_args.annotation_file,
                     ped_list=bulk_args.ped_list,                                    
-                    policy_path=policy_file_list_for_feat,
-                    agent_type=agent_type_for_feat,
+                    policy_path=[policy_file_list_for_feat[0]],
+                    agent_type=[agent_type_for_feat[0]],
                     save_filename=feature_name, 
-                    dont_replace_subject=True,
+                    dont_replace_subject=False,
                     disregard_collisions=bulk_args.disregard_collisions,
                     drift_timesteps=bulk_args.drift_timesteps,
                     render=False,
                     policy_net_hidden_dims=[256],
                     start_interval=bulk_args.start_interval,
                     end_interval=bulk_args.end_interval,
-                    increment_interval=bulk_args.increment_interval
+                    increment_interval=bulk_args.increment_interval,
+                    plot=False
                     )
             #print(per_feat_args)
-            pdb.set_trace()
+            #pdb.set_trace()
 
             evaluate_drift_maxent_main(per_feat_args)
 
