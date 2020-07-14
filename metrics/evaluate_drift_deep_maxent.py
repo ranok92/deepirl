@@ -408,12 +408,12 @@ def run_analysis(args):
 
     #folder_dict = read_files_from_directories(args.parent_directory)
     
-    
+    feat_size = feat_ext.extract_features(env.reset()).shape[0]
     for i in range(len(args.agent_type)):
 
         if args.agent_type[i] == 'Policy_network':
             #initialize the network
-            agent = Policy(feat_ext.state_rep_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
+            agent = Policy(feat_size, env.action_space.n, hidden_dims=args.policy_net_hidden_dims)
 
             if args.policy_path:
                 agent.load(args.policy_path[policy_network_counter])
@@ -495,15 +495,8 @@ def run_analysis(args):
 
 
 
+def main(args):
 
-
-
-
-if __name__ == '__main__':
-
-    args = parser.parse_args()
-
-    
     #****************************************************
     #******for generating the drift files
     run_analysis(args)
@@ -533,3 +526,12 @@ if __name__ == '__main__':
     plot_drift_results(args.parent_folder, ped_list=ped_list)
     '''
     #**************************************************************
+
+
+
+if __name__ == '__main__':
+
+
+    args = parser.parse_args()
+    main(args)
+    
