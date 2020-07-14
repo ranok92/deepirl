@@ -194,7 +194,7 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
 
 
     """
-
+    bar_color_list = ['r','g','m','y','b']
     if metric_info is None:
         metric_value_len = 1
     else:
@@ -246,10 +246,16 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
             std_list.append(np.std(np.nanmean(run_information_list[i][:, :, info], axis=1)))
             
 
-        ax.bar(x_axis, mean_list, yerr=std_list, 
-            alpha=alpha, capsize=capsize, align='center')
+        print(np.nanmean(run_information_list[i][:, :, info], axis=1))
+        pdb.set_trace()
 
- 
+        barlist = ax.bar(x_axis, mean_list, yerr=std_list, 
+                        alpha=alpha, capsize=capsize, align='center')
+
+        for bar in barlist:
+            bar.set_color(bar_color_list[i])
+            i = (i+1)%len(bar_color_list)
+    
         if y_axis is not None:
             ax.set_ylabel(y_axis)
 
