@@ -480,9 +480,14 @@ def run_analysis(args):
 
     if args.save_filename:
         
-        filename = args.save_filename + str(start_interval) + \
+        path_list = args.save_filename.strip().split('/')
+        filename = path_list[-1]
+        folder_path = ''
+        for i in range(len(path_list)):
+            folder_path = folder_path + path_list[i] +'/'
+        filename = filename + str(start_interval) + \
                 '-' + str(reset_lim) + '-' + str(reset_int)
-        np.save('./drift_results/'+ filename, drift_info_numpy)
+        np.save(folder_path+ filename, drift_info_numpy)
 
 
 
