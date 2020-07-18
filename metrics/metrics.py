@@ -301,7 +301,7 @@ def pedestrian_hit(trajectory, agent_radius):
 def distance_to_nearest_pedestrian_over_time(trajectory):
     """
     At each timestep in trajectory, calculates the distances to the
-    nearest pedestrian.
+    nearest pedestrian. If no pedestrian, returns np.inf
 
     :param trajectory: trajectory comprised of states_dicts.
     :type trajectory: list of state_dicts
@@ -317,7 +317,10 @@ def distance_to_nearest_pedestrian_over_time(trajectory):
         distances = [
             dist_2d(ped_pos, agent_position) for ped_pos in ped_positions
         ]
-        min_distances.append(np.min(distances))
+        if len(distances)==0:
+            min_distances.append(np.inf)
+        else:
+            min_distances.append(np.min(distances))
 
     return min_distances
 
