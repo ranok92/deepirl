@@ -1,12 +1,14 @@
 import numpy as np
 from matplotlib import pyplot as plt 
-import argparse
+from argparse import ArgumentParser, Namespace 
 from evaluate_drift_deep_maxent import plot_drift_results
 
 import pdb
-parser = argparse.ArgumentParser()
+parser = ArgumentParser()
 
-parser.add_argument('--drift-files', type=str, nargs="*", default=None)
+#parser.add_argument('--drift-files', type=str, nargs="*", default=None)
+
+parser.add_argument('--parent-folder', type=str, required=True)
 
 
 parser.add_argument('--ped-list', type=str, nargs="*", default=["./ped_lists/easy.npy",
@@ -30,9 +32,10 @@ ped_list = np.zeros(1)
 for file in args.ped_list:
     ped_list = np.concatenate((ped_list,np.load(file)), axis=0)
 
+ped_list = ped_list[1:]
 ped_list = np.sort(ped_list).astype(int)
 
-
+'''
 master_drift_results = []
 for file in args.drift_files:
     drift_info = np.load(file)
@@ -40,5 +43,12 @@ for file in args.drift_files:
     if drift_info.shape[1]!=ped_list.shape[0]:
         print("there is inconsistency in stuff.")
 
+'''
+sec_args = Namespace(parent_folder=args.parent_folder,
+				 ped_list=ped_list,
+				 start_interval=args.start_interval,
+				 end_interval=args.end_interval,
+				 increment_interval=args.increment_interval)
 
-plot_drift_results(args.parent_folder, ped_list=ped_list)
+
+plot_drift_results(sec_args)
