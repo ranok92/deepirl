@@ -199,6 +199,13 @@ def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[72
 
     extracted_dict = read_data_from_file(annotation_file, rows=world_size[1], cols=world_size[0])
     dense_info_list = []
+
+    #add the world size to the trajectory file
+    with open(file_n, 'a') as f:
+        for val in world_size:
+            f.write("%s " % val)
+        f.write("\n")
+
     for ped in extracted_dict.keys():
             
         #for i in range(len(extracted_dict[ped])):
@@ -207,11 +214,7 @@ def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[72
 
         #for i in range(len(dense_info)):
         #    print(dense_info[i])
-        #add the world size to the trajectory file
-        with open(file_n, 'a') as f:
-            for val in world_size:
-                f.write("%s " % val)
-            f.write("\n")
+
 
         with open(file_n, 'a') as f:
             if dense_info is not None:
@@ -525,7 +528,8 @@ def extract_subjects_from_file(annotation_file):
 
         for line in f:
             line = line.strip().split(' ')
-            sub_list.append(int(line[1]))
+            if len(line)==4:
+                sub_list.append(int(line[1]))
 
     return set(sub_list)
 
@@ -685,6 +689,7 @@ def classify_pedestrians(annotation_file, viscinity):
     
     subject_set = extract_subjects_from_file(annotation_file)
     avg_ped_per_subject = []
+    pdb.set_trace()
     for subject in subject_set:
         print(' Subject :', subject)
         state = env.reset_and_replace(ped=subject)
@@ -705,9 +710,14 @@ def classify_pedestrians(annotation_file, viscinity):
     avg_peds_per_subject_arr = np.asarray(avg_ped_per_subject)
     subject_array = subject_array[avg_peds_per_subject_arr.argsort()]
     avg_peds_per_subject_arr.sort()
-    easy_arr = subject_array[0:200]
-    medium_arr = subject_array[200:380]
-    hard_arr = subject_array[380:]
+    total = len(subject_set)
+
+    easy_cutoff = int(total*.5)
+    med_cutoff = int(total*.85)
+
+    easy_arr = subject_array[0:easy_cutoff]
+    medium_arr = subject_array[easy_cutoff:med_cutoff]
+    hard_arr = subject_array[med_cutoff:]
 
     return easy_arr, medium_arr, hard_arr
 
@@ -837,10 +847,12 @@ def get_index_from_pedid_university_student_dataset(ped_id):
     #load the precomputed list that contains the difference between index and 
     #id for each of the pedestrians
 
-    with open('university_students_ped_id_difference_dict.json', 'r') as fp:
+    with open('../envs/expert_datasets/\
+/university_students/data_info/university_students_ped_id_difference_dict.json', 'r') as fp:
         diff_dict = json.load(fp)
     
-    return ped_id - diff_dict[str(ped_id)] 
+
+    return ped_id + diff_dict[str(ped_id)] 
 
 
 
@@ -1047,13 +1059,12 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #******** section for preprocessing data ************
-    
-    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-custom_scenarios/annotation/sparse_splines/head_on_passing_2.txt'
+    '''
+    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/crowds_zara02.vsp'
 
     intval = preprocess_data_from_control_points(file_name, 1)
+    '''
     
-
     
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
@@ -1068,9 +1079,12 @@ custom_scenarios/annotation/sparse_splines/head_on_passing_2.txt'
     '''
     #*****************************************************
     #************* classify pedestrians based on presence of nearby obstacles
-    '''
+    
+    
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+data_zara/annotation/processed/crowds_zara02_per_frame.txt'
 
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
-
-    classify_pedestrians(annotation_file, 30)
-    '''
+    easy, med, hard = classify_pedestrians(annotation_file, 30)
+    pdb.set_trace()
+    
