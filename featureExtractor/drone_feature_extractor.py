@@ -551,54 +551,60 @@ def social_force_features(
 
     # in the paper formula, 'i' is our agent, while 'j's are the pedestrians.
 
-    rel_positions = pedestrian_positions - agent_position
-    rel_distances = np.linalg.norm(rel_positions, axis=1)
-    normalized_rel_positions = rel_positions / np.max(rel_distances)
+    if pedestrian_positions.shape[0] > 0:
+        #there has to be atleast one pedestrian in the scene
+        rel_positions = pedestrian_positions - agent_position
+        rel_distances = np.linalg.norm(rel_positions, axis=1)
+        normalized_rel_positions = rel_positions / np.max(rel_distances)
 
-    assert rel_positions.shape == normalized_rel_positions.shape
+        assert rel_positions.shape == normalized_rel_positions.shape
 
-    rel_angles = np.zeros(rel_distances.shape)
+        rel_angles = np.zeros(rel_distances.shape)
 
-    # used to group pedestrians with the same orientation bin together using
-    # their ID.
-    feature = np.zeros(3)
-    ped_orientation_bins = [np.empty(0, dtype=np.int64)] * 3
+        # used to group pedestrians with the same orientation bin together using
+        # their ID.
+        feature = np.zeros(3)
+        ped_orientation_bins = [np.empty(0, dtype=np.int64)] * 3
 
-    for ped_id in range(len(pedestrian_positions)):
-        relative_pos = rel_positions[ped_id]
+        for ped_id in range(len(pedestrian_positions)):
+            relative_pos = rel_positions[ped_id]
 
-        # angle_between produces only positive angles
-        angle = angle_between(relative_pos, agent_velocity)
-        rel_angles[ped_id] = angle
+            # angle_between produces only positive angles
+            angle = angle_between(relative_pos, agent_velocity)
+            rel_angles[ped_id] = angle
 
-        # put into bins
-        # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
-        if 0.75 * np.pi <= angle <= np.pi:
-            ped_orientation_bins[0] = np.append(
-                ped_orientation_bins[0], ped_id
-            )
-        elif 0.25 * np.pi <= angle < 0.75 * np.pi:
-            ped_orientation_bins[1] = np.append(
-                ped_orientation_bins[1], ped_id
-            )
-        elif 0.0 <= angle < 0.25 * np.pi:
-            ped_orientation_bins[2] = np.append(
-                ped_orientation_bins[2], ped_id
-            )
-        else:
-            raise ValueError("Orientation does not fit into any bin.")
+            # put into bins
+            # Bins adjusted to work with angle_between() (i.e. abs value of angles.)
+            if 0.75 * np.pi <= angle <= np.pi:
+                ped_orientation_bins[0] = np.append(
+                    ped_orientation_bins[0], ped_id
+                )
+            elif 0.25 * np.pi <= angle < 0.75 * np.pi:
+                ped_orientation_bins[1] = np.append(
+                    ped_orientation_bins[1], ped_id
+                )
+            elif 0.0 <= angle < 0.25 * np.pi:
+                ped_orientation_bins[2] = np.append(
+                    ped_orientation_bins[2], ped_id
+                )
+            else:
+                raise ValueError("Orientation does not fit into any bin.")
 
-    exp_multiplier = np.exp(2 * agent_radius - rel_distances).reshape(-1, 1)
-    anisotropic_term = (2.0 - 0.5 * (1.0 + np.cos(rel_angles))).reshape(-1, 1)
-    social_forces = (
-        exp_multiplier * normalized_rel_positions * anisotropic_term
-    )
+        exp_multiplier = np.exp(2 * agent_radius - rel_distances).reshape(-1, 1)
+        anisotropic_term = (2.0 - 0.5 * (1.0 + np.cos(rel_angles))).reshape(-1, 1)
+        social_forces = (
+            exp_multiplier * normalized_rel_positions * anisotropic_term
+        )
 
-    forces_above_threshold = np.linalg.norm(social_forces, axis=1) > 0.5
+        forces_above_threshold = np.linalg.norm(social_forces, axis=1) > 0.5
 
-    feature[0] = np.sum(forces_above_threshold[ped_orientation_bins[0]])
-    feature[1] = np.sum(forces_above_threshold[ped_orientation_bins[1]])
-    feature[2] = np.sum(forces_above_threshold[ped_orientation_bins[2]])
+        feature[0] = np.sum(forces_above_threshold[ped_orientation_bins[0]])
+        feature[1] = np.sum(forces_above_threshold[ped_orientation_bins[1]])
+        feature[2] = np.sum(forces_above_threshold[ped_orientation_bins[2]])
+
+    else:
+
+        feature = np.zeros(3)
 
     return feature
 
