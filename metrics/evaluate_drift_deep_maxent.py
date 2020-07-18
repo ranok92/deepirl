@@ -26,6 +26,9 @@ from rlmethods.b_actor_critic import Policy
 from tqdm import tqdm
 from envs.drone_data_utils import classify_pedestrians
 from envs.drone_data_utils import get_pedestrians_in_viscinity
+from envs.drone_data_utils import get_index_from_pedid_university_student_dataset
+
+
 from featureExtractor.drone_feature_extractor import dist_2d
 from featureExtractor.drone_feature_extractor import (
     VasquezF1,
@@ -266,7 +269,7 @@ def drift_analysis(agent_list,
     return drift_lists
     
 
-def plot_drift_results(parent_folder, ped_list=None):
+def plot_drift_results(args):
     """
     Plots the dirft results.
         input: 
@@ -282,12 +285,13 @@ def plot_drift_results(parent_folder, ped_list=None):
             1. args.start_interval
             2. args.end_interval
             3. args.increment_interval
-            4. args.agent_type [list containing the names you want get printed
-                                in the legend of the plot]
+
 
         output : plot of the result.
 
     """
+    parent_folder = args.parent_folder
+    ped_list = args.ped_list
     file_structure_dict = read_files_from_directories(parent_folder)
     agent_type_list = []
 
@@ -297,21 +301,25 @@ def plot_drift_results(parent_folder, ped_list=None):
         key_list.append(key)
 
     #insert the first element in agent_type_list and master_drift_array
-    agent_type_list.append(key_list[0])
+    #agent_type_list.append(key_list[0])
 
-    print('Reading from file :', file_structure_dict[key_list[0]][0])
-    master_drift_array = np.load(file_structure_dict[key_list[0]][0])
+    #print('Reading from file :', file_structure_dict[key_list[0]][0])
+    master_drift_dict = {} #dictionary containing the drift information
+    #feature_drift_array = np.expand_dims(np.load(file_structure_dict[key_list[0]][0]), axis=0)
+    ped_index_list = []
+    for ped in ped_list:
+        ped_index_list.append(get_index_from_pedid_university_student_dataset(int(ped)))
 
-    #insert the rest of the elements in the agent_type_list and the 
-    #master_drift_array
-    for i in range(1, len(key_list)):
+    #pdb.set_trace()
+    for i in range(len(key_list)):
+
         agent_type_list.append(key_list[i])
         print('reading from file :', file_structure_dict[key_list[i]][0])
-        master_drift_array = np.concatenate((master_drift_array, np.load(file_structure_dict[key_list[i]][0])), axis=0)
-        
-    if ped_list is not None:
-        master_drift_array = master_drift_array[:, :, :]
-
+        agent_drift_info = np.load(file_structure_dict[key_list[i]][0])
+        #sieve drift information of the needed pedestrians only
+        master_drift_dict[key_list[i]] = agent_drift_info[:, :, ped_index_list]
+        #master_drift_array = np.concatenate((master_drift_array, np.load(file_structure_dict[key_list[i]][0])), axis=0)
+        #pdb.set_trace()
     
     start_interval = args.start_interval
     reset_int = args.increment_interval
@@ -319,14 +327,20 @@ def plot_drift_results(parent_folder, ped_list=None):
 
     x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
     #get the mean and std deviation of pedestrians from drift_lists
-
     _, ax = plt.subplots()
-    for i in range(master_drift_array.shape[0]):
-        mean_drift = [np.mean(drift_info_interval) for drift_info_interval in master_drift_array[i]]
-        std_div_drift = [np.std(drift_info_interval) for drift_info_interval in master_drift_array[i]]
-        
-        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=agent_type_list[i],
+    agent_counter = 0
+    for key in master_drift_dict.keys():
+        agent_drift_info = master_drift_dict[key]
+        #mean_drift = [np.mean(master_drift_dict[key]) for drift_info_interval in master_drift_array[i]]
+        #std_div_drift = [np.std(drift_info_interval) for drift_info_interval in master_drift_array[i]]
+        #per_seed_drift = np.mean(agent_drift_info[:, i, :], axis=2)
+        #pdb.set_trace()
+        mean_drift = [np.mean(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
+        std_div_drift = [np.std(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
+        #pdb.set_trace()
+        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=key,
                     capsize=5, capthick=3, alpha=0.5)
+        agent_counter += 1
     ax.set_xticks(x_axis)
     ax.set_xticklabels(start_interval+x_axis*reset_int)
     ax.set_xlabel('Reset interval (in frames)')
@@ -407,7 +421,7 @@ def run_analysis(args):
     policy_network_counter = 0
 
     #folder_dict = read_files_from_directories(args.parent_directory)
-    
+    #pdb.set_trace()
     feat_size = feat_ext.extract_features(env.reset()).shape[0]
     for i in range(len(args.agent_type)):
 
