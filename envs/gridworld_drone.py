@@ -244,7 +244,7 @@ class GridWorldDrone(GridWorld):
 
 
         if self.show_orientation:
-            mag = 10 + 10 * self.agent_state['speed']
+            mag = 10 #+ 10 * self.agent_state['speed']
 
             if self.agent_state['orientation'] is not None: 
                 pygame.draw.line(self.gameDisplay, self.black, [self.agent_state['position'][1],self.agent_state['position'][0]], 
@@ -1159,14 +1159,22 @@ if __name__=="__main__":
     feat_drone = DroneFeatureRisk_speed(step_size=2,
                                         thresh1=20,
                                         thresh2=30,
-                                        show_agent_persp=True)
+                                        show_agent_persp=False)
     #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
 #arxiepiskopi/annotation/processed/arxiepiskopi1_per_frame.txt'
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+#university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
+data_zara/annotation/processed/crowds_zara02_per_frame_65.txt'
+    
+
+    speed_distribution_array = np.linspace(0,5,501)
+    x_axis = np.linspace(0,5,502)
+    speed_histogram = np.zeros(502)
     obstacle_map = './maps/real_map.jpg'
     #annotation_file = None
-    world = GridWorldDrone(display=True, 
+    world = GridWorldDrone(display=False, 
                         seed=20, obstacles=None, 
                         show_trail=False,
                         is_random=False,
@@ -1206,9 +1214,11 @@ university_students/annotation/processed/frame_skip_1/students003_processed_corr
     print ("here")
     
     done = False
-    for i in range(50):
+    avg_speed_ped = []
+    for i in range(203):
 
-
+        total_speed = 0
+        step_counter = 0
         state = world.reset()
         feat_drone.reset()
 
@@ -1235,8 +1245,9 @@ university_students/annotation/processed/frame_skip_1/students003_processed_corr
             #print(world.agent_state)
             #action = action_speed+(action_orient*7)
             #print('Action :', action)
-
             state, reward , done, _ = world.step(action)
+            speed_histogram[speed_distribution_array.searchsorted(state['agent_state']['speed'])] += 1
+            step_counter += 1
             #print(reward, done)
             if done:
                 break
@@ -1249,7 +1260,13 @@ university_students/annotation/processed/frame_skip_1/students003_processed_corr
 
             t+=1
 
-        #info_collector.collab_end_traj_results()
+        avg_speed_ped.append(total_speed/step_counter)
 
+        #info_collector.collab_end_traj_results()
+    from matplotlib import pyplot as plt 
+    plt.hist(x_axis, speed_histogram)
+    plt.show()
+    pdb.set_trace()
+    print('Avg speed : ', total_speed/step_counter)
     #info_collector.collab_end_results()
     
