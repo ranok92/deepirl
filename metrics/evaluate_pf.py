@@ -16,8 +16,8 @@ import pickle
 from rlmethods.b_actor_critic import Policy
 from alternateController.potential_field_controller import PotentialFieldController as PFController
 
-import metrics
-import metric_utils
+from metrics import metrics
+from metrics import metric_utils
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -195,8 +195,8 @@ def main(args):
 
     # metric parameters
     metric_applicator = metric_utils.MetricApplicator()
-    metric_applicator.add_metric(metrics.compute_trajectory_smoothness, [10])
-    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio, [10])
+    metric_applicator.add_metric(metrics.compute_trajectory_smoothness)
+    metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
     metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
     metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
     metric_applicator.add_metric(metrics.count_collisions, [10])
