@@ -27,7 +27,7 @@ from tqdm import tqdm
 from envs.drone_data_utils import classify_pedestrians
 from envs.drone_data_utils import get_pedestrians_in_viscinity
 from envs.drone_data_utils import get_index_from_pedid_university_student_dataset
-
+from envs.drone_data_utils import get_index_from_pedid_zara_02, get_index_from_pedid_zara_01
 
 from featureExtractor.drone_feature_extractor import dist_2d
 from featureExtractor.drone_feature_extractor import (
@@ -39,6 +39,7 @@ from featureExtractor.drone_feature_extractor import (
 )
 
 from metric_utils import read_files_from_directories
+
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
@@ -67,6 +68,12 @@ university_students/annotation/processed/frame_skip_1/\
 students003_processed_corrected.txt', 
                     help='The location of the annotation file to \
                     be used to run the environment.')
+
+
+parser.add_argument('--dataset', type=str, default='UCY',
+                    help='Name of the dataset on which the \
+                    current drift files have been calculated.')
+
 
 
 parser.add_argument("--render" , action='store_true')
@@ -300,15 +307,18 @@ def plot_drift_results(args):
     for key in file_structure_dict.keys():
         key_list.append(key)
 
-    #insert the first element in agent_type_list and master_drift_array
-    #agent_type_list.append(key_list[0])
-
-    #print('Reading from file :', file_structure_dict[key_list[0]][0])
     master_drift_dict = {} #dictionary containing the drift information
-    #feature_drift_array = np.expand_dims(np.load(file_structure_dict[key_list[0]][0]), axis=0)
+
     ped_index_list = []
+    #pdb.set_trace()
     for ped in ped_list:
-        ped_index_list.append(get_index_from_pedid_university_student_dataset(int(ped)))
+
+        if args.dataset=='UCY':
+            ped_index_list.append(get_index_from_pedid_university_student_dataset(int(ped)))
+        if args.dataset=='Zara02':
+            ped_index_list.append(get_index_from_pedid_zara_02(int(ped)))
+        if args.dataset=='Zara01':
+            ped_index_list.append(get_index_from_pedid_zara_01(int(ped)))
 
     #pdb.set_trace()
     for i in range(len(key_list)):
@@ -331,10 +341,6 @@ def plot_drift_results(args):
     agent_counter = 0
     for key in master_drift_dict.keys():
         agent_drift_info = master_drift_dict[key]
-        #mean_drift = [np.mean(master_drift_dict[key]) for drift_info_interval in master_drift_array[i]]
-        #std_div_drift = [np.std(drift_info_interval) for drift_info_interval in master_drift_array[i]]
-        #per_seed_drift = np.mean(agent_drift_info[:, i, :], axis=2)
-        #pdb.set_trace()
         mean_drift = [np.mean(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
         std_div_drift = [np.std(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
         #pdb.set_trace()
@@ -422,7 +428,8 @@ def run_analysis(args):
 
     #folder_dict = read_files_from_directories(args.parent_directory)
     #pdb.set_trace()
-    feat_size = feat_ext.extract_features(env.reset()).shape[0]
+    if args.feat_extractor is not None:
+        feat_size = feat_ext.extract_features(env.reset()).shape[0]
     for i in range(len(args.agent_type)):
 
         if args.agent_type[i] == 'Policy_network':
@@ -493,7 +500,7 @@ def run_analysis(args):
 
 
     if args.save_filename:
-        
+        #pdb.set_trace()
         path_list = args.save_filename.strip().split('/')
         filename = path_list[-1]
         folder_path = ''
@@ -501,6 +508,9 @@ def run_analysis(args):
             folder_path = folder_path + path_list[i] +'/'
         filename = filename + str(start_interval) + \
                 '-' + str(reset_lim) + '-' + str(reset_int)
+
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
         np.save(folder_path+ filename, drift_info_numpy)
 
 
