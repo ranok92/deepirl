@@ -104,7 +104,8 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_s
 
 
 
-def read_data_from_file(annotation_file, rows=576, cols=720):
+def read_data_from_file(annotation_file, speed_multiplier=1,
+                        rows=576, cols=720):
     '''
 
     given a file_name read the f and convert that into a list.
@@ -133,7 +134,7 @@ def read_data_from_file(annotation_file, rows=576, cols=720):
             prob_point_info = line.split(' - ')[0]
             if len(prob_point_info.split(' '))==4:
                 point_info = prob_point_info.split(' ')
-                processed_dict[ped_id].append([point_info[2], ped_id, frame_y - (float(point_info[1])+diff_y), float(point_info[0])+diff_x])
+                processed_dict[ped_id].append([int(int(point_info[2])/speed_multiplier), ped_id, frame_y - (float(point_info[1])+diff_y), float(point_info[0])+diff_x])
             else:
                 ped_id += 1
                 processed_dict[ped_id] = []
@@ -175,7 +176,8 @@ def preprocess_data_from_stanford_drone_dataset(annotation_file):
     return 0
 
 
-def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[720, 576]):
+def preprocess_data_from_control_points(annotation_file, speed_multiplier=1,
+                                        frame=1, world_size=[720, 576]):
     '''
     given a annotation file containing spline control points converts that 
     to a frame-by-frame representation and writes that on a txt file with a easy to read format
@@ -197,7 +199,9 @@ def preprocess_data_from_control_points(annotation_file, frame=1, world_size=[72
     print(dir_name) 
     file_n = dir_name + file_name+'_per_frame'+'.txt'
 
-    extracted_dict = read_data_from_file(annotation_file, rows=world_size[1], cols=world_size[0])
+    extracted_dict = read_data_from_file(annotation_file, 
+                                         speed_multiplier=speed_multiplier,
+                                        rows=world_size[1], cols=world_size[0])
     dense_info_list = []
 
     #add the world size to the trajectory file
@@ -855,8 +859,24 @@ def get_index_from_pedid_university_student_dataset(ped_id):
     return ped_id + diff_dict[str(ped_id)] 
 
 
-
+def get_index_from_pedid_zara_02(ped_id):
+    #ped_id 148 is missing
+    #id indexing start from 1
+    #total pedestrians : 203
+    pedindex = None
+    if int(ped_id) <= 147:
+        pedindex = ped_id - 1
+    else:
+        pedindex = ped_id -2  
     
+    return pedindex 
+
+
+def get_index_from_pedid_zara_01(ped_id):
+    #no pedestrians are missing and the ped_id 
+    #starts from 0
+    #total pedestrians 148
+    return ped_id
 
 
 
@@ -1059,11 +1079,12 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #******** section for preprocessing data ************
-    '''
+    
     file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/crowds_zara02.vsp'
 
-    intval = preprocess_data_from_control_points(file_name, 1)
-    '''
+    intval = preprocess_data_from_control_points(file_name, speed_multiplier=0.65, 
+                                                 frame=1)
+    
     
     
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
@@ -1080,11 +1101,11 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #*****************************************************
     #************* classify pedestrians based on presence of nearby obstacles
     
-    
+    '''
     #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-data_zara/annotation/processed/crowds_zara02_per_frame.txt'
-
+data_zara/annotation/processed/crowds_zara01_per_frame.txt'
+    #get_index_from_pedid_zara_02(annotation_file)
     easy, med, hard = classify_pedestrians(annotation_file, 30)
     pdb.set_trace()
-    
+    '''
