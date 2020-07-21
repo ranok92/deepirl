@@ -3,13 +3,13 @@ from matplotlib import pyplot as plt
 from argparse import ArgumentParser, Namespace 
 from evaluate_drift_deep_maxent import plot_drift_results
 
+
 import pdb
 parser = ArgumentParser()
 
 #parser.add_argument('--drift-files', type=str, nargs="*", default=None)
 
 parser.add_argument('--parent-folder', type=str, required=True)
-
 
 parser.add_argument('--ped-list', type=str, nargs="*", default=["./ped_lists/easy.npy",
                     "./ped_lists/med.npy", "./ped_lists/hard.npy"],
@@ -24,6 +24,9 @@ parser.add_argument('--end-interval', type=int, default=60, help='The final numb
 parser.add_argument('--increment-interval', type=int, default=30, help='The number of \
                     frames by which the interval should increase.')
 
+parser.add_argument('--dataset', type=str, default='UCY',
+                    help='Name of the dataset on which the \
+                    current drift files have been calculated.')
 
 
 args = parser.parse_args()
@@ -44,11 +47,14 @@ for file in args.drift_files:
         print("there is inconsistency in stuff.")
 
 '''
+
+
 sec_args = Namespace(parent_folder=args.parent_folder,
-				 ped_list=ped_list,
-				 start_interval=args.start_interval,
-				 end_interval=args.end_interval,
-				 increment_interval=args.increment_interval)
+                 ped_list=ped_list,
+                 start_interval=args.start_interval,
+                 end_interval=args.end_interval,
+                 dataset=args.dataset,
+                 increment_interval=args.increment_interval)
 
 
 plot_drift_results(sec_args)
