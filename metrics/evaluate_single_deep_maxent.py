@@ -224,9 +224,7 @@ def main(args):
         # metric parameters
         metric_applicator = metric_utils.MetricApplicator()
         metric_applicator.add_metric(metrics.compute_trajectory_smoothness)
-        metric_applicator.add_metric(
-            metrics.compute_distance_displacement_ratio
-        )
+        metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
         metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
         metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
         metric_applicator.add_metric(metrics.count_collisions, [10])
@@ -297,12 +295,8 @@ def main(args):
         # when raw trajectories are directly provided.
         # metric parameters
         metric_applicator = metric_utils.MetricApplicator()
-        metric_applicator.add_metric(
-            metrics.compute_trajectory_smoothness, [10]
-        )
-        metric_applicator.add_metric(
-            metrics.compute_distance_displacement_ratio, [10]
-        )
+        metric_applicator.add_metric(metrics.compute_trajectory_smoothness)
+        metric_applicator.add_metric(metrics.compute_distance_displacement_ratio)
         metric_applicator.add_metric(metrics.proxemic_intrusions, [3])
         metric_applicator.add_metric(metrics.anisotropic_intrusions, [20])
         metric_applicator.add_metric(metrics.count_collisions, [10])
