@@ -1,5 +1,6 @@
 import argparse
 import sys 
+import os
 import pickle
 import pdb
 import numpy as np
@@ -21,14 +22,14 @@ parser.add_argument('--metric-info', type=str, nargs='*', default=None,
                         the metrics result is more than one.")
                         
 parser.add_argument('--ped-file-list', nargs="*", type=str,
-                    default=["./ped_lists/easy.npy", 
-                    "./ped_lists/med.npy", "./ped_lists/hard.npy"],
+                    default=["../envs/expert_datasets/university_students/data_info/ped_lists_ucy_003/ucy_003_easy.npy", 
+                    "../envs/expert_datasets/university_students/data_info/ped_lists_ucy_003/ucy_003_med.npy",
+                    "../envs/expert_datasets/university_students/data_info/ped_lists_ucy_003/ucy_003_hard.npy"],
                     help='List of the files containing the pedestrian ids to be \
                         used in the current metric plot.')
 
 parser.add_argument('--x-axis', type=str, default=None)
 parser.add_argument('--y-axis', type=str, default=None)
-
 
 def read_data(list_of_files, ped_file_list):
     """
@@ -40,7 +41,7 @@ def read_data(list_of_files, ped_file_list):
         for seed_file in agent_file:
             with open(seed_file, 'rb') as pickle_file:
                 agent_dictionary_list.append(pickle.load(pickle_file))
-
+                #pdb.set_trace()
         master_dictionary_list.append(agent_dictionary_list)
 
     ped_list = np.zeros(1)
@@ -105,27 +106,46 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
         run_information_array_agent = np.zeros([len(agent),
                                                 len(ped_list),
                                                 metric_value_len])
+
         for run_info in agent:
             #reading data from a single metric dictionary
             i = 0
             for ped in ped_list:
-                #print('ped', ped)
-                #print('seed_counter', seed_counter)
-                #print('i', i)
+                '''
                 run_information_array_agent\
                         [seed_counter][i][:] = run_info['metric_results'][ped]\
-                                                                [metric_name][0]
+                                                             [metric_name][0]
+                '''
+
+                if metric_name == 'compute_trajectory_smoothness' or \
+                   metric_name == 'compute_distance_displacement_ratio':
+                    
+                    if run_info['metric_results'][ped]['trajectory_length'][0] >  100:           
+                        
+                        run_information_array_agent\
+                            [seed_counter][i][:] = run_info['metric_results'][ped]\
+                                                                    [metric_name][0]
+                        #selected += 1
+                    else:
+                        run_information_array_agent\
+                            [seed_counter][i][:] = np.nan
+                else:
+
+                    run_information_array_agent\
+                            [seed_counter][i][:] = run_info['metric_results'][ped]\
+                                                                    [metric_name][0]  
+
                 i += 1
             seed_counter += 1
 
         run_information_list.append(run_information_array_agent)
 
         #agent_counter += 1
-    
+    pdb.set_trace()
     bins = 200
     alpha = 0.3
     for i in range(len(list_of_dictionary)):
-        plt.hist(np.mean(run_information_list[i], axis=0),
+        plt.hist(np.nanmean(run_information_list[i], axis=0),
                  bins=bins,
                  label=list_of_agent_names[i],
                  alpha=alpha)
@@ -209,24 +229,107 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
     total_peds = len(ped_list)
     agent_counter = 0
     seed_counter = 0
+    seed_rejected = 0
     for agent in list_of_dictionary:
         seed_counter = 0
+        seed_rejected = 0
 
         run_information_array_agent = np.zeros([len(agent),
                                                 len(ped_list),
                                                 metric_value_len])
+        #pdb.set_trace()
+        selected_total = 0
         for run_info in agent:
             #reading data from a single metric dictionary
             i = 0
+            selected = 0
+            #pdb.set_trace()
+            seed_info_array = np.zeros((total_peds, metric_value_len))
+            seed_info_array_NAN = seed_info_array+np.NAN
             for ped in ped_list:
-                run_information_array_agent\
-                        [seed_counter][i][:] = run_info['metric_results'][ped]\
-                                                                [metric_name][0]
+
+                if metric_name == 'compute_trajectory_smoothness' or \
+                   metric_name == 'compute_distance_displacement_ratio':
+                    
+                    if run_info['metric_results'][ped]['trajectory_length'][0] > 5 or run_info['metric_results'][ped]['goal_reached'][0]:           
+                        
+                        #run_information_array_agent\
+                        #    [seed_counter][i][:] = run_info['metric_results'][ped]\
+                        #                                            [metric_name][0]
+
+
+                        seed_info_array[i, :] = run_info['metric_results'][ped]\
+                                                                    [metric_name][0]
+
+                        selected += 1
+                        selected_total += 1
+                    else:
+                        #run_information_array_agent\
+                        #    [seed_counter][i][:] = np.nan
+                        seed_info_array[i, :] = np.nan
+                else:
+
+                    run_information_array_agent\
+                            [seed_counter][i][:] = run_info['metric_results'][ped]\
+                                                                    [metric_name][0]  
+
+                    seed_info_array[i, :] = run_info['metric_results'][ped]\
+                                                                    [metric_name][0]                                                     
                 i += 1
+
+            #select those seeds that atleast have success in the above criteria in 
+            #25% of all the trajectories
+            if metric_name == 'compute_trajectory_smoothness' or \
+                   metric_name == 'compute_distance_displacement_ratio':
+                if selected > total_peds*0:
+                    run_information_array_agent[seed_counter] = seed_info_array[:]
+                else:
+                    #print('SEED rejected')
+                    seed_rejected += 1
+                    run_information_array_agent[seed_counter] = seed_info_array_NAN[:]
+            else:
+
+                run_information_array_agent[seed_counter] = seed_info_array[:]
+
             seed_counter += 1
-        agent_counter += 1
+            
+            print("For agent :no. of peds that clear the criteria: {}/{}".format(selected, total_peds))
+        print("For agent :no. of peds that clear the criteria: {}/{}".format(selected_total, total_peds*seed_counter))
+        print("Seeds rejected : {} / {}".format(seed_rejected, seed_counter))
         run_information_list.append(run_information_array_agent)
+
+    #select those pedestrians that have success in all the seeds 
+    run_information_array = np.array(run_information_list)
     
+    #pdb.set_trace()
+    '''
+    selected_ped_list_agent = [[[] for i in range(len(list_of_agent_names))] for j in range(metric_value_len)]
+
+    selected_ped_list_all = [[] for j in range(metric_value_len)]
+    for k in range(metric_value_len):
+        for i in range(total_peds):
+            selected_ped_list = []
+            ped_score = run_information_array[:, :, i, :]
+            select_ped = True
+            for j in range(len(list_of_agent_names)):
+                ped_score_agent = ped_score[j,:,:]
+                #print(ped_score)
+                #pdb.set_trace()
+                if sum(np.isnan(ped_score_agent))[k] >= int(seed_counter/3):
+                    #print("rejected")
+                    select_ped = False
+                    pass
+                else:
+                    #print("selected")
+                    selected_ped_list_agent[k][j].append(i)
+            #pdb.set_trace()
+            if select_ped:
+                selected_ped_list_all[k].append(i)
+        #select those pedestrians that have success in all the agents 
+
+    run_information_list = run_information_array.take(selected_ped_list_all[0], axis=2)
+    pdb.set_trace()
+    '''    
     #plotting parameters
     bins = 200
     alpha = 0.3
@@ -239,16 +342,29 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         fig, ax = plt.subplots()
         mean_list = []
         std_list = []
-
+        lower_bound_list = []
+        upper_bound_list = []
         for i in range(len(list_of_dictionary)):
             mean_over_seeds = np.nanmean(run_information_list[i][:, :, info], axis=1)
             mean_over_seeds_nonzero = mean_over_seeds[mean_over_seeds.nonzero()]
-            mean_list.append(np.mean(mean_over_seeds_nonzero))
-            std_list.append(np.std(mean_over_seeds_nonzero))
-            
+            #clip outliers
+            cur_std = np.nanstd(mean_over_seeds_nonzero)
+            mean_over_seeds_clipped_up = mean_over_seeds_nonzero[mean_over_seeds_nonzero <= np.nanmean(mean_over_seeds_nonzero) + 2*cur_std]
+            mean_over_seeds_clipped = mean_over_seeds_clipped_up[mean_over_seeds_clipped_up >= np.nanmean(mean_over_seeds_nonzero) - 2*cur_std]
+            #print("Mean over seeds clipped :", mean_over_seeds_clipped, np.mean(mean_over_seeds_clipped), np.std(mean_over_seeds_clipped))
+            #pdb.set_trace() 
 
+            mean_list.append(np.nanmean(mean_over_seeds_clipped))
+            std_list.append(np.nanstd(mean_over_seeds_clipped))
+            lower_bound_list.append(np.nanmean(mean_over_seeds_nonzero) - np.nanmin(mean_over_seeds_nonzero))
+            upper_bound_list.append(np.nanmax(mean_over_seeds_nonzero) - np.nanmean(mean_over_seeds_nonzero))
+
+        print("Mean list :", mean_list)
+        print("Std list :", std_list)
+        #pdb.set_trace()
+        bounds = [lower_bound_list, upper_bound_list]
         #print(np.nanmean(run_information_list[i][:, :, info], axis=1))
-        pdb.set_trace()
+        #pdb.set_trace()
 
         barlist = ax.bar(x_axis, mean_list, yerr=std_list, 
                         alpha=alpha, capsize=capsize, align='center')
@@ -272,8 +388,14 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         storage_dict['mean_list'] = mean_list
         storage_dict['std_list'] = std_list
 
+        comparing_agents = ''
+        for agent in list_of_agent_names:
+            comparing_agents += agent + '-'
 
-        filename_info_dict = "./numerical_results/"+metric_name + "_info_dict.pk"
+        comparing_agents = comparing_agents[0:-1]
+        filename_info_dict = "./numerical_results/"+ metric_name + "_ " +\
+                            comparing_agents + "_info_dict.pk"
+
         with open(filename_info_dict, 'wb') as fp:
             pickle.dump(storage_dict, fp)
             fp.close()
@@ -282,6 +404,20 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         ax.set_xticks(x_axis)
         ax.set_xticklabels(list_of_agent_names)
         ax.yaxis.grid(True)
+        #set the y axis label
+        '''
+        y_label = ''
+        if metric_name=='goal_reached':
+            y_label = 'Fraction of runs reaching the goal'
+
+        if metric_name=='compute_trajectory_smoothness':
+            y_label = 'Change in orientation (in degrees)'
+
+        if metric_name=='count_collisions':
+            y_label = 'Average number of collisions encountered per trajectory'
+
+        plt.ylabel(y_label)
+        '''
         #title = fig_title+metric_info[info]
         #ax.set_title(title)
         plt.show()
@@ -416,12 +552,12 @@ if __name__=='__main__':
                                --metric-name 'compute_distance_displacement_ratio'
 
     
-    """
+    
     plot_histogram(master_dictionary_list, agent_names, 
                    args.metric_name, 
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis)
-    
+    """
     #################################################
     #uncomment this to get barplots with erros
     """
@@ -431,14 +567,14 @@ if __name__=='__main__':
                                 --metric-name 'compute_trajectory_smoothness'
                                 --metric-info 'total' 'average'
     
-      
-    
+    """  
     barplots_with_errorbars(master_dictionary_list, agent_names, 
                    args.metric_name,
                    metric_info=args.metric_info,
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis) 
-    """ 
+     
+
     #################################################
     #uncomment this to get line plots over time frames.
     """
