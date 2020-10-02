@@ -56,7 +56,7 @@ def read_data(list_of_files, ped_file_list):
 
 
 def plot_histogram(list_of_dictionary, list_of_agent_names, 
-                   metric_name, fig_title, metric_info=None, 
+                   metric_name, metric_info=None, 
                    ped_list=None, x_axis=None, y_axis=None):
     """
     given a list of dictionary containing run information of different agents
@@ -135,7 +135,6 @@ def plot_histogram(list_of_dictionary, list_of_agent_names,
     if y_axis is not None:
         plt.ylabel(y_axis)
 
-    plt.title(fig_title)
     plt.legend()
     plt.show()
 
@@ -242,11 +241,13 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         std_list = []
 
         for i in range(len(list_of_dictionary)):
-            mean_list.append(np.mean(np.nanmean(run_information_list[i][:, :, info], axis=1)))
-            std_list.append(np.std(np.nanmean(run_information_list[i][:, :, info], axis=1)))
+            mean_over_seeds = np.nanmean(run_information_list[i][:, :, info], axis=1)
+            mean_over_seeds_nonzero = mean_over_seeds[mean_over_seeds.nonzero()]
+            mean_list.append(np.mean(mean_over_seeds_nonzero))
+            std_list.append(np.std(mean_over_seeds_nonzero))
             
 
-        print(np.nanmean(run_information_list[i][:, :, info], axis=1))
+        #print(np.nanmean(run_information_list[i][:, :, info], axis=1))
         pdb.set_trace()
 
         barlist = ax.bar(x_axis, mean_list, yerr=std_list, 
@@ -415,12 +416,12 @@ if __name__=='__main__':
                                --metric-name 'compute_distance_displacement_ratio'
 
     
+    """
     plot_histogram(master_dictionary_list, agent_names, 
-                   args.metric_name, args.fig_title, 
+                   args.metric_name, 
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis)
-       
-"""
+    
     #################################################
     #uncomment this to get barplots with erros
     """
@@ -430,14 +431,14 @@ if __name__=='__main__':
                                 --metric-name 'compute_trajectory_smoothness'
                                 --metric-info 'total' 'average'
     
-       """ 
-   
+      
+    
     barplots_with_errorbars(master_dictionary_list, agent_names, 
                    args.metric_name,
                    metric_info=args.metric_info,
                    ped_list=ped_list, x_axis=args.x_axis,
                    y_axis=args.y_axis) 
-        
+    """ 
     #################################################
     #uncomment this to get line plots over time frames.
     """

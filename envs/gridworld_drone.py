@@ -131,6 +131,7 @@ class GridWorldDrone(GridWorld):
         self.skip_list = [] #dont consider these pedestrians as obstacles
 
         ######################################################################
+        '''
         self.image_file = ['../envs/faces/ped_faces/face_1.jpg',
                            '../envs/faces/ped_faces/face_2.jpg', 
                            '../envs/faces/ped_faces/face_3.jpg',
@@ -141,7 +142,7 @@ class GridWorldDrone(GridWorld):
         for i in self.image_file:
 
             self.ped_images.append(pygame.image.load(i))
-
+        '''
         ############# this comes with the change in the action space##########
 
         self.continuous_action = continuous_action
@@ -212,8 +213,8 @@ class GridWorldDrone(GridWorld):
         #pdb.set_trace()
         font = pygame.freetype.Font(None, 12)
 
-        index = int(obs['id'])%len(self.ped_images)
         if cartoon:
+            index = int(obs['id'])%len(self.ped_images)
             self.gameDisplay.blit(self.ped_images[index], 
                                   (obs['position'][1]-(self.obs_width/2), 
                                    obs['position'][0]-(self.obs_width/2)))
@@ -1166,7 +1167,7 @@ if __name__=="__main__":
 #university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
 
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-data_zara/annotation/processed/crowds_zara02_per_frame_65.txt'
+university_students/annotation/processed/frame_skip_1/students001_per_frame.txt'
     
 
     speed_distribution_array = np.linspace(0,5,501)
@@ -1215,7 +1216,7 @@ data_zara/annotation/processed/crowds_zara02_per_frame_65.txt'
     
     done = False
     avg_speed_ped = []
-    for i in range(203):
+    for i in range(410):
 
         total_speed = 0
         step_counter = 0
@@ -1264,9 +1265,10 @@ data_zara/annotation/processed/crowds_zara02_per_frame_65.txt'
 
         #info_collector.collab_end_traj_results()
     from matplotlib import pyplot as plt 
-    plt.hist(x_axis, speed_histogram)
-    plt.show()
     pdb.set_trace()
+    plt.bar(x_axis, speed_histogram)
+    plt.show()
+
     print('Avg speed : ', total_speed/step_counter)
     #info_collector.collab_end_results()
     

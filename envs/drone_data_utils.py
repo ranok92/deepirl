@@ -653,6 +653,7 @@ def get_expert_trajectory_info(expert_trajectory_folder):
         print('Trajectory length :', traj_np.shape[0])
         #pdb.set_trace()
 
+    pdb.set_trace()
     print('Average speed :', total_avg_speed/len(trajectories))
 
     print('Average len of trajectories :', total_len/len(trajectories))
@@ -693,7 +694,6 @@ def classify_pedestrians(annotation_file, viscinity):
     
     subject_set = extract_subjects_from_file(annotation_file)
     avg_ped_per_subject = []
-    pdb.set_trace()
     for subject in subject_set:
         print(' Subject :', subject)
         state = env.reset_and_replace(ped=subject)
@@ -716,13 +716,48 @@ def classify_pedestrians(annotation_file, viscinity):
     avg_peds_per_subject_arr.sort()
     total = len(subject_set)
 
-    easy_cutoff = int(total*.5)
-    med_cutoff = int(total*.85)
+    #easy_cutoff = int(total*.5)
+    #med_cutoff = int(total*.85)
+    '''
+    ##############################
+    cutoff values for UCY 003 student dataset : {easy: 248, med: 375} 
+    mean for easy = 0.048, med : .295, hard: .73
+    ##############################
+    cutoff values for zara 01 : {easy :90, med: 134}
+    Easy : 0.0008541002858650179, Moderate : 0.07109769250746073, Difficult :0.40787718716023774 
+    ##############################
+    cutoff values for zara 02 : {easy: 105, med: 180}
+    Easy : 0.017, Moderate : 0.206, Difficult: 0.71 
+    ##############################
+    cutoff values for UCY 001 student dataset : {easy: 250, med: 385}
+    Mean value for easy: 0.16 med: 0.71 hard: 1.37 
+    '''
+    easy_cutoff = 250   
+    med_cutoff = 385
+   
+    plt.plot(avg_peds_per_subject_arr, color='darkgreen')
 
+    plt.vlines(easy_cutoff, 0, 
+               avg_peds_per_subject_arr[easy_cutoff], 
+               linestyles='dashed', color='lightgreen',
+               label='Easy cutoff')
+    plt.vlines(med_cutoff, 0, 
+               avg_peds_per_subject_arr[med_cutoff],
+               linestyles='dashed', color='limegreen',
+               label='Med cutoff')
+    plt.xlabel('Pedestrians sorted according to their average local density')
+    plt.ylabel('Average number of pedestrians in the vicinity')
+    print("The mean no. of pedestrians for different classes:")
+    print("Easy : {}, Moderate : {}, Difficult :{} ".format(np.mean(avg_peds_per_subject_arr[0:easy_cutoff]),
+                                                            np.mean(avg_peds_per_subject_arr[easy_cutoff:med_cutoff]),
+                                                            np.mean(avg_peds_per_subject_arr[med_cutoff:])))
+
+    plt.show()
+
+    pdb.set_trace()
     easy_arr = subject_array[0:easy_cutoff]
     medium_arr = subject_array[easy_cutoff:med_cutoff]
     hard_arr = subject_array[med_cutoff:]
-
     return easy_arr, medium_arr, hard_arr
 
 
@@ -960,18 +995,18 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     pdb.set_trace()
     '''
     #********* section to extract trajectories **********
-    '''
+    
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
     #the annotation file to be used to run and extract expert demonstrations
-    file_n = 'processed/frame_skip_1/students003_processed_corrected.txt'
+    file_n = 'processed/frame_skip_1/students001_processed_corrected.txt'
 
     #name of the folder to save the extracted results
     feature_extractor_name = 'Raw_expert_states'
 
     #path to save the folder
-    to_save = 'traj_info/frame_skip_1/students003/'
+    to_save = 'traj_info/frame_skip_1/students001/'
     
     #complete path to the annotation file for the environment
     file_name = folder_name + dataset_name + file_n
@@ -987,10 +1022,10 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #initialize the feature extractor
-    #feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
-    #                                           agent_width=10, obs_width=10,
-    #                                           debug=True,
-    #                                           grid_size=10, step_size=step_size)
+    feature_extractor = DroneFeatureRisk_speedv2(thresh1=18, thresh2=30,
+                                               agent_width=10, obs_width=10,
+                                               debug=False,
+                                               grid_size=10, step_size=step_size)
 
     
     #feature_extractor = VasquezF1(agent_width*6, 0, 2)
@@ -1013,7 +1048,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
                        extract_action=False,
                        display=False, trajectory_length_limit=None)
     
-    '''
+    
     #****************************************************
     #******** section to record trajectories
     '''
@@ -1079,14 +1114,14 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
 
     
     #******** section for preprocessing data ************
-    
-    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/crowds_zara02.vsp'
+    '''
+    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/students001.vsp'
 
-    intval = preprocess_data_from_control_points(file_name, speed_multiplier=0.65, 
-                                                 frame=1)
+    intval = preprocess_data_from_control_points(file_name, speed_multiplier=1, 
+                                            frame=1)
     
-    
-    
+      
+    '''
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
     
@@ -1094,7 +1129,8 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #*****************************************************
     #********** getting information of the trajectories
     '''
-    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speed_segments'
+    expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2'
     get_expert_trajectory_info(expert_traj_folder)
     
     '''
@@ -1102,9 +1138,10 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #************* classify pedestrians based on presence of nearby obstacles
     
     '''
-    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-data_zara/annotation/processed/crowds_zara01_per_frame.txt'
+university_students/annotation/processed/frame_skip_1/students001_processed_corrected.txt'
+    #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+#data_zara/annotation/processed/crowds_zara02_per_frame.txt'
     #get_index_from_pedid_zara_02(annotation_file)
     easy, med, hard = classify_pedestrians(annotation_file, 30)
     pdb.set_trace()
