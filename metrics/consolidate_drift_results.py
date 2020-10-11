@@ -11,20 +11,22 @@ parser = ArgumentParser()
 
 parser.add_argument('--parent-folder', type=str, required=True)
 
-parser.add_argument('--ped-list', type=str, nargs="*", default=["./ped_lists/easy.npy",
-                    "./ped_lists/med.npy", "./ped_lists/hard.npy"],
+parser.add_argument('--ped-list', type=str, nargs="*", default=["/home/abhisek/Study/Robotics/deepirl/\
+envs/expert_datasets/university_students/data_info/ped_lists/ucy_easy.npy", 
+"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ped_lists/ucy_med.npy",
+"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ped_lists/ucy_hard.npy"],
                     help="Pedestrian list to work with.")
 
-parser.add_argument('--start-interval', type=int, default=20, help='The initial number of \
+parser.add_argument('--start-interval', type=int, default=30, help='The initial number of \
                     frames after which the position of the agent will be reset.')
 
-parser.add_argument('--end-interval', type=int, default=60, help='The final number of \
+parser.add_argument('--end-interval', type=int, default=190, help='The final number of \
                     frames after which the position of the agent will be reset.')
 
-parser.add_argument('--increment-interval', type=int, default=30, help='The number of \
+parser.add_argument('--increment-interval', type=int, default=40, help='The number of \
                     frames by which the interval should increase.')
 
-parser.add_argument('--dataset', type=str, default='UCY',
+parser.add_argument('--dataset', type=str, default='UCY003',
                     help='Name of the dataset on which the \
                     current drift files have been calculated.')
 
