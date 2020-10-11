@@ -213,7 +213,7 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
 
 
     """
-    bar_color_list = ['r','g','m','y','b']
+    bar_color_list = ['r','g','m','y','b','k']
     if metric_info is None:
         metric_value_len = 1
     else:
