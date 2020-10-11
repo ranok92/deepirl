@@ -286,13 +286,13 @@ def pedestrian_hit(trajectory, agent_radius):
 
         pedestrians = state["obstacles"]
         agent_position = state["agent_state"]["position"]
-
+        
         for ped in pedestrians:
             ped_position = ped["position"]
-
-            distance = dist_2d(ped_position, agent_position)
-
-            if distance <= (agent_radius):
+            
+            if abs(agent_position[0] - ped_position[0]) < agent_radius and abs(agent_position[1] - ped_position[1]) < agent_radius:
+            #distance = dist_2d(ped_position, agent_position)
+            #if distance <= (agent_radius):
                 return True
 
     return False
