@@ -693,6 +693,12 @@ def classify_pedestrians(annotation_file, viscinity):
                         width=10)    
     
     subject_set = extract_subjects_from_file(annotation_file)
+    subject_list = list(subject_set)
+    for i in range(len(subject_list)-1):
+        if subject_list[i+1] - subject_list[i] !=1:
+            print(subject_list[i])
+
+    pdb.set_trace()
     avg_ped_per_subject = []
     for subject in subject_set:
         print(' Subject :', subject)
@@ -869,9 +875,31 @@ def group_pedestrians_from_trajectories(trajectory_folder,
     return trajectory_group_info_dict, classification_info
 
 
+def get_index_from_pedid_university_students001_dataset(ped_id):
+    '''
+    Given the ped id will return the serial number of the pedestrian
+    (basically taking into account for the missing pedestrians)
+    Total number of pedestrian - 410, max pedestrian id 415
+    Missing pedestrians 24, 194, 206, 230, 239
+    input:
+        ped_id : pedestrian id (int)
+    
+    output:
+        ped_index : serial index of the pedestrian
+    '''
+    #load the precomputed list that contains the difference between index and 
+    #id for each of the pedestrians
+    ped_list = np.zeros(416)
+    missing_list = [24, 194, 206, 230, 239]
+    ped_list[missing_list] = 1
+    offset = sum(ped_list[0:ped_id])
 
 
-def get_index_from_pedid_university_student_dataset(ped_id):
+
+    return int(ped_id - 1 - offset)
+
+
+def get_index_from_pedid_university_students003_dataset(ped_id):
     '''
     Given the ped id will return the serial number of the pedestrian
     (basically taking into account for the missing pedestrians)
@@ -995,7 +1023,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     pdb.set_trace()
     '''
     #********* section to extract trajectories **********
-    
+    '''
     folder_name = './expert_datasets/'
     dataset_name = 'university_students/annotation/'
     
@@ -1048,7 +1076,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
                        extract_action=False,
                        display=False, trajectory_length_limit=None)
     
-    
+    '''
     #****************************************************
     #******** section to record trajectories
     '''
@@ -1137,7 +1165,7 @@ university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRi
     #*****************************************************
     #************* classify pedestrians based on presence of nearby obstacles
     
-    '''
+    
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
 university_students/annotation/processed/frame_skip_1/students001_processed_corrected.txt'
     #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
@@ -1145,4 +1173,4 @@ university_students/annotation/processed/frame_skip_1/students001_processed_corr
     #get_index_from_pedid_zara_02(annotation_file)
     easy, med, hard = classify_pedestrians(annotation_file, 30)
     pdb.set_trace()
-    '''
+    
