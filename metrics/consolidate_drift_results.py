@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt 
 from argparse import ArgumentParser, Namespace 
-from evaluate_drift_deep_maxent import plot_drift_results
+from evaluate_drift_deep_maxent import plot_drift_results, hist_plot_drift_results
 
 
 import pdb
@@ -60,3 +60,4 @@ sec_args = Namespace(parent_folder=args.parent_folder,
 
 
 plot_drift_results(sec_args)
+#hist_plot_drift_results(sec_args, 4)
