@@ -637,6 +637,8 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     flag = False
     total_len = 0
     avg_speed = np.zeros(6)
+    min_len = 10000
+    max_len = -1
     for idx, trajectory in enumerate(trajectories):
         print('The trajectory filename :', trajectory)
         traj = torch.load(trajectory, map_location=DEVICE)
@@ -651,11 +653,17 @@ def get_expert_trajectory_info(expert_trajectory_folder):
         total_avg_speed += avg_speed
         print(avg_speed)
         print('Trajectory length :', traj_np.shape[0])
+        if min_len > traj_np.shape[0]:
+            min_len = traj_np.shape[0]
+        if max_len < traj_np.shape[0]:
+            max_len = traj_np.shape[0]
         #pdb.set_trace()
 
     pdb.set_trace()
+    print('Total number of trajectories :', len(trajectories))
     print('Average speed :', total_avg_speed/len(trajectories))
-
+    print("Min length :", min_len)
+    print('Max length :', max_len)
     print('Average len of trajectories :', total_len/len(trajectories))
 
 
@@ -735,14 +743,22 @@ def classify_pedestrians(annotation_file, viscinity):
     cutoff values for zara 02 : {easy: 105, med: 180}
     Easy : 0.017, Moderate : 0.206, Difficult: 0.71 
     ##############################
+    cutoff values for zara 03 : {easy: 92, med: 123}
+    Easy : 0.013, Moderate : 0.24, Difficult: 0.76 
+    ##############################
+    cutoff values for zara combined : {easy: 310, med: 448}
+    Easy : 0.013, Moderate : 0.23, Difficult: 0.783 
+    ##############################
     cutoff values for UCY 001 student dataset : {easy: 250, med: 385}
     Mean value for easy: 0.16 med: 0.71 hard: 1.37 
+
+
     '''
-    easy_cutoff = 250   
-    med_cutoff = 385
+    easy_cutoff = 310   
+    med_cutoff = 448
    
     plt.plot(avg_peds_per_subject_arr, color='darkgreen')
-
+    
     plt.vlines(easy_cutoff, 0, 
                avg_peds_per_subject_arr[easy_cutoff], 
                linestyles='dashed', color='lightgreen',
@@ -751,6 +767,7 @@ def classify_pedestrians(annotation_file, viscinity):
                avg_peds_per_subject_arr[med_cutoff],
                linestyles='dashed', color='limegreen',
                label='Med cutoff')
+    
     plt.xlabel('Pedestrians sorted according to their average local density')
     plt.ylabel('Average number of pedestrians in the vicinity')
     print("The mean no. of pedestrians for different classes:")
@@ -998,6 +1015,61 @@ def find_pedestrian_group(pedestrian_trajectory,
     return ped_group
 
 
+def stitch_annotation_files(annotation_file_list):
+    '''
+    Given a list of annotation files, appends them one after the other 
+    in the order provided in the list
+    '''
+    frame_offset = 0
+    ped_id_offset = 0
+
+    env_size_flag = False
+    annotation_file_merged = []
+    for annotation_file in annotation_file_list:
+
+        #read the annotation file
+        with open(annotation_file,'r') as anno_f:
+            print("Processing annotation file : ", annotation_file)
+            max_frame = 0 
+            max_ped_id = 0
+            for lines in anno_f:
+                #pdb.set_trace()
+                if len(lines.strip().split(' '))==4:
+                    frame_id, ped_id, loc_x, loc_y = lines.strip().split(' ')
+                    updated_frame_id = int(frame_id) + frame_offset
+                    updated_ped_id = int(ped_id) + ped_id_offset
+                    if max_frame < int(frame_id):
+                        max_frame = int(frame_id)
+
+                    if max_ped_id < int(ped_id):
+                        max_ped_id = int(ped_id)
+
+                    print("Ped id : {}, frame_id :{} \
+                          \nped_id_new : {}, frame_id_new :{}\
+                          \nped_offset : {}, frame_offset : {}".format(ped_id, frame_id, 
+                                                                       updated_ped_id, updated_frame_id,
+                                                                       ped_id_offset, frame_offset))
+                    #pdb.set_trace()
+                    new_line = "{} {} {} {} \n".format(str(updated_frame_id), 
+                                                       str(updated_ped_id),
+                                                       loc_x,
+                                                       loc_y)
+                    annotation_file_merged.append(new_line)
+
+
+                else:
+                    if not env_size_flag:
+                        annotation_file_merged.append(lines)
+                        env_size_flag = True
+
+            frame_offset += max_frame
+            ped_id_offset += max_ped_id
+
+
+    with open('appeneded_annotation_file.txt', 'w') as append_anno:
+        for line in annotation_file_merged:
+            append_anno.write(line)
+
 
 
 
@@ -1025,16 +1097,16 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #********* section to extract trajectories **********
     '''
     folder_name = './expert_datasets/'
-    dataset_name = 'university_students/annotation/'
+    dataset_name = 'data_zara/annotation/'
     
     #the annotation file to be used to run and extract expert demonstrations
-    file_n = 'processed/frame_skip_1/students001_processed_corrected.txt'
+    file_n = 'processed/crowds_zara03_per_frame.txt'
 
     #name of the folder to save the extracted results
-    feature_extractor_name = 'Raw_expert_states'
+    feature_extractor_name = 'DroneFeatureRisk_speedv2'
 
     #path to save the folder
-    to_save = 'traj_info/frame_skip_1/students001/'
+    to_save = 'traj_info/frame_skip_1/zara03/'
     
     #complete path to the annotation file for the environment
     file_name = folder_name + dataset_name + file_n
@@ -1071,12 +1143,12 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #print(extract_subjects_from_file(file_name))
     extract_trajectory(file_name, 
                        folder_to_save, 
-                       feature_extractor=None, 
+                       feature_extractor=feature_extractor, 
                        show_states=False,
                        extract_action=False,
                        display=False, trajectory_length_limit=None)
-    
     '''
+    
     #****************************************************
     #******** section to record trajectories
     '''
@@ -1143,13 +1215,13 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     
     #******** section for preprocessing data ************
     '''
-    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/annotation/students001.vsp'
+    file_name = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/crowds_zara03.vsp'
 
     intval = preprocess_data_from_control_points(file_name, speed_multiplier=1, 
                                             frame=1)
     
       
-    '''
+    '''    
     #preprocess_data_from_stanford_drone_dataset('annotations.txt')
     #****************************************************
     
@@ -1158,7 +1230,7 @@ traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2_with_raw_actions'
     #********** getting information of the trajectories
     '''
     expert_traj_folder = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRisk_speedv2'
+data_zara/annotation/traj_info/frame_skip_1/zara02/DroneFeatureRisk_speedv2'
     get_expert_trajectory_info(expert_traj_folder)
     
     '''
@@ -1166,11 +1238,19 @@ university_students/annotation/traj_info/frame_skip_1/students003/DroneFeatureRi
     #************* classify pedestrians based on presence of nearby obstacles
     
     
-    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-university_students/annotation/processed/frame_skip_1/students001_processed_corrected.txt'
     #annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-#data_zara/annotation/processed/crowds_zara02_per_frame.txt'
+#university_students/annotation/processed/frame_skip_1/students001_processed_corrected.txt'
+    annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
+data_zara/annotation/processed/crowds_zara_combined_per_frame.txt'
     #get_index_from_pedid_zara_02(annotation_file)
     easy, med, hard = classify_pedestrians(annotation_file, 30)
     pdb.set_trace()
     
+
+    #*******************************************************
+    #************* stitch multiple annotation files
+    '''
+    stitch_annotation_files(['/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara01_per_frame.txt', 
+                             '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara02_per_frame.txt', 
+                             '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/data_zara/annotation/processed/crowds_zara03_per_frame.txt'])
+    '''
