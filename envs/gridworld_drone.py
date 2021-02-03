@@ -537,9 +537,9 @@ class GridWorldDrone(GridWorld):
             pygame.draw.rect(self.gameDisplay, self.ghost_color, [self.ghost_state['position'][1]-(self.agent_width/2), self.ghost_state['position'][0]- \
                             (self.agent_width/2), self.agent_width, self.agent_width])
 
-        if self.show_trail:
+            if self.show_trail:
             #pdb.set_trace()
-            self.draw_trajectory(self.pos_history, (200,200,200), show_frames=show_trail_frames)
+                self.draw_trajectory(self.pos_history, (200,200,200), show_frames=show_trail_frames)
 
             if self.ghost:
                 self.draw_trajectory(self.ghost_state_history, self.ghost_color_trail, show_frames=show_trail_frames)
@@ -1167,7 +1167,7 @@ if __name__=="__main__":
 #university_students/annotation/processed/frame_skip_1/students003_processed_corrected.txt'
 
     annotation_file = '/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/\
-university_students/annotation/processed/frame_skip_1/students001_per_frame.txt'
+university_students/annotation/processed/frame_skip_1/students001_processed_corrected.txt'
     
 
     speed_distribution_array = np.linspace(0,5,501)
@@ -1175,22 +1175,22 @@ university_students/annotation/processed/frame_skip_1/students001_per_frame.txt'
     speed_histogram = np.zeros(502)
     obstacle_map = './maps/real_map.jpg'
     #annotation_file = None
-    world = GridWorldDrone(display=False, 
+    world = GridWorldDrone(display=True, 
                         seed=20, obstacles=None, 
-                        show_trail=False,
+                        show_trail=True,
                         is_random=False,
                         annotation_file=annotation_file,
-                        subject=None,
+                        subject=4,
                         tick_speed=30, 
                         obs_width=7,
                         step_size=2,
-                        agent_width=7,
+                        agent_width=10,
                         step_reward=0.01,
                         show_comparison=True,
                         show_orientation=True,
                         external_control=False,
                         replace_subject=True, 
-                        segment_size=500,
+                        segment_size=None,
                         consider_heading=True,                      
                         continuous_action=False,
                         rows=576, cols=720, width=20)
