@@ -13,6 +13,7 @@ import copy
 import math
 from logger.logger import Logger
 import matplotlib
+import matplotlib.font_manager
 import matplotlib.pyplot as plt
 import datetime, time
 #from debugtools import compile_results
@@ -26,7 +27,9 @@ from rlmethods.b_actor_critic import Policy
 from tqdm import tqdm
 from envs.drone_data_utils import classify_pedestrians
 from envs.drone_data_utils import get_pedestrians_in_viscinity
-from envs.drone_data_utils import get_index_from_pedid_university_student_dataset
+from envs.drone_data_utils import ( get_index_from_pedid_university_students003_dataset, 
+                                    get_index_from_pedid_university_students001_dataset
+                                  )
 from envs.drone_data_utils import get_index_from_pedid_zara_02, get_index_from_pedid_zara_01
 
 from featureExtractor.drone_feature_extractor import dist_2d
@@ -39,8 +42,103 @@ from featureExtractor.drone_feature_extractor import (
 )
 
 from metric_utils import read_files_from_directories
+####################################################
+#SETTINGS for the plots
+
+plt.style.use('seaborn-colorblind')
+matplotlib.rcParams.update({'lines.markeredgewidth': 1})
+matplotlib.rcParams.update({'errorbar.capsize': 2})
+plt.rcParams['axes.axisbelow'] = True
+# mpl.rcParams['pdf.fonttype'] = 42
+# mpl.rcParams['ps.fonttype'] = 42
+matplotlib.rcParams['text.usetex'] = True #Let TeX do the typsetting
+matplotlib.rcParams['text.latex.preamble'] = [r'\usepackage{sansmath}', r'\sansmath'] #Force sans-serif math mode (for axes labels)
+matplotlib.rcParams['font.family'] = 'sans-serif' # ... for regular text
+matplotlib.rcParams['font.sans-serif'] = 'Computer Modern Sans serif'
+font_size=18
+matplotlib.rcParams['axes.labelsize']= font_size
+matplotlib.rcParams['axes.titlesize']= font_size
+matplotlib.rcParams['xtick.labelsize']=font_size
+matplotlib.rcParams['ytick.labelsize']=font_size
+matplotlib.rcParams['legend.fontsize']=font_size
+matplotlib.rcParams['xtick.major.pad']='8'
+matplotlib.rcParams['ytick.major.pad']='8'
+plt.rcParams["figure.figsize"] = (8,6.4)
 
 
+
+####################################################
+color_map = {
+    "vasquez_F3": "plum",
+    "VasquezF3": "plum",
+    "vasquez_F1": "yellow",
+    "VasquezF1": "yellow",
+    "goal_conditioned_SAM": "chocolate",
+    "GoalConditionedFahad": "chocolate",
+    "Goal-augmented SAM": "chocolate",
+    "risk_features_smoothing": "steelblue",
+    "risk_features_no_smoothing": "steelblue",
+    "ground_truth": "purple",
+    "potential_field": "yellow",
+    "risk_features_rl": "dodgerblue",
+    "Expert demonstrations": "C1",
+    "Goal-conditioned SAM": "chocolate",
+    "Potential Field": "teal",
+    "Potential field": "teal",
+    "Risk-features(IRL)": "steelblue",
+    "Risk-features(RL)": "dodgerblue",
+    "Vasquez F1": "yellow",
+    "Vasquez F3": "plum",
+    "Risk-features(ours)": "steelblue"
+    }
+
+label_map = {
+    "vasquez_F3": "$\mathcal{F}$3",
+    "VasquezF3": "$\mathcal{F}$3",
+    "vasquez_F1": "$\mathcal{F}$1",
+    "VasquezF1": "$\mathcal{F}$1",
+    "goal_conditioned_SAM": "Goal Conditioned SAM",
+    "GoalConditionedFahad": "Goal Conditioned SAM",
+    "Goal-augmented SAM": "Goal Conditioned SAM",
+    "risk_features_smoothing": "Risk Features (ours)",
+    "risk_features_no_smoothing": "Risk Features (ours)",
+    "ground_truth": "Ground Truth",
+    "potential_field": "Potential Field",
+    "risk_features_rl": "Risk Features(RL)",
+    "Expert demonstrations": "Ground Truth",
+    "Goal-conditioned SAM": "Goal Conditioned SAM",
+    "Potential Field": "Potential Field",
+    "Potential field": "Potential Field",
+    "Risk-features(IRL)": "Risk Features (ours)",
+    "Risk-features(RL)": "Risk Features(RL)",
+    "Vasquez F1": "$\mathcal{F}$1",
+    "Vasquez F3": "$\mathcal{F}$3",
+    "Risk-features(ours)": "Risk Features (ours)"
+    }
+
+line_style_map = {"$\mathcal{F}$3": 'dashed',
+                  "$\mathcal{F}$1": 'solid',
+                  "Goal Conditioned SAM": 'dotted',
+                  "Risk Features (ours)": 'dashdot'}
+'''
+color_map = {
+"vasquez_F3": "C3",
+"VasquezF3": "C3",
+"Vasquez F3": "C3",
+"vasquez_F1": "C10",
+"VasquezF1": "C10",
+"Vasquez F1": "C10", 
+"goal_conditioned_SAM": "C2",
+"Goal-augmented SAM": "C2", 
+"GoalConditionedFahad": "C2",
+"risk_features_smoothing": "C0",
+"risk_features_no_smoothing": "C0",
+"Risk-features(IRL)" :"C0",
+"ground_truth": "C1",
+"potential_field": "C4",
+"risk_features_rl": "C5",
+}
+'''
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
 #general arguments
@@ -70,7 +168,7 @@ students003_processed_corrected.txt',
                     be used to run the environment.')
 
 
-parser.add_argument('--dataset', type=str, default='UCY',
+parser.add_argument('--dataset', type=str, default='UCY003',
                     help='Name of the dataset on which the \
                     current drift files have been calculated.')
 
@@ -280,14 +378,136 @@ def plot_drift_results(args):
     """
     Plots the dirft results.
         input: 
+            #also takes in the following arguments from the command line
+            1. args.start_interval
+            2. args.end_interval
+            3. args.increment_interval
 
-            drift_lists : 3 dimensional list where:
-                            The outer most dimension represents the number of agents' 
-                            runs present in the list
-                            The next dimension represents number of drift intervals present.
-                            The final dimension represents number of pedestrians against which
-                            the drift values have been calculated.
 
+        output : plot of the result.
+
+    """
+    
+    #plt.style.use('seaborn-colorblind')
+
+    #matplotlib.rcParams.update({'lines.markeredgewidth': 1})
+    #matplotlib.rcParams.update({'errorbar.capsize': 2})
+    #plt.rcParams['axes.axisbelow'] = True
+    #matplotlib.rcParams['pdf.fonttype'] = 42
+    #matplotlib.rcParams['ps.fonttype'] = 42
+
+    #matplotlib.rcParams['text.usetex'] = True #Let TeX do the typsetting
+    #matplotlib.rcParams['text.latex.preamble'] = [r'\usepackage{sansmath}', r'\sansmath'] #Force sans-serif math mode (for axes labels)
+    #matplotlib.rcParams['font.family'] = 'sans-serif' # ... for regular text
+    #matplotlib.rcParams['font.sans-serif'] = 'Computer Modern Sans serif' # Choose a nice font here
+
+    parent_folder = args.parent_folder
+    ped_list = args.ped_list
+    file_structure_dict = read_files_from_directories(parent_folder)
+    agent_type_list = []
+    key_list = []
+
+    for key in file_structure_dict.keys():
+        key_list.append(key)
+
+    master_drift_dict = {} #dictionary containing the drift information
+
+    ped_index_list = []
+    #pdb.set_trace()
+    for ped in ped_list:
+
+        if args.dataset=='UCY003':
+            ped_index_list.append(get_index_from_pedid_university_students003_dataset(int(ped)))
+        if args.dataset=='UCY001':
+            ped_index_list.append(get_index_from_pedid_university_students001_dataset(int(ped)))
+        if args.dataset=='Zara02':
+            ped_index_list.append(get_index_from_pedid_zara_02(int(ped)))
+        if args.dataset=='Zara01':
+            ped_index_list.append(get_index_from_pedid_zara_01(int(ped)))
+
+    for i in range(len(key_list)):
+
+        agent_type_list.append(key_list[i])
+        print('reading from file :', file_structure_dict[key_list[i]][0])
+        agent_drift_info = np.load(file_structure_dict[key_list[i]][0])
+        #sieve drift information of the needed pedestrians only
+        master_drift_dict[key_list[i]] = agent_drift_info[:, :, ped_index_list]
+        #master_drift_array = np.concatenate((master_drift_array, np.load(file_structure_dict[key_list[i]][0])), axis=0)
+        #pdb.set_trace()
+    
+    start_interval = args.start_interval
+    reset_int = args.increment_interval
+    reset_lim = args.end_interval
+
+    x_axis = np.arange(int((reset_lim-start_interval)/reset_int)+1)
+    #get the mean and std deviation of pedestrians from drift_lists
+    _, ax = plt.subplots()
+    agent_counter = 0
+    #pdb.set_trace()
+    #remove outliers 
+
+    for key in master_drift_dict.keys():
+        agent_drift_info = master_drift_dict[key]
+
+        #remove outlier seeds from each interval
+        mean_drift_agent = []
+        std_drift_agent = []
+        for interval in range(agent_drift_info.shape[1]):
+            agent_mean_over_seeds = np.mean(agent_drift_info[:, interval, :], axis=1)
+            mean_drift = np.mean(agent_mean_over_seeds)
+            std_div_drift = np.std(agent_mean_over_seeds)
+
+            mean_drift_clipped_ub = agent_mean_over_seeds[agent_mean_over_seeds <= mean_drift + 2*std_div_drift]
+            mean_drift_clippped_seeds = mean_drift_clipped_ub[mean_drift_clipped_ub >= mean_drift - 2*std_div_drift]
+
+            mean_drift_interval_clipped = np.mean(mean_drift_clippped_seeds)
+            std_drift_interval_clipped = np.std(mean_drift_clippped_seeds)
+
+
+            #print("before clipping :",agent_mean_over_seeds)
+            #print("After clipping :", mean_drift_clippped_seeds)
+            #pdb.set_trace()
+            mean_drift_agent.append(mean_drift_interval_clipped)
+            std_drift_agent.append(std_drift_interval_clipped)  
+
+        '''
+        agent_mean_over_seeds = [np.mean(agent_drift_info[:, i, :], axis=1) for i in range(agent_drift_info.shape[1])
+        mean_drift = [np.mean(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
+        std_div_drift = [np.std(agent_mean_over_seeds) for i in range(agent_drift_info.shape[1])]
+        #remove outliers
+        mean_drift_clipped_ub = agent_mean_over_seeds[agent_mean_over_seeds < mean_drift + 2*std_div_drift]
+        mean_drift_clippped = agent_mean_over_seeds[agent_mean_over_seeds > mean_drift - 2*std_div_drift]
+       
+        #re calculate mean and std after removing outliers
+        mean_drift = [np.mean(agent_mean_over_seeds) for i in range(agent_drift_info.shape[1])]
+        pdb.set_trace()
+        '''
+        ax.errorbar(x_axis, mean_drift_agent, label=label_map[key], 
+                    linestyle=line_style_map[label_map[key]],
+                    marker='o', color=color_map[key], capsize=5, 
+                    capthick=3, alpha=1)
+        print("Agent  :", key)
+        print("Drift means : ", mean_drift_agent)
+        agent_counter += 1
+
+    ax.set_xticks(x_axis)
+    ax.set_xticklabels(start_interval+x_axis*reset_int)
+    ax.set_xlabel('Reset interval (in frames)')
+    ax.set_ylabel('Cumulative drift')
+    ax.legend()
+    ax.grid()
+    plt.show()
+    #plt.savefig("IRL_ucy001_drift.pdf")
+    #store the result in the form of a dictionary
+
+
+
+def hist_plot_drift_results(args, interval):
+
+
+    """
+    Plots the dirft results.
+        input: 
             #also takes in the following arguments from the command line
             1. args.start_interval
             2. args.end_interval
@@ -313,14 +533,15 @@ def plot_drift_results(args):
     #pdb.set_trace()
     for ped in ped_list:
 
-        if args.dataset=='UCY':
-            ped_index_list.append(get_index_from_pedid_university_student_dataset(int(ped)))
+        if args.dataset=='UCY003':
+            ped_index_list.append(get_index_from_pedid_university_students003_dataset(int(ped)))
+        if args.dataset=='UCY001':
+            ped_index_list.append(get_index_from_pedid_university_students001_dataset(int(ped)))
         if args.dataset=='Zara02':
             ped_index_list.append(get_index_from_pedid_zara_02(int(ped)))
         if args.dataset=='Zara01':
             ped_index_list.append(get_index_from_pedid_zara_01(int(ped)))
 
-    #pdb.set_trace()
     for i in range(len(key_list)):
 
         agent_type_list.append(key_list[i])
@@ -339,21 +560,34 @@ def plot_drift_results(args):
     #get the mean and std deviation of pedestrians from drift_lists
     _, ax = plt.subplots()
     agent_counter = 0
+    #pdb.set_trace()
+    #remove outliers 
+
+
     for key in master_drift_dict.keys():
+        #calculating for each of the involved agents
         agent_drift_info = master_drift_dict[key]
-        mean_drift = [np.mean(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
-        std_div_drift = [np.std(np.mean(agent_drift_info[:, i, :], axis=1)) for i in range(agent_drift_info.shape[1])]
-        #pdb.set_trace()
-        ax.errorbar(x_axis, mean_drift, yerr=std_div_drift, label=key,
-                    capsize=5, capthick=3, alpha=0.5)
+
+        
+        mean_drift_agent = []
+        std_drift_agent = []
+
+        #take the mean over all the seeds for all the pedestrians for the given
+        #interval
+        agent_mean_over_seeds = np.mean(agent_drift_info[:, interval, :], axis=1)
+
+        plt.hist(agent_mean_over_seeds, bins=10, label=key, alpha=0.4)
+        plt.draw()
+
         agent_counter += 1
-    ax.set_xticks(x_axis)
-    ax.set_xticklabels(start_interval+x_axis*reset_int)
-    ax.set_xlabel('Reset interval (in frames)')
-    ax.set_ylabel('Divergence from ground truth')
+        
+    #ax.set_xticks(x_axis)
+    #ax.set_xticklabels(start_interval+x_axis*reset_int)
+    ax.set_xlabel('Drift value')
+    ax.set_ylabel('No. of pedestrians')
     ax.legend()
     plt.show()
-
+    #store the result in the form of a dictionary
 
 
 def run_analysis(args):
