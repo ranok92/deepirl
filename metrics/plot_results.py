@@ -6,7 +6,7 @@ import pdb
 import numpy as np
 sys.path.insert(0,"..")
 from matplotlib import pyplot as plt 
-
+import matplotlib
 
 from metric_utils import read_files_from_directories
 parser = argparse.ArgumentParser()
@@ -31,11 +31,88 @@ parser.add_argument('--ped-file-list', nargs="*", type=str,
 parser.add_argument('--x-axis', type=str, default=None)
 parser.add_argument('--y-axis', type=str, default=None)
 
+
+color_map = {
+    "vasquez_F3": "plum",
+    "VasquezF3": "plum",
+    "vasquez_F1": "yellow",
+    "VasquezF1": "yellow",
+    "goal_conditioned_SAM": "chocolate",
+    "GoalConditionedFahad": "chocolate",
+    "Goal-augmented SAM": "chocolate",
+    "risk_features_smoothing": "steelblue",
+    "risk_features_no_smoothing": "steelblue",
+    "ground_truth": "purple",
+    "potential_field": "teal",
+    "risk_features_rl": "dodgerblue",
+    "Expert demonstrations": "C1",
+    "Goal-conditioned SAM": "chocolate",
+    "Ahad": "chocolate",
+    "Potential Field": "teal",
+    "Potential field": "teal",
+    "Risk-features(IRL)": "steelblue",
+    "Risk-features(RL)": "dodgerblue",
+    "Vasquez F1": "yellow",
+    "Vasquez F3": "plum",
+    "F1": "yellow",
+    "F3":"plum",
+    "Risk-features(ours)": "steelblue"
+    }
+
+label_map = {
+    "vasquez_F3": "F3",
+    "VasquezF3": "F3",
+    "vasquez_F1": "F1",
+    "VasquezF1": "F1",
+    "goal_conditioned_SAM": "Goal Conditioned SAM",
+    "GoalConditionedFahad": "Goal Conditioned SAM",
+    "Goal-augmented SAM": "Goal Conditioned SAM",
+    "risk_features_smoothing": "Risk Features (IRL)",
+    "risk_features_no_smoothing": "Risk Features (IRL)",
+    "ground_truth": "Ground Truth",
+    "potential_field": "Potential Field",
+    "risk_features_rl": "Risk Features(RL)",
+    "Expert demonstrations": "Ground Truth",
+    "Goal-conditioned SAM": "Goal Conditioned SAM",
+    "Ahad": "Goal Conditioned SAM",
+    "Potential Field": "Potential Field",
+    "Potential field": "Potential Field",
+    "Risk-features(IRL)": "Risk Features(IRL)",
+    "Risk-features(RL)": "Risk Features(RL)",
+    "Vasquez F1": "$\mathcal{F}$1",
+    "Vasquez F3": "$\mathcal{F}$3",
+    "F1": "$\mathcal{F}$1",
+    "F3": "$\mathcal{F}$3",
+    "Risk-features(ours)": "Risk Features (ours)"
+    }
+plt.style.use('seaborn-colorblind')
+
+matplotlib.rcParams.update({'lines.markeredgewidth': 1})
+matplotlib.rcParams.update({'errorbar.capsize': 2})
+plt.rcParams['axes.axisbelow'] = True
+#matplotlib.rcParams['pdf.fonttype'] = 42
+#matplotlib.rcParams['ps.fonttype'] = 42
+
+matplotlib.rcParams['text.usetex'] = True #Let TeX do the typsetting
+matplotlib.rcParams['text.latex.preamble'] = [r'\usepackage{sansmath}', r'\sansmath'] #Force sans-serif math mode (for axes labels)
+matplotlib.rcParams['font.family'] = 'sans-serif' # ... for regular text
+matplotlib.rcParams['font.sans-serif'] = 'Computer Modern Sans serif' # Choose a nice font here
+font_size=18
+matplotlib.rcParams['axes.labelsize']= font_size
+matplotlib.rcParams['axes.titlesize']= font_size
+matplotlib.rcParams['xtick.labelsize']=font_size
+matplotlib.rcParams['ytick.labelsize']=font_size
+matplotlib.rcParams['legend.fontsize']=font_size
+matplotlib.rcParams['xtick.major.pad']='8'
+matplotlib.rcParams['ytick.major.pad']='8'
+plt.rcParams["figure.figsize"] = (8,6.4)
+
 def read_data(list_of_files, ped_file_list):
     """
     Reads list of data files and pedlist files
     """
     master_dictionary_list = []
+    #list_of_files.sort()
     for agent_file in list_of_files:
         agent_dictionary_list = []
         for seed_file in agent_file:
@@ -332,10 +409,10 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
     '''    
     #plotting parameters
     bins = 200
-    alpha = 0.3
-    capsize = 20
+    alpha = 1
+    capsize = 5
 
-    x_axis = np.arange(len(list_of_dictionary))
+    x_axis_ticks = np.arange(len(list_of_dictionary))
     #pdb.set_trace()
     for info in range(metric_value_len):
         
@@ -366,15 +443,18 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         #print(np.nanmean(run_information_list[i][:, :, info], axis=1))
         #pdb.set_trace()
 
-        barlist = ax.bar(x_axis, mean_list, yerr=std_list, 
+        barlist = ax.bar(x_axis_ticks, mean_list, yerr=std_list, 
                         alpha=alpha, capsize=capsize, align='center')
-
+        i=0
         for bar in barlist:
-            bar.set_color(bar_color_list[i])
-            i = (i+1)%len(bar_color_list)
+            bar.set_color(color_map[list_of_agent_names[i]])
+            i = i+1
     
         if y_axis is not None:
             ax.set_ylabel(y_axis)
+        if x_axis is not None:
+            ax.set_xlabel(x_axis)
+
 
 
         #Create the storage dictionary
@@ -389,8 +469,10 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
         storage_dict['std_list'] = std_list
 
         comparing_agents = ''
+        x_tick_labels = []
         for agent in list_of_agent_names:
             comparing_agents += agent + '-'
+            x_tick_labels.append(label_map[agent])
 
         comparing_agents = comparing_agents[0:-1]
         filename_info_dict = "./numerical_results/"+ metric_name + "_ " +\
@@ -401,11 +483,12 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
             fp.close()
 
 
-        ax.set_xticks(x_axis)
-        ax.set_xticklabels(list_of_agent_names)
-        ax.yaxis.grid(True)
+        ax.set_xticks(x_axis_ticks)
+        ax.set_xticklabels(x_tick_labels)
+        #ax.yaxis.grid(True)
+        ax.grid()
         #set the y axis label
-        '''
+        
         y_label = ''
         if metric_name=='goal_reached':
             y_label = 'Fraction of runs reaching the goal'
@@ -417,10 +500,13 @@ def barplots_with_errorbars(list_of_dictionary, list_of_agent_names,
             y_label = 'Average number of collisions encountered per trajectory'
 
         plt.ylabel(y_label)
-        '''
+        
         #title = fig_title+metric_info[info]
         #ax.set_title(title)
         plt.show()
+        #save_filename = metric_name+ str(list_of_agent_names) + ".pdf"
+        #plt.savefig(save_filename)
+
         '''
         file_name = title+'.fig.pickle'
         file_name_eps = title+'.svg'
