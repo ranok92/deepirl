@@ -12,9 +12,9 @@ parser = ArgumentParser()
 parser.add_argument('--parent-folder', type=str, required=True)
 
 parser.add_argument('--ped-list', type=str, nargs="*", default=["/home/abhisek/Study/Robotics/deepirl/\
-envs/expert_datasets/university_students/data_info/ped_lists/ucy_easy.npy", 
-"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ped_lists/ucy_med.npy",
-"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ped_lists/ucy_hard.npy"],
+envs/expert_datasets/university_students/data_info/ucy003/ped_lists/ucy_003_easy.npy", 
+"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ucy003/ped_lists/ucy_003_med.npy",
+"/home/abhisek/Study/Robotics/deepirl/envs/expert_datasets/university_students/data_info/ucy003/ped_lists/ucy_003_hard.npy"],
                     help="Pedestrian list to work with.")
 
 parser.add_argument('--start-interval', type=int, default=30, help='The initial number of \
