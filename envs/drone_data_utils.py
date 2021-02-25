@@ -27,6 +27,11 @@ import pathlib
 import copy
 import json
 '''
+******************
+This file contains utility functions that help process annotation files 
+provided in the UCY dataset to useable information for the environment.
+******************
+
 information regarding datasets and annotations:
 ZARA DATASET:
     Video size : 720 × 576
@@ -46,15 +51,25 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_size = [576, 720]):
     '''
-    input:
-        list_of_ctrl_pts : path to the file containing the spline control points
-        frames : int containing the number of frame intervals to maintain
-        world_size : the size of the world on which to create the annotation file
+    Given the control points returns a dense array of all the in between points
+    the control points should be of the format for a SINGLE pedestrian:
+        frame number, ped_id, y_coord, x_coord
+
+    *Input*
+    :param list_of_ctrl_pts : path to the file containing the spline control points
+    :type list_of_ctrl_pts: list
+    
+    :param frames: int containing the number of frames to skip in between frames.
+                    1 means no skipping. 2 means skip every other frame etc.
+    :type frames: int
+    
+    :param world_size : the size of the world on which to create the annotation file
                      [rows, cols]
-    #given the control points returns a dense array of all the in between points
-    #the control points should be of the format 
-    #
-    #frame number, ped_id, y_coord, x_coord
+    *Output*
+    :var dense_val: list containing [[frame number, ped_id, y_coord, x_coord],[] ] for 
+                    each pedestrian at each frame
+    :var dense_val: list of list
+    
     '''
     x = []
     y = []
@@ -67,9 +82,9 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_s
     dense_val = []
 
     if len(list_of_ctrl_pts) > 0:
+        #read the spline points from the file
         for point in list_of_ctrl_pts:
 
-            #point_list = point.split(',')
             point_list = point
             x.append(float(point_list[3]))
             y.append(float(point_list[2]))
@@ -81,9 +96,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_s
             t.append(int(point_list[0]))
             ped_id = point_list[1]
 
-        #print('x :',x)
-        #print('y :',y)
-        #print('t :',t)
+ 
 
         if len(x) > k: #condition needed to be satisfied for proper interpolation
             tck, u = splprep([x,y], u=t, k=k)
@@ -97,6 +110,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_s
 
                 dense_val.append([t_dense[i], ped_id, y_dense[i], x_dense[i]])
         else:
+
             print('Discarding set of control points due to lack of control points.')
             return None
 
@@ -107,8 +121,7 @@ def get_dense_trajectory_from_control_points(list_of_ctrl_pts, frames=1, world_s
 def read_data_from_file(annotation_file, speed_multiplier=1,
                         rows=576, cols=720):
     '''
-
-    given a file_name read the f and convert that into a list.
+    Reads data from the annotation_file and converts that to a list
     
     The current format :
     x, y, frame_id, gaze_direction 
@@ -116,6 +129,28 @@ def read_data_from_file(annotation_file, speed_multiplier=1,
     Final format:
     frame_number, ped_id, y_coord, x_coord
     
+    Input:
+        - annotation_file: string
+                         file name (including location) of the annotation 
+    
+
+        - speed_multiplier: integer
+                            control the speed of the replay. Higher speed
+                            will make the pedestrians move faster by scaling 
+                            the frame rate of the playback
+
+        - rows, cols: integer
+                      size of the environment 
+    Output:
+        - processed_dict : dictionary
+                           Contains a list of [frame_number, ped_id, y_coord, x_coord]
+                           for all pedestrians indexed by pedestrian id
+                           {ped_1: [[frame_no . . .]
+                                    [frame_no . . .]]
+                            ped_2: [[frame_no . . .]
+                                    [frmae_no . . .]]
+                            }
+
     '''
     frame_x = cols
     frame_y = rows  
@@ -134,21 +169,34 @@ def read_data_from_file(annotation_file, speed_multiplier=1,
             prob_point_info = line.split(' - ')[0]
             if len(prob_point_info.split(' '))==4:
                 point_info = prob_point_info.split(' ')
-                processed_dict[ped_id].append([int(int(point_info[2])/speed_multiplier), ped_id, frame_y - (float(point_info[1])+diff_y), float(point_info[0])+diff_x])
+                processed_dict[ped_id].append([int(int(point_info[2])/speed_multiplier), 
+                                               ped_id, 
+                                               frame_y - (float(point_info[1])+diff_y), 
+                                               float(point_info[0])+diff_x])
             else:
                 ped_id += 1
                 processed_dict[ped_id] = []
 
 
     print('Reading complete')
-    #pdb.set_trace()
+
     return processed_dict
 
 
 def preprocess_data_from_stanford_drone_dataset(annotation_file):
     '''
+    Convert annotation files from the stanford drone dataset
+    to the format used by the environment and stores them in a 
+    text file.
     Final format:
-    frame_number, ped_id, y_coord, x_coord
+        frame_number, ped_id, y_coord, x_coord
+    Input:
+        - annotation_file: string
+                           name and location of the annotation file
+    
+    Output:
+        No output
+
     '''
     file_n = annotation_file+'_processed'+'.txt'
 
@@ -179,14 +227,25 @@ def preprocess_data_from_stanford_drone_dataset(annotation_file):
 def preprocess_data_from_control_points(annotation_file, speed_multiplier=1,
                                         frame=1, world_size=[720, 576]):
     '''
-    given a annotation file containing spline control points converts that 
-    to a frame-by-frame representation and writes that on a txt file with a easy to read format
-    input:
-        annotation_file : the path to the annotation file
-        frame : int, denoting the number of frames to skip between each entries of the 
+    Given an annotation file containing spline control points converts that 
+    to a frame-by-frame representation and writes that on a txt file in a format
+    usable by the drone environment.
+
+    Input:
+        - annotation_file : string
+                            the path to the annotation file
+                            
+        - frame : int
+                denoting the number of frames to skip between each entries of the 
                 final frame by frame representation
 
-        world_size : the size of the world [cols, rows]
+        - world_size : integer tuple
+                        the size of the world [cols, rows]
+
+    Output:
+        - dense_info_list : list 
+                            ordered list (by frame) containing the frame by frame representation 
+                            of all the pedestrians.
     '''
 
     file_name = annotation_file.strip().split('/')[-1].split('.')[0]
@@ -211,16 +270,12 @@ def preprocess_data_from_control_points(annotation_file, speed_multiplier=1,
         f.write("\n")
 
     for ped in extracted_dict.keys():
-            
-        #for i in range(len(extracted_dict[ped])):
-        #    print(extracted_dict[ped][i])
+
         dense_info = get_dense_trajectory_from_control_points(extracted_dict[ped], frame, world_size)
 
-        #for i in range(len(dense_info)):
-        #    print(dense_info[i])
-
-
+        #write the obtained trajectory into a file
         with open(file_n, 'a') as f:
+
             if dense_info is not None:
                 for info in dense_info:
                     dense_info_list.append(info)
@@ -234,7 +289,19 @@ def preprocess_data_from_control_points(annotation_file, speed_multiplier=1,
 
 def extract_expert_speed_orientation(current_state):
     '''
-    get the angle between the goal and the current orientation and the speed
+    Get the angle between the goal and the current orientation and the speed
+    from the state of the environment
+
+    Input:
+        - current_state: dictionary
+                        State dictionary returned from the environment
+                        Check the environment files for more information
+    Output:
+        - signed_angle_between: float
+                                The signed angle between the goal and the 
+                                orientation of the agent
+        - speed: float
+                Speed of the agent
     '''
     ref_vector = np.array([-1, 0])
     agent_orientation = current_state['agent_state']['orientation']
@@ -256,6 +323,7 @@ def extract_expert_speed_orientation(current_state):
     speed = current_state['agent_state']['speed']
 
     return np.asarray([signed_angle_between, speed])
+
 
 
 def extract_expert_action(next_state, current_state, 
@@ -302,12 +370,7 @@ def extract_expert_action(next_state, current_state,
     orient_action = min(max(angle_btwn_div, 
                         -int(orientation_array_len/2)),
                         int(orientation_array_len/2)) + int(orientation_array_len/2)
-    '''
-    print('Current orientation :', current_orientation)
-    print('Next orientation :', next_orientation)
-    print('Angle between :', signed_angle_between)
-    '''
-    #pdb.set_trace()
+
     
     change_in_speed = next_state['agent_state']['speed'] - \
                       current_state['agent_state']['speed']
@@ -315,45 +378,68 @@ def extract_expert_action(next_state, current_state,
     change_in_speed_div = int(change_in_speed/speed_div_size)
 
     speed_action = min(max(int(change_in_speed/speed_div_size), 
-                        -int(speed_array_len/2)),
-                        int(speed_array_len/2)) + int(speed_array_len/2)
+                           -int(speed_array_len/2)),
+                       int(speed_array_len/2)) + int(speed_array_len/2)
 
-    '''
-    print('Change in orientation  :{}, change in speed : {}'.format(angle_btwn,
-                                                                        change_in_speed))
+    action = (speed_action*orientation_array_len)+orient_action
 
-    print('Change in orientation division  :{}, change in speed division: {}'.format(angle_btwn_div,
-                                                                        change_in_speed_div))
-
-    print('Orientation action  :{}, speed : {}'.format(orient_action,
-                                                      speed_action))
-    '''
-
-    return (speed_action*orientation_array_len)+orient_action
+    return action
 
 
 
 def extract_trajectory(annotation_file, 
                        folder_to_save, 
                        feature_extractor=None, 
-                       display=False, 
                        extract_action=False,
-                       show_states=False, subject=None, 
+                       display=False, subject=None, 
                        trajectory_length_limit=None):
+    '''
+    Extract trajectories traced by the pedestrians described by an annotation file 
+    The trajectories comprises of features extracted from the states encountered by 
+    the pedestrians 
 
+    Input:
+        - annotation_file: string
+        - folder_to_save: string
+                         Location to save the extraced trajectories
+        - feature_extractor: Object of a feature extractor class
+                            Feature extractor to use on the states to 
+                            form the trajectory
+
+        - extract_action: bool
+                          Flag to enable the estimation of the action taken 
+                          by the pedestrian at different frames
+        - display: bool 
+                   Flag to render the environment
+
+        - subject: integer
+                    Id of a specific pedestrian for trajectory extraction
+        - trajectory_length_limit: integer
+                                 If provided, breaks the trajectory of a pedestrian in to 
+                                 segments of the stipulated length
+
+
+
+    '''
 
     if not os.path.exists(folder_to_save):
         os.makedirs(folder_to_save)
+
+
+    #set the frame interval considered to estimate expert action
+    #e.g. if lag_val == 8 then the position and speed from the every
+    #8th frame will be used to calculate the action of the agent
+    #if the value is too small, say 1, the very minute changes in the 
+    #orientation and speed of the agent goes undetected
 
     lag_val = 8
     
     tick_speed = 60
     subject_list = extract_subjects_from_file(annotation_file)
     print(subject_list)
-    disp = display
     total_path_len = 0
 
-    if show_states:
+    if display:
             tick_speed = 5
             disp = True
             
@@ -372,7 +458,9 @@ def extract_trajectory(annotation_file,
                         width=10)
 
 
-    default_action = int(len(world.speed_array)/2)*int(len(world.orientation_array))+int(len(world.orientation_array)/2)
+    #the default action is to maintain the current orientation and speed
+    default_action = int(len(world.speed_array)/2)*int(len(world.orientation_array))+ \
+                     int(len(world.orientation_array)/2)
     
     
     default_action = torch.tensor(default_action)
@@ -408,9 +496,6 @@ def extract_trajectory(annotation_file,
         while world.current_frame < cur_subject_final_frame:
             state, _, _, _ = world.step()
             step_counter_segment += 1
-            #step_counter_trajectory += 1 
-            #if disp:
-            #    feature_extractor.overlay_bins(state)
 
             if extract_action:
                 
@@ -421,9 +506,7 @@ def extract_trajectory(annotation_file,
                                             len(world.orientation_array),
                                             world.speed_quantization,
                                                 len(world.speed_array))
-                    '''
-                    action = extract_expert_speed_orientation(state)
-                    '''
+
                     old_state = copy.deepcopy(state)
                     action = torch.tensor(action)
                     action_info.append(action)
@@ -438,6 +521,7 @@ def extract_trajectory(annotation_file,
                 state = feature_extractor.extract_features(state)
                 state = torch.tensor(state)
             trajectory_info.append(copy.deepcopy(state))
+            
             if trajectory_length_limit is not None:
 
                 if step_counter_segment%traj_seg_length == 0:
@@ -447,7 +531,8 @@ def extract_trajectory(annotation_file,
                     print('Length of next path :', traj_seg_length)
 
                     #change the goal position
-                    world.goal_state = copy.deepcopy(world.return_position(world.cur_ped, world.current_frame + traj_seg_length)['position'])        
+                    world.goal_state = copy.deepcopy(world.return_position(world.cur_ped,
+                                                                           world.current_frame + traj_seg_length)['position'])        
                     world.state['goal_state'] = copy.deepcopy(world.goal_state) 
                     print('Trajectory length : ', len(trajectory_info))
 
@@ -457,10 +542,12 @@ def extract_trajectory(annotation_file,
                                 os.path.join(folder_to_save, 
                                         'traj_of_sub_{}_segment{}.states'.format(str(sub), 
                                         str(segment_counter))))
+
                     else:
                         with open('traj_of_sub_{}_segment{}.states'.format(str(sub), 
                                   str(segment_counter)), 'w') as fout:
                             json.dump(trajectory_info, fout)
+                    #save the actions if asked for        
                     if extract_action:
 
                         acton_tensors = torch.stack(action_info)
@@ -521,7 +608,17 @@ def extract_trajectory(annotation_file,
 
 
 def extract_subjects_from_file(annotation_file):
+    '''
+    Get the pedestrian ids present in a given annotation file
+    Input:
+        - annotation_file : string
+                            Annotation file name + location
 
+    Output:
+        - sub_list : set
+                     Set of pedestrian ids in the annotation file
+
+    '''
     sub_list = []
     print('The annotation file :', annotation_file)
     if not os.path.isfile(annotation_file):
@@ -540,7 +637,21 @@ def extract_subjects_from_file(annotation_file):
 
 def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list=None):
     '''
-    Let user play in an environment simulated from the data taken from a dataset
+    Lets the user control an agent in the environment 
+    and record. Records both states and actions and stores them in the path provided.
+    Input:
+        - num_of_trajs : integer
+                        No. of trajectories to record
+        - env : environment object
+        - feature_extractor : Object of any feature extractor class
+        - path : string
+                 Path to store the extracted states and actions
+        - subject_list : python list
+                         List of pedestrian ids to replace with the agent
+                         at the start of an episode
+
+    Output:
+        N/A
     '''
 
     i = 0
@@ -573,32 +684,16 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
                 actions.append(action)
             next_state, reward, done, _ = env.step(action)
             run_reward += reward 
-            '''
-            if reward != 0:
-                print('current_reward :', reward)
-                print('Run reward :', run_reward)
-            '''
             next_state = feature_extractor.extract_features(next_state)
-            #print('state dim :', next_state.shape)
-            #for variants of localglobal
-            #print(next_state[-window_size**2:].reshape(window_size,window_size))
-            
-            #for fbs simple
-            #print(next_state[12:].reshape(3,4))
+
             if record_flag:
-                '''
-                print(done)
-                print(next_state[0:9].reshape(3,3))
-                print(next_state[9:18].reshape(3,3))
-                print(next_state[18:])
-                '''
-                #print('Action taken :', action)
+
                 states.append(torch.from_numpy(next_state))
-                #print('not recording')
 
         print('Run reward :',run_reward)
 
-
+        #discard trajectories that fall below a certain threshold 
+        #based on a classical navigation metric
         if run_reward >= .90:
 
             avg_len += len(states)
@@ -622,11 +717,16 @@ def record_trajectories(num_of_trajs, env, feature_extractor, path, subject_list
 
 def get_expert_trajectory_info(expert_trajectory_folder):
     '''
-    given the expert trajectory folder, this fuctions reads the folder and 
+    Given the expert trajectory folder, this fuctions reads the folder and 
     publishes the following information
     1. The dimension of the states present in the trajectory.
     2. The length of the trajectories.
     3. The avg length of the trajectories.
+    Input:
+        - expert_trajectory_folder: string
+                                    Path to the expert trajectories
+    Output:
+        N/A
     '''
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -639,6 +739,7 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     avg_speed = np.zeros(6)
     min_len = 10000
     max_len = -1
+
     for idx, trajectory in enumerate(trajectories):
         print('The trajectory filename :', trajectory)
         traj = torch.load(trajectory, map_location=DEVICE)
@@ -657,9 +758,8 @@ def get_expert_trajectory_info(expert_trajectory_folder):
             min_len = traj_np.shape[0]
         if max_len < traj_np.shape[0]:
             max_len = traj_np.shape[0]
-        #pdb.set_trace()
 
-    pdb.set_trace()
+
     print('Total number of trajectories :', len(trajectories))
     print('Average speed :', total_avg_speed/len(trajectories))
     print("Min length :", min_len)
@@ -667,13 +767,27 @@ def get_expert_trajectory_info(expert_trajectory_folder):
     print('Average len of trajectories :', total_len/len(trajectories))
 
 
-def get_pedestrians_in_viscinity(state, viscinity):
+def get_pedestrians_in_viscinity(state, vicinity):
+    '''
+    Given a state and a proximity threshold, calculates the number of pedestrians 
+    that violate it.
 
+    Input:
+        - state : python dict
+                  State of the environment
+        - vicinity : float
+                     Proximity threshold (in pixels)
+
+    Output:
+        - counter : integer
+                    Number of pedestrians that violate the 
+                    proximity threshold
+    '''
     counter = 0
     for obs in state['obstacles']:
 
         dist = np.linalg.norm(obs['position']-state['agent_state']['position'], 1)
-        if dist < viscinity:
+        if dist < vicinity:
             counter += 1
 
     return counter
@@ -682,7 +796,20 @@ def get_pedestrians_in_viscinity(state, viscinity):
 
 def classify_pedestrians(annotation_file, viscinity):
     '''
-    reads the annotation file and spits out important stats about the data
+    Reads the annotation file and divides the pedestrians described within into 3 different
+    categories based on the number of pedestrians in their vicinity.
+    Input:
+        - annoptation_file : string
+        - vicinity : float
+                     Proximity threshold (in pixels)
+    Output:
+
+         - easy_arr, 
+           medium_arr, 
+           hard_arr : numpy array
+                     List of pedestrians belonging to the different
+                     categories.
+
     '''
 
     tick_speed = 30
@@ -706,7 +833,6 @@ def classify_pedestrians(annotation_file, viscinity):
         if subject_list[i+1] - subject_list[i] !=1:
             print(subject_list[i])
 
-    pdb.set_trace()
     avg_ped_per_subject = []
     for subject in subject_set:
         print(' Subject :', subject)
@@ -777,7 +903,6 @@ def classify_pedestrians(annotation_file, viscinity):
 
     plt.show()
 
-    pdb.set_trace()
     easy_arr = subject_array[0:easy_cutoff]
     medium_arr = subject_array[easy_cutoff:med_cutoff]
     hard_arr = subject_array[med_cutoff:]
@@ -838,58 +963,6 @@ def read_training_data(parent_folder):
 
     return output_tensor
 
-
-
-def group_pedestrians_from_trajectories(trajectory_folder,
-                                         proximity_threshold=45,
-                                         temporal_threshold=0.45):
-    
-    '''
-    Returns 2 dictionaries where:
-    dictionary 1 stores the group information of each pedestrian.
-        (key : value ) - (ped-id : [group])
-    
-    dictionary 2 stores the group information of each group
-        (key : value) - (group-id : [ped id of the peds in the group])
-
-    dictionary 3 stores the classification information of each pedestrian,
-    stating if they are solo or not
-        (key : value) - (ped-id : 1/0 [based on group or solo])
-    '''
-
-    assert os.path.isdir(trajectory_folder), "bad folder path"
-
-    trajectories = glob.glob(os.path.join(trajectory_folder, '*.states.npy'))
-    trajectory_group_info_dict = {}
-
-    missing_peds = []
-    ped_index = 1
-    for trajectory in trajectories:
-
-        file_name = trajectory.split('/')[-1]
-        ped_id = file_name.strip().split('_')[3]
-        
-        if ped_id!=ped_index:
-            pdb.set_trace()
-            missing_ped.append(ped_index)
-            ped_index += 1
-        '''
-        group_info = find_pedestrian_group(trajectory, 
-                                              proximity_threshold=proximity_threshold,
-                                              temporal_threshold=temporal_threshold)
-        
-        trajectory_group_info_dict[ped_id] = group_info
-        '''
-    
-    #create the second dictionary
-    classification_info = {}
-    for key in trajectory_group_info_dict.keys():
-        if len(trajectory_group_info_dict[key])>0:
-            classification_info[key] = 1
-        else:
-            classification_info[key] = 0
-    
-    return trajectory_group_info_dict, classification_info
 
 
 def get_index_from_pedid_university_students001_dataset(ped_id):
@@ -1019,6 +1092,12 @@ def stitch_annotation_files(annotation_file_list):
     '''
     Given a list of annotation files, appends them one after the other 
     in the order provided in the list
+    Input:
+        - annotation_file_list : python list
+                                 List of annotation files to be stitched
+
+    Output:
+        N/A
     '''
     frame_offset = 0
     ped_id_offset = 0
@@ -1049,7 +1128,8 @@ def stitch_annotation_files(annotation_file_list):
                           \nped_offset : {}, frame_offset : {}".format(ped_id, frame_id, 
                                                                        updated_ped_id, updated_frame_id,
                                                                        ped_id_offset, frame_offset))
-                    #pdb.set_trace()
+
+
                     new_line = "{} {} {} {} \n".format(str(updated_frame_id), 
                                                        str(updated_ped_id),
                                                        loc_x,
